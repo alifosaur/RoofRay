@@ -61,26 +61,6 @@ export const Navbar: React.FC<NavbarProps> = ({ appName, onToggleHomeMenu, isHom
 
       {/* Right: Systray */}
       <div className="flex items-center space-x-3">
-        {/* Quick Links: Website & Tech Mobile PWA */}
-        <Link
-          to="/"
-          className="text-xs px-2 py-1 rounded bg-white/10 hover:bg-white/20 flex items-center gap-1.5 transition-colors"
-          title="Customer Website"
-        >
-          <FontAwesomeIcon icon={faGlobe} />
-          <span className="hidden sm:inline">Website</span>
-        </Link>
-
-        <Link
-          to="/pwa/tech"
-          className="text-xs px-2 py-1 rounded bg-odoo-accent hover:bg-odoo-accent-dark flex items-center gap-1.5 transition-colors font-medium"
-          title="Technician Mobile View"
-        >
-          <FontAwesomeIcon icon={faMobileAlt} />
-          <span className="hidden sm:inline">Tech PWA</span>
-        </Link>
-
-
         <NotificationBell />
 
         {/* User Avatar & Logged-in User Profile Dropdown */}

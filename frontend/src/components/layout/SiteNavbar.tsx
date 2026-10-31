@@ -161,10 +161,10 @@ export const SiteNavbar: React.FC = () => {
                 Login / Register
               </Link>
               <Link
-                to="/#book-call"
+                to="/packages"
                 className="hidden sm:inline-flex items-center justify-center bg-[#6B4B63] hover:bg-[#583D51] text-white text-[14px] font-medium px-4 py-2 rounded transition-colors shadow-xs"
               >
-                Book a Call
+                Explore Packages
               </Link>
             </div>
           )}

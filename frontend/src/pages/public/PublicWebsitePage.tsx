@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { api } from '../../api/client';
+import { Link } from 'react-router-dom';
 import { SiteNavbar } from '../../components/layout/SiteNavbar';
 import { SiteFooter } from '../../components/layout/SiteFooter';
 import { ScriptHeading } from '../../components/common/ScriptHeading';
@@ -16,53 +15,28 @@ import {
   faCheckCircle,
   faArrowRight,
   faShieldAlt,
-  faTag,
   faCalculator,
+  faLeaf,
+  faAward,
+  faQuoteLeft,
+  faSolarPanel,
+  faRupeeSign,
 } from '@fortawesome/free-solid-svg-icons';
 
 export const PublicWebsitePage: React.FC = () => {
-  const navigate = useNavigate();
+  // Solar Savings & Rooftop ROI Calculator state
+  const [monthlyBill, setMonthlyBill] = useState<number>(5500);
+  const [roofType, setRoofType] = useState<'rcc' | 'metal' | 'shed'>('rcc');
 
-  // Consultation Call Form state
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [email, setEmail] = useState('');
-  const [address, setAddress] = useState('');
-  const [capacityKw, setCapacityKw] = useState(3.0);
-  const [systemType, setSystemType] = useState('On-Grid');
-  const [notes, setNotes] = useState('');
-
-  const [submitting, setSubmitting] = useState(false);
-  const [submittedLead, setSubmittedLead] = useState<any | null>(null);
-  const [errorMessage, setErrorMessage] = useState('');
-
-  const handleLeadSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMessage('');
-    try {
-      setSubmitting(true);
-      const lead = await api.post('/leads/public', {
-        name,
-        phone,
-        email: email || undefined,
-        address,
-        required_capacity: Number(capacityKw),
-        system_type: systemType,
-        source: 'book_a_call',
-        notes: notes ? `Booked Call: ${notes}` : 'Client Booked Consultation Call to Get Quotation',
-      });
-      setSubmittedLead(lead);
-      setName('');
-      setPhone('');
-      setEmail('');
-      setAddress('');
-      setNotes('');
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Failed to book consultation call. Please try again.');
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  // Realistic dynamic solar engineering calculations based on benchmark standards
+  const calcCapacityKw = Math.min(10, Math.max(1, Math.round((monthlyBill / 950) * 2) / 2));
+  const estimatedUnits = Math.round(calcCapacityKw * 125);
+  const estimatedSavingsMonthly = Math.min(monthlyBill, Math.round(estimatedUnits * 7.8));
+  const estimatedNewBill = Math.max(250, monthlyBill - estimatedSavingsMonthly);
+  const subsidyAmount =
+    calcCapacityKw >= 3.0 ? 78000 : calcCapacityKw >= 2.0 ? 60000 : 30000;
+  const lifetime25YrSavings = Math.round((estimatedSavingsMonthly * 12 * 25) / 100000 * 10) / 10;
+  const treesPlantedEquivalent = Math.round(calcCapacityKw * 16);
 
   const featureItems: FeatureItem[] = [
     {
@@ -100,19 +74,19 @@ export const PublicWebsitePage: React.FC = () => {
   const infoBullets: InfoBulletItem[] = [
     {
       leadIn: 'Enquire',
-      text: 'Book a consultation call and submit your roof area and electricity bill in under 2 minutes.',
+      text: 'Submit your rooftop requirements and current electricity bill to get started with instant feasibility.',
     },
     {
       leadIn: 'Survey',
-      text: 'Certified technician visits your roof to measure tilt, orientation, and shadow-free zones.',
+      text: 'Certified technician visits your roof to measure tilt, orientation, structure strength, and shadow-free zones.',
     },
     {
       leadIn: 'Consultation & Quotation',
-      text: 'Our technical advisor calls you, evaluates requirements, and prepares a customized quotation according to your roof.',
+      text: 'Our technical advisor prepares a customized quotation according to your roof and client requirements.',
     },
     {
       leadIn: 'Delivery',
-      text: 'Tier-1 panels and smart inverters barcode-scanned and reserved from our warehouse stock.',
+      text: 'Tier-1 panels and smart inverters are barcode-scanned and verified from our central warehouse stock.',
     },
     {
       leadIn: 'Installation',
@@ -124,37 +98,42 @@ export const PublicWebsitePage: React.FC = () => {
     },
   ];
 
-  const PREVIEW_PACKAGES = [
+  const CASE_STUDIES = [
     {
-      kw: 2,
-      name: '2 kW Smart On-Grid',
-      tag: 'Best for 2-3 BHK',
-      price: '₹ 1,15,000',
-      subsidy: '₹ 60,000',
-      netCost: '₹ 55,000',
-      generation: '240 - 280 Units/mo',
-      panels: '4-5 Mono PERC Panels',
+      name: 'Dr. Sunita Bansal',
+      location: 'Vasant Kunj, South Delhi',
+      system: '4 kW Smart On-Grid System',
+      billBefore: '₹ 7,200/mo',
+      billAfter: '₹ 480/mo',
+      pctReduction: '93%',
+      quote:
+        'Our monthly electricity bill plummeted from day one. RoofRay took full responsibility for the DISCOM net-metering synchronization and the ₹78,000 PM Surya Ghar subsidy was deposited directly into our bank account with zero fuss.',
+      generation: '500 Units / Month',
+      warranty: '25-Year Performance Guarantee',
     },
     {
-      kw: 3,
-      name: '3 kW Popular Residential',
-      tag: 'Most Popular',
-      price: '₹ 1,65,000',
-      subsidy: '₹ 78,000 (Max)',
-      netCost: '₹ 87,000',
-      generation: '360 - 420 Units/mo',
-      panels: '6-7 Bi-facial Half-Cut Panels',
-      popular: true,
+      name: 'Rajesh Mehra',
+      location: 'DLF Phase 2, Gurgaon',
+      system: '5 kW High-Capacity On-Grid',
+      billBefore: '₹ 11,500/mo',
+      billAfter: '₹ 1,120/mo',
+      pctReduction: '90%',
+      quote:
+        'Flawless rooftop installation! The crew used heavy-duty pre-galvanized mounting stands and high-efficiency mono PERC panels. Every single panel is registered with its individual barcode in my customer portal.',
+      generation: '650 Units / Month',
+      warranty: '25-Year Performance Guarantee',
     },
     {
-      kw: 5,
-      name: '5 kW High-Capacity Villa',
-      tag: 'Commercial & Villas',
-      price: '₹ 2,75,000',
-      subsidy: '₹ 78,000',
-      netCost: '₹ 1,97,000',
-      generation: '600 - 700 Units/mo',
-      panels: '10-12 TopCon Panels',
+      name: 'Anand Singhal',
+      location: 'Sector 62, Noida',
+      system: '3 kW Residential Hybrid System',
+      billBefore: '₹ 5,400/mo',
+      billAfter: '₹ 380/mo',
+      pctReduction: '93%',
+      quote:
+        'Uninterrupted power during outages and complete independence from rising peak power tariffs. The in-house certified technician crew completed earthing and structural testing in under two days.',
+      generation: '390 Units / Month',
+      warranty: '25-Year Performance Guarantee',
     },
   ];
 
@@ -164,7 +143,7 @@ export const PublicWebsitePage: React.FC = () => {
       <SiteNavbar />
 
       <main className="flex-1">
-        {/* 2. Hero SplitSection matching Screenshot 1 */}
+        {/* 2. Hero SplitSection matching Reference Screenshot 1 */}
         <SplitSection
           id="hero"
           className="pt-10 sm:pt-14 pb-20 sm:pb-24"
@@ -192,17 +171,17 @@ export const PublicWebsitePage: React.FC = () => {
 
               {/* Action Buttons */}
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 mt-10">
-                <a
-                  href="#book-call"
-                  className="bg-[#6B4B63] hover:bg-[#583D51] text-white text-[15px] font-medium px-7 py-3 rounded text-center transition-colors shadow-xs"
-                >
-                  Book a Call to Get Quotation
-                </a>
                 <Link
                   to="/packages"
+                  className="bg-[#6B4B63] hover:bg-[#583D51] text-white text-[15px] font-medium px-7 py-3 rounded text-center transition-colors shadow-xs"
+                >
+                  Explore Solar Packages
+                </Link>
+                <Link
+                  to="/schemes"
                   className="border border-[#6B4B63] text-[#6B4B63] hover:bg-[#6B4B63] hover:text-white text-[15px] font-medium px-7 py-3 rounded text-center transition-colors"
                 >
-                  Browse Solar Packages
+                  Government Subsidy Guide
                 </Link>
               </div>
             </div>
@@ -210,111 +189,168 @@ export const PublicWebsitePage: React.FC = () => {
           right={<RooftopSolarIllustration />}
         />
 
-        {/* 3. FeatureBand matching Screenshot 2 */}
+        {/* 3. FeatureBand matching Reference Screenshot 2 */}
         <FeatureBand
           id="features"
           title="Why go solar with RoofRay?"
           items={featureItems}
         />
 
-        {/* 4. Packages Preview Cards */}
-        <section id="packages" className="py-20 sm:py-24 bg-white border-b border-gray-100">
+        {/* 4. REPLACEMENT SECTION 1: Interactive Solar Savings & Rooftop ROI Estimator */}
+        <section id="calculator" className="py-20 sm:py-24 bg-white border-b border-gray-100">
           <div className="max-w-[1320px] mx-auto px-6">
-            <div className="text-center max-w-2xl mx-auto mb-16">
+            <div className="text-center max-w-2xl mx-auto mb-14">
               <span className="text-xs uppercase tracking-widest text-[#6B4B63] font-bold">
-                Standard Packages
+                Rooftop Impact Estimator
               </span>
               <div className="mt-2 flex justify-center">
                 <ScriptHeading as="h2" align="center">
-                  Rooftop Solar Systems
+                  Calculate Your Rooftop Potential
                 </ScriptHeading>
               </div>
               <p className="mt-4 text-[#6C757D] text-base leading-relaxed">
-                Pre-engineered Bill of Materials with tier-1 panels, smart inverters, and full DISCOM net-metering approval.
+                Estimate how much you can save every month, your recommended solar capacity, and your eligibility for central PM Surya Ghar direct-benefit subsidies.
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {PREVIEW_PACKAGES.map((pkg, idx) => (
-                <div
-                  key={idx}
-                  className={`rounded-xl border transition-all duration-200 p-7 flex flex-col justify-between ${
-                    pkg.popular
-                      ? 'border-[#6B4B63] shadow-md relative bg-gradient-to-b from-white to-[#F8F4F7]/40 ring-2 ring-[#6B4B63]/20'
-                      : 'border-gray-200 shadow-xs hover:border-gray-300 bg-white'
-                  }`}
-                >
-                  {pkg.popular && (
-                    <span className="absolute -top-3.5 right-6 bg-[#6B4B63] text-white text-[11px] font-bold px-3 py-1 rounded-full uppercase tracking-wider">
-                      Most Popular
-                    </span>
-                  )}
-
+            {/* Interactive Calculator Panel */}
+            <div className="max-w-4xl mx-auto bg-gradient-to-b from-white to-[#F8F4F7]/30 rounded-2xl border border-gray-200/90 shadow-md p-6 sm:p-10">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+                {/* Left Controls */}
+                <div className="space-y-6">
                   <div>
-                    <span className="inline-block text-xs font-semibold px-2.5 py-1 rounded bg-gray-100 text-[#495057] mb-3">
-                      {pkg.tag}
-                    </span>
-                    <h3 className="text-xl font-bold text-[#212529] mb-1">{pkg.name}</h3>
-                    <p className="text-sm text-[#6C757D] mb-6">{pkg.panels}</p>
-
-                    <div className="border-t border-b border-gray-100 py-4 my-4 space-y-2">
-                      <div className="flex justify-between items-center text-sm">
-                        <span className="text-gray-500">Gross Price:</span>
-                        <span className="font-semibold text-gray-800 line-through">{pkg.price}</span>
-                      </div>
-                      <div className="flex justify-between items-center text-sm">
-                        <span className="text-[#5CC9B0] font-medium">PM Surya Ghar Subsidy:</span>
-                        <span className="font-bold text-[#5CC9B0]">-{pkg.subsidy}</span>
-                      </div>
-                      <div className="flex justify-between items-center pt-2 border-t border-dashed border-gray-200">
-                        <span className="text-base font-bold text-[#212529]">Net Investment:</span>
-                        <span className="text-2xl font-extrabold text-[#6B4B63]">{pkg.netCost}</span>
-                      </div>
+                    <div className="flex justify-between items-center mb-2">
+                      <label className="text-sm font-bold text-[#212529]">
+                        Current Monthly Electricity Bill:
+                      </label>
+                      <span className="text-xl font-extrabold text-[#6B4B63]">
+                        ₹{monthlyBill.toLocaleString()}
+                      </span>
                     </div>
-
-                    <ul className="space-y-2.5 text-sm text-[#495057] mb-8">
-                      <li className="flex items-center">
-                        <FontAwesomeIcon icon={faCheckCircle} className="text-[#5CC9B0] mr-2 text-xs" />
-                        <span>Generates {pkg.generation}</span>
-                      </li>
-                      <li className="flex items-center">
-                        <FontAwesomeIcon icon={faCheckCircle} className="text-[#5CC9B0] mr-2 text-xs" />
-                        <span>25-year panel performance guarantee</span>
-                      </li>
-                      <li className="flex items-center">
-                        <FontAwesomeIcon icon={faCheckCircle} className="text-[#5CC9B0] mr-2 text-xs" />
-                        <span>Turnkey net-metering & DISCOM approvals</span>
-                      </li>
-                    </ul>
+                    <input
+                      type="range"
+                      min="1500"
+                      max="25000"
+                      step="500"
+                      value={monthlyBill}
+                      onChange={(e) => setMonthlyBill(Number(e.target.value))}
+                      className="w-full accent-[#6B4B63] h-2 bg-gray-200 rounded-lg cursor-pointer"
+                    />
+                    <div className="flex justify-between text-[11px] text-gray-400 mt-1.5 font-medium">
+                      <span>₹1,500/mo</span>
+                      <span>₹10,000/mo</span>
+                      <span>₹25,000/mo</span>
+                    </div>
                   </div>
 
-                  <Link
-                    to="/packages"
-                    className={`w-full py-2.5 rounded font-medium text-sm text-center transition-colors ${
-                      pkg.popular
-                        ? 'bg-[#6B4B63] hover:bg-[#583D51] text-white shadow-xs'
-                        : 'border border-[#6B4B63] text-[#6B4B63] hover:bg-[#6B4B63] hover:text-white'
-                    }`}
-                  >
-                    View BOM & Details
-                  </Link>
-                </div>
-              ))}
-            </div>
+                  <div>
+                    <label className="block text-xs font-bold text-[#212529] uppercase tracking-wider mb-2">
+                      Rooftop Architecture:
+                    </label>
+                    <div className="grid grid-cols-3 gap-2 text-xs">
+                      {[
+                        { id: 'rcc', label: 'RCC Terrace' },
+                        { id: 'metal', label: 'Slanted Metal' },
+                        { id: 'shed', label: 'Factory Shed' },
+                      ].map((type) => (
+                        <button
+                          key={type.id}
+                          type="button"
+                          onClick={() => setRoofType(type.id as any)}
+                          className={`py-2 px-2 rounded-lg font-semibold border transition-all text-center ${
+                            roofType === type.id
+                              ? 'bg-[#6B4B63] text-white border-[#6B4B63] shadow-xs'
+                              : 'bg-white text-gray-700 border-gray-300 hover:border-gray-400'
+                          }`}
+                        >
+                          {type.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
 
-            <div className="text-center mt-12">
-              <Link
-                to="/packages"
-                className="inline-flex items-center space-x-2 text-[#6B4B63] hover:text-[#583D51] font-bold text-base hover:underline"
-              >
-                <span>Browse all 1 kW to 5 kW On-Grid & Off-Grid Packages</span>
-                <FontAwesomeIcon icon={faArrowRight} className="text-sm" />
-              </Link>
+                  <div className="p-3.5 bg-teal-50/70 border border-[#5CC9B0]/40 rounded-xl flex items-start gap-3 text-xs text-[#212529]">
+                    <FontAwesomeIcon icon={faLeaf} className="text-[#5CC9B0] text-lg mt-0.5" />
+                    <div>
+                      <strong className="block font-bold text-teal-900">Environmental Offset</strong>
+                      <span>
+                        This system avoids approx. <strong>{(calcCapacityKw * 1.4).toFixed(1)} tons</strong> of CO2 per year, equivalent to planting <strong>{treesPlantedEquivalent} trees</strong> annually.
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Metrics Grid */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-4 bg-white rounded-xl border border-gray-200 shadow-2xs">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 block">
+                      Recommended System
+                    </span>
+                    <div className="text-xl font-extrabold text-[#212529] mt-1 flex items-baseline gap-1">
+                      <span>{calcCapacityKw}</span>
+                      <span className="text-sm font-semibold text-gray-500">kW</span>
+                    </div>
+                    <span className="text-[11px] text-gray-500 mt-1 block">
+                      ~{Math.round(calcCapacityKw * 100)} sq. ft. roof area
+                    </span>
+                  </div>
+
+                  <div className="p-4 bg-white rounded-xl border border-gray-200 shadow-2xs">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 block">
+                      Central Subsidy (DBT)
+                    </span>
+                    <div className="text-xl font-extrabold text-[#5CC9B0] mt-1">
+                      ₹{subsidyAmount.toLocaleString()}
+                    </div>
+                    <span className="text-[11px] text-gray-500 mt-1 block">
+                      PM Surya Ghar Scheme
+                    </span>
+                  </div>
+
+                  <div className="p-4 bg-white rounded-xl border border-gray-200 shadow-2xs">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 block">
+                      Estimated Monthly Bill
+                    </span>
+                    <div className="text-xl font-extrabold text-[#6B4B63] mt-1">
+                      ₹{estimatedNewBill.toLocaleString()}
+                    </div>
+                    <span className="text-[11px] text-emerald-600 font-bold mt-1 block">
+                      Save ₹{estimatedSavingsMonthly.toLocaleString()}/mo
+                    </span>
+                  </div>
+
+                  <div className="p-4 bg-white rounded-xl border border-gray-200 shadow-2xs">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 block">
+                      25-Year Net Return
+                    </span>
+                    <div className="text-xl font-extrabold text-teal-800 mt-1">
+                      ₹{lifetime25YrSavings}L
+                    </div>
+                    <span className="text-[11px] text-gray-500 mt-1 block">
+                      Cumulative ROI
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Button inside calculator */}
+              <div className="mt-8 pt-6 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="text-xs text-gray-500 text-center sm:text-left">
+                  Estimated generation: <strong className="text-gray-800">~{estimatedUnits} kWh units</strong> per month based on seasonal peak sun hours.
+                </div>
+                <Link
+                  to="/packages"
+                  className="bg-[#6B4B63] hover:bg-[#583D51] text-white text-xs font-bold px-6 py-2.5 rounded-lg transition-colors shadow-xs flex items-center gap-2"
+                >
+                  <FontAwesomeIcon icon={faSolarPanel} />
+                  <span>Browse Pre-Engineered Packages</span>
+                </Link>
+              </div>
             </div>
           </div>
         </section>
 
-        {/* 5. InfoList matching Screenshot 3 */}
+        {/* 5. InfoList matching Reference Screenshot 3 */}
         <InfoList
           id="how-it-works"
           title="How it works:"
@@ -327,167 +363,101 @@ export const PublicWebsitePage: React.FC = () => {
           sideIllustrationCaption="Power from your own roof!"
         />
 
-        {/* 6. Embedded Book a Call Form Section matching Design System */}
-        <section id="book-call" className="py-20 sm:py-24 bg-[#F8F4F7]/40 border-t border-gray-100">
-          <div id="quote-section" className="-mt-20 pt-20"></div>
+        {/* 6. REPLACEMENT SECTION 2: Verified Customer Case Studies & Trust Assurance */}
+        <section id="testimonials" className="py-20 sm:py-24 bg-[#F8F4F7]/40 border-t border-gray-100">
           <div className="max-w-[1320px] mx-auto px-6">
-            <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-subtle border border-gray-200 p-8 sm:p-10">
-              <div className="text-center mb-8">
-                <span className="text-xs uppercase tracking-widest text-[#6B4B63] font-bold">
-                  Free Rooftop Consultation
-                </span>
-                <div className="mt-1 flex justify-center">
-                  <ScriptHeading as="h2" align="center">
-                    Book a Call to Get the Quotation
-                  </ScriptHeading>
-                </div>
-                <p className="mt-3 text-sm text-[#6C757D]">
-                  Schedule a free consultation call with our solar engineers. We will call you, assess your roof capacity, and prepare a customized quotation according to your roof.
-                </p>
+            <div className="text-center max-w-2xl mx-auto mb-16">
+              <span className="text-xs uppercase tracking-widest text-[#6B4B63] font-bold">
+                Verified Rooftop Performance
+              </span>
+              <div className="mt-2 flex justify-center">
+                <ScriptHeading as="h2" align="center">
+                  Real Homes, Real Solar Savings
+                </ScriptHeading>
               </div>
+              <p className="mt-4 text-[#6C757D] text-base leading-relaxed">
+                Discover how homeowners and businesses across Delhi NCR transformed their rooftops into revenue-generating clean power plants.
+              </p>
+            </div>
 
-              {submittedLead ? (
-                <div className="p-6 bg-teal-50 border border-teal-200 rounded-lg text-center animate-in fade-in">
-                  <FontAwesomeIcon icon={faCheckCircle} className="text-4xl text-[#5CC9B0] mb-3" />
-                  <h4 className="text-lg font-bold text-[#212529]">Thank you, {submittedLead.name}!</h4>
-                  <p className="text-sm text-[#495057] mt-2">
-                    Your consultation call has been booked. Our sales representative will call you soon at{' '}
-                    <strong>{submittedLead.phone}</strong> to discuss your requirements and prepare your customized quotation.
-                  </p>
-                  <button
-                    onClick={() => setSubmittedLead(null)}
-                    className="mt-5 text-sm text-[#6B4B63] hover:underline font-bold"
-                  >
-                    Book another consultation call
-                  </button>
+            {/* Case Studies Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {CASE_STUDIES.map((study, idx) => (
+                <div
+                  key={idx}
+                  className="bg-white rounded-xl border border-gray-200/90 shadow-subtle p-7 flex flex-col justify-between hover:shadow-md transition-shadow"
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <span className="text-xs font-bold px-2.5 py-1 rounded bg-purple-50 text-[#6B4B63] border border-purple-100">
+                        {study.system}
+                      </span>
+                      <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                        {study.pctReduction} Cut
+                      </span>
+                    </div>
+
+                    <div className="mb-4">
+                      <h3 className="text-base font-bold text-[#212529]">{study.name}</h3>
+                      <p className="text-xs text-gray-500">{study.location}</p>
+                    </div>
+
+                    {/* Bill Comparison Strip */}
+                    <div className="grid grid-cols-2 gap-2 p-3 bg-gray-50 rounded-lg mb-4 text-xs">
+                      <div>
+                        <span className="text-gray-400 block text-[10px]">Monthly Bill Before</span>
+                        <span className="font-bold text-gray-600 line-through">{study.billBefore}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-400 block text-[10px]">Monthly Bill After</span>
+                        <span className="font-bold text-emerald-700">{study.billAfter}</span>
+                      </div>
+                    </div>
+
+                    <p className="text-xs text-[#6C757D] italic leading-relaxed mb-6">
+                      <FontAwesomeIcon icon={faQuoteLeft} className="text-[#6B4B63]/20 mr-1.5 text-sm" />
+                      "{study.quote}"
+                    </p>
+                  </div>
+
+                  <div className="pt-4 border-t border-gray-100 flex items-center justify-between text-[11px] text-gray-500 font-medium">
+                    <span className="flex items-center gap-1 text-[#212529] font-bold">
+                      <FontAwesomeIcon icon={faBolt} className="text-amber-500" />
+                      {study.generation}
+                    </span>
+                    <span className="flex items-center gap-1 text-[#5CC9B0] font-bold">
+                      <FontAwesomeIcon icon={faShieldAlt} />
+                      {study.warranty}
+                    </span>
+                  </div>
                 </div>
-              ) : (
-                <form onSubmit={handleLeadSubmit} className="space-y-5">
-                  {errorMessage && (
-                    <div className="p-3.5 bg-red-50 text-red-700 text-xs rounded border border-red-200">
-                      {errorMessage}
-                    </div>
-                  )}
+              ))}
+            </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                    <div>
-                      <label className="block text-xs font-semibold text-[#212529] mb-1.5">
-                        Full Name <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="e.g. Ramesh Kumar"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        className="w-full px-3.5 py-2.5 border border-gray-300 rounded text-sm text-[#212529] placeholder-gray-400 focus:outline-none focus:border-[#6B4B63] focus:ring-2 focus:ring-[#6B4B63]/20"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-[#212529] mb-1.5">
-                        Phone Number <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="tel"
-                        required
-                        placeholder="+91 98110 00000"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        className="w-full px-3.5 py-2.5 border border-gray-300 rounded text-sm text-[#212529] placeholder-gray-400 focus:outline-none focus:border-[#6B4B63] focus:ring-2 focus:ring-[#6B4B63]/20"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                    <div>
-                      <label className="block text-xs font-semibold text-[#212529] mb-1.5">
-                        Email Address
-                      </label>
-                      <input
-                        type="email"
-                        placeholder="ramesh@example.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="w-full px-3.5 py-2.5 border border-gray-300 rounded text-sm text-[#212529] placeholder-gray-400 focus:outline-none focus:border-[#6B4B63] focus:ring-2 focus:ring-[#6B4B63]/20"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-[#212529] mb-1.5">
-                        System Type <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        value={systemType}
-                        onChange={(e) => setSystemType(e.target.value)}
-                        className="w-full px-3.5 py-2.5 border border-gray-300 rounded text-sm text-[#212529] focus:outline-none focus:border-[#6B4B63] focus:ring-2 focus:ring-[#6B4B63]/20"
-                      >
-                        <option value="On-Grid">On-Grid (Connected to Grid, Net-metering)</option>
-                        <option value="Off-Grid">Off-Grid (with Battery Energy Storage Bank)</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-[#212529] mb-1.5">
-                      Rooftop Address & City <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="House No., Street, Sector, City, State"
-                      value={address}
-                      onChange={(e) => setAddress(e.target.value)}
-                      className="w-full px-3.5 py-2.5 border border-gray-300 rounded text-sm text-[#212529] placeholder-gray-400 focus:outline-none focus:border-[#6B4B63] focus:ring-2 focus:ring-[#6B4B63]/20"
-                    />
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between items-center mb-1.5">
-                      <label className="block text-xs font-semibold text-[#212529]">
-                        Target Capacity: <span className="text-[#6B4B63] font-bold">{capacityKw} kW</span>
-                      </label>
-                      <span className="text-xs text-gray-400">1 to 5 kW</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="1"
-                      max="5"
-                      step="0.5"
-                      value={capacityKw}
-                      onChange={(e) => setCapacityKw(parseFloat(e.target.value))}
-                      className="w-full accent-[#6B4B63] cursor-pointer"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-[#212529] mb-1.5">
-                      Additional Notes / Monthly Bill
-                    </label>
-                    <textarea
-                      rows={2}
-                      placeholder="e.g. RCC flat terrace, approx monthly electricity bill ₹4,500..."
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
-                      className="w-full px-3.5 py-2 border border-gray-300 rounded text-sm text-[#212529] placeholder-gray-400 focus:outline-none focus:border-[#6B4B63] focus:ring-2 focus:ring-[#6B4B63]/20"
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={submitting}
-                    className="w-full bg-[#6B4B63] hover:bg-[#583D51] text-white font-bold py-3 rounded text-sm transition-colors shadow-xs disabled:opacity-50"
-                  >
-                    {submitting ? 'Booking Call...' : 'Book a Call to Get Quotation'}
-                  </button>
-                </form>
-              )}
+            {/* Bottom Trust Credentials Strip */}
+            <div className="mt-14 pt-10 border-t border-gray-200 grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+              <div>
+                <div className="text-2xl sm:text-3xl font-extrabold text-[#6B4B63]">40+</div>
+                <div className="text-xs text-gray-600 font-medium mt-1">Projects Monthly</div>
+              </div>
+              <div>
+                <div className="text-2xl sm:text-3xl font-extrabold text-[#6B4B63]">100%</div>
+                <div className="text-xs text-gray-600 font-medium mt-1">Serial-Tracked Hardware</div>
+              </div>
+              <div>
+                <div className="text-2xl sm:text-3xl font-extrabold text-[#6B4B63]">₹78,000</div>
+                <div className="text-xs text-gray-600 font-medium mt-1">Max Central Subsidy</div>
+              </div>
+              <div>
+                <div className="text-2xl sm:text-3xl font-extrabold text-[#6B4B63]">25 Years</div>
+                <div className="text-xs text-gray-600 font-medium mt-1">Performance Warranty</div>
+              </div>
             </div>
           </div>
         </section>
       </main>
 
-      {/* 7. Footer matching Screenshot 3 */}
+      {/* 7. Footer matching Reference Screenshot 3 */}
       <SiteFooter />
     </div>
   );

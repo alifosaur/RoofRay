@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth, getRoleHomePath } from '../../context/AuthContext';
-import { SunPowerLogo } from '../brand/SunPowerLogo';
+import { RoofRayLogo } from '../brand/SunPowerLogo';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faChevronDown,
@@ -65,10 +65,10 @@ export const SiteNavbar: React.FC = () => {
   return (
     <header className="sticky top-0 z-40 w-full bg-white/95 backdrop-blur-xs border-b border-gray-100 shadow-[0_1px_4px_rgba(0,0,0,0.08)]">
       <div className="max-w-[1320px] mx-auto px-6 h-16 flex items-center justify-between">
-        {/* Left: SunPower Logo + Desktop Nav links */}
+        {/* Left: RoofRay Logo + Desktop Nav links */}
         <div className="flex items-center space-x-8 sm:space-x-12">
           <Link to="/" className="flex items-center focus:outline-none">
-            <SunPowerLogo className="h-8 sm:h-9" />
+            <RoofRayLogo className="h-8 sm:h-9" />
           </Link>
 
           {/* Desktop Nav Links matching Screenshot 1 */}

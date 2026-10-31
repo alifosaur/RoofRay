@@ -1,5 +1,5 @@
 /**
- * SunPower Solutions Design Tokens
+ * RoofRay Solutions Design Tokens
  * Matched to the Odoo-style visual reference system
  */
 

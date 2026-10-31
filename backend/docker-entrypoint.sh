@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-echo "Starting SunPower Solutions Backend Container..."
+echo "Starting RoofRay Solutions Backend Container..."
 
 # Wait for PostgreSQL if DATABASE_URL points to postgres
 if [[ "$DATABASE_URL" == *"postgres"* ]]; then

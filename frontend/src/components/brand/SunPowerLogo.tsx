@@ -1,12 +1,12 @@
 import React from 'react';
 
-interface SunPowerLogoProps {
+export interface RoofRayLogoProps {
   variant?: 'dark' | 'white';
   className?: string;
   iconOnly?: boolean;
 }
 
-export const SunPowerLogo: React.FC<SunPowerLogoProps> = ({
+export const RoofRayLogo: React.FC<RoofRayLogoProps> = ({
   variant = 'dark',
   className = 'h-9',
   iconOnly = false,
@@ -55,8 +55,8 @@ export const SunPowerLogo: React.FC<SunPowerLogoProps> = ({
       {!iconOnly && (
         <div className="flex flex-col leading-none">
           <div className="flex items-center tracking-tight font-bold text-[22px]">
-            <span style={{ color: plum }} className="font-extrabold">sun</span>
-            <span style={{ color: textDark }} className="font-semibold">power</span>
+            <span style={{ color: plum }} className="font-extrabold">Roof</span>
+            <span style={{ color: textDark }} className="font-semibold">Ray</span>
             <span style={{ color: teal }} className="text-xl ml-0.5">•</span>
           </div>
           <span
@@ -70,3 +70,5 @@ export const SunPowerLogo: React.FC<SunPowerLogoProps> = ({
     </div>
   );
 };
+
+export const SunPowerLogo = RoofRayLogo;

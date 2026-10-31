@@ -14,15 +14,18 @@ def seed_users():
     db = SessionLocal()
 
     users_data = [
-        {"email": "admin@sunpower.com", "full_name": "System Administrator", "role": UserRole.ADMIN, "uid": "admin_uid", "phone": "9876543210"},
-        {"email": "sales@sunpower.com", "full_name": "Rohan Sharma (Sales)", "role": UserRole.SALES, "uid": "sales_uid", "phone": "9876543211"},
-        {"email": "tech@sunpower.com", "full_name": "Amit Verma (Lead Technician)", "role": UserRole.TECHNICIAN, "uid": "tech_uid", "phone": "9876543212"},
-        {"email": "warehouse@sunpower.com", "full_name": "Deepak Kumar (Warehouse)", "role": UserRole.WAREHOUSE, "uid": "warehouse_uid", "phone": "9876543213"},
-        {"email": "customer@sunpower.com", "full_name": "Vikram Malhotra (Customer)", "role": UserRole.CUSTOMER, "uid": "customer_uid", "phone": "9876543214"},
+        {"email": "admin@roofray.com", "full_name": "System Administrator", "role": UserRole.ADMIN, "uid": "admin_uid", "phone": "9876543210"},
+        {"email": "sales@roofray.com", "full_name": "Rohan Sharma (Sales)", "role": UserRole.SALES, "uid": "sales_uid", "phone": "9876543211"},
+        {"email": "tech@roofray.com", "full_name": "Amit Verma (Lead Technician)", "role": UserRole.TECHNICIAN, "uid": "tech_uid", "phone": "9876543212"},
+        {"email": "warehouse@roofray.com", "full_name": "Deepak Kumar (Warehouse)", "role": UserRole.WAREHOUSE, "uid": "warehouse_uid", "phone": "9876543213"},
+        {"email": "customer@roofray.com", "full_name": "Vikram Malhotra (Customer)", "role": UserRole.CUSTOMER, "uid": "customer_uid", "phone": "9876543214"},
     ]
 
     for data in users_data:
-        existing = db.query(User).filter((User.email == data["email"]) | (User.firebase_uid == data["uid"])).first()
+        old_email = data["email"].replace("@roofray.com", "@sunpower.com")
+        existing = db.query(User).filter(
+            (User.email == data["email"]) | (User.email == old_email) | (User.firebase_uid == data["uid"])
+        ).first()
         if not existing:
             user = User(
                 email=data["email"],
@@ -36,7 +39,8 @@ def seed_users():
             db.add(user)
             print(f"Created user: {data['email']} ({data['role'].value})")
         else:
-            print(f"User exists: {data['email']}")
+            existing.email = data["email"]
+            print(f"User synced: {data['email']}")
 
     db.commit()
     db.close()

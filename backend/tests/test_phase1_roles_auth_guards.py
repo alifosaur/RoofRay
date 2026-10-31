@@ -53,13 +53,13 @@ def test_public_self_registration_creates_only_customer_and_links_customer_row()
 
 def test_login_unified_endpoint():
     """Verify login returns token and profile for customer and admin."""
-    # Test customer login
-    cust_login = client.post("/api/auth/login", json={"email": "customer@sunpower.com"})
+    # Test customer login (supports both new @roofray.com and legacy @sunpower.com)
+    cust_login = client.post("/api/auth/login", json={"email": "customer@roofray.com"})
     assert cust_login.status_code == 200
     assert cust_login.json()["user"]["role"] == "customer"
 
     # Test admin login
-    admin_login = client.post("/api/auth/login", json={"email": "admin@sunpower.com"})
+    admin_login = client.post("/api/auth/login", json={"email": "admin@roofray.com"})
     assert admin_login.status_code == 200
     assert admin_login.json()["user"]["role"] == "admin"
 

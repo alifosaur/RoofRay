@@ -74,7 +74,7 @@ export const GovtSchemesPage: React.FC = () => {
               </ScriptHeading>
             </div>
             <p className="mt-6 text-lg text-[#6C757D] max-w-2xl mx-auto body-paragraph">
-              Understand Central and State rooftop solar financial assistance, calculate your PM Surya Ghar subsidy in real time, and let SunPower manage the entire portal submission for you.
+              Understand Central and State rooftop solar financial assistance, calculate your PM Surya Ghar subsidy in real time, and let RoofRay manage the entire portal submission for you.
             </p>
           </div>
         </section>
@@ -243,7 +243,7 @@ export const GovtSchemesPage: React.FC = () => {
                 </ScriptHeading>
               </div>
               <p className="mt-4 text-[#6C757D] text-base body-paragraph">
-                SunPower handles 100% of DISCOM liaison and portal uploads so you never need to visit a government office.
+                RoofRay handles 100% of DISCOM liaison and portal uploads so you never need to visit a government office.
               </p>
             </div>
 
@@ -262,7 +262,7 @@ export const GovtSchemesPage: React.FC = () => {
                 {
                   step: '03',
                   title: 'Vendor Installation & Sizing',
-                  desc: 'SunPower certified technicians install Tier-1 components meeting strict ALMM and BIS specifications.',
+                  desc: 'RoofRay certified technicians install Tier-1 components meeting strict ALMM and BIS specifications.',
                 },
                 {
                   step: '04',

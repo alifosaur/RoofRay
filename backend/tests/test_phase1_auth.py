@@ -20,7 +20,7 @@ def test_auth_me_admin():
     response = client.get("/api/auth/me", headers={"Authorization": "Bearer admin_uid"})
     assert response.status_code == 200
     data = response.json()
-    assert data["email"] == "admin@sunpower.com"
+    assert data["email"] in ["admin@roofray.com", "admin@sunpower.com"]
     assert data["role"] == "admin"
 
 

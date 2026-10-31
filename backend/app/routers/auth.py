@@ -103,6 +103,11 @@ def login(payload: UserLoginRequest, db: Session = Depends(get_db)):
     email_clean = payload.email.lower().strip()
     user = db.query(User).filter(User.email == email_clean).first()
     if not user:
+        if "@roofray.com" in email_clean:
+            user = db.query(User).filter(User.email == email_clean.replace("@roofray.com", "@sunpower.com")).first()
+        elif "@sunpower.com" in email_clean:
+            user = db.query(User).filter(User.email == email_clean.replace("@sunpower.com", "@roofray.com")).first()
+    if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",

@@ -168,7 +168,7 @@ export const TechnicianPWAPage: React.FC = () => {
           <div>
             <h1 className="text-base font-bold flex items-center gap-1.5 text-amber-400">
               <FontAwesomeIcon icon={faHardHat} />
-              <span>SunPower Field PWA</span>
+              <span>RoofRay Field PWA</span>
             </h1>
             <p className="text-[11px] text-gray-400">Crew Mobile Portal</p>
           </div>

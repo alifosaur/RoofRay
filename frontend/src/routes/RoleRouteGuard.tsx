@@ -22,7 +22,7 @@ export const RoleRouteGuard: React.FC<RoleRouteGuardProps> = ({ children, allowe
     );
   }
 
-  if (!user && !localStorage.getItem('sunpower_token')) {
+  if (!user && !localStorage.getItem('roofray_token') && !localStorage.getItem('sunpower_token')) {
     return <Navigate to="/login" replace />;
   }
 

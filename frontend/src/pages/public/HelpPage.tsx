@@ -34,7 +34,7 @@ export const HelpPage: React.FC = () => {
     {
       question: 'What warranties and service guarantees are provided?',
       answer:
-        'SunPower provides an authentic 25-year linear performance warranty on solar panels (guaranteeing >= 80% output after 25 years), 2 years warranty on inverters and charge controllers, and 2 years warranty on battery storage units. Every serial number is barcode-tracked in your customer portal.',
+        'RoofRay provides an authentic 25-year linear performance warranty on solar panels (guaranteeing >= 80% output after 25 years), 2 years warranty on inverters and charge controllers, and 2 years warranty on battery storage units. Every serial number is barcode-tracked in your customer portal.',
     },
     {
       question: 'How much government subsidy can I receive under PM Surya Ghar?',
@@ -49,7 +49,7 @@ export const HelpPage: React.FC = () => {
     {
       question: 'How do I track my installation progress and raise tickets?',
       answer:
-        'Once you accept a quote, you can sign in to the SunPower Customer Portal to view our real-time 13-stage project tracker. After installation, you can inspect registered hardware serials and raise maintenance tickets with 1-click in your portal.',
+        'Once you accept a quote, you can sign in to the RoofRay Customer Portal to view our real-time 13-stage project tracker. After installation, you can inspect registered hardware serials and raise maintenance tickets with 1-click in your portal.',
     },
   ];
 
@@ -129,8 +129,8 @@ export const HelpPage: React.FC = () => {
                 </div>
                 <div className="flex items-center space-x-3">
                   <FontAwesomeIcon icon={faEnvelope} className="text-plum w-4" />
-                  <a href="mailto:support@sunpower.com" className="hover:underline">
-                    support@sunpower.com
+                  <a href="mailto:support@roofray.com" className="hover:underline">
+                    support@roofray.com
                   </a>
                 </div>
               </div>

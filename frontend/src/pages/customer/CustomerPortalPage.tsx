@@ -410,7 +410,7 @@ export const CustomerPortalPage: React.FC = () => {
         <div className="max-w-[1320px] mx-auto px-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <span className="text-xs uppercase tracking-widest text-[#6B4B63] font-bold">
-              SunPower Customer Portal
+              RoofRay Customer Portal
             </span>
             <div className="mt-1">
               <ScriptHeading as="h1" className="text-3xl sm:text-4xl md:text-5xl">
@@ -499,7 +499,7 @@ export const CustomerPortalPage: React.FC = () => {
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
                   <span className="text-xs font-bold uppercase tracking-wider text-amber-300">
-                    SunPower Premium Solar Catalog
+                    RoofRay Premium Solar Catalog
                   </span>
                   <h1 className="text-2xl sm:text-3xl font-bold mt-1 mb-2">
                     Turnkey Rooftop Solar Systems (1 - 5 kW)
@@ -648,7 +648,7 @@ export const CustomerPortalPage: React.FC = () => {
                         value={enquiryForm.email}
                         onChange={(e) => setEnquiryForm({ ...enquiryForm, email: e.target.value })}
                         className="w-full px-3 py-2 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-odoo-purple focus:border-odoo-purple"
-                        placeholder="customer@sunpower.com"
+                        placeholder="customer@roofray.com"
                       />
                     </div>
                     <div className="sm:col-span-2">
@@ -1497,7 +1497,7 @@ export const CustomerPortalPage: React.FC = () => {
                 <div className="text-center py-6 text-gray-500 text-xs">
                   <i className="fa-solid fa-hourglass-start text-2xl text-gray-300 mb-2"></i>
                   <p className="font-semibold">Subsidy application will be filed upon installation agreement signing</p>
-                  <p className="text-gray-400 mt-1">SunPower Solutions liaisons with DISCOM and national portal end to end.</p>
+                  <p className="text-gray-400 mt-1">RoofRay Solutions liaisons with DISCOM and national portal end to end.</p>
                 </div>
               )}
             </div>

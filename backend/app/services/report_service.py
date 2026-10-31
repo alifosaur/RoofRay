@@ -158,7 +158,7 @@ def export_dashboard_to_excel(db: Session) -> str:
     ws1.title = "Executive Summary"
     metrics = get_director_dashboard_metrics(db, "all")
 
-    ws1.append(["SunPower Solutions - Executive Operations Summary"])
+    ws1.append(["RoofRay Solutions - Executive Operations Summary"])
     ws1.merge_cells("A1:D1")
     ws1["A1"].font = Font(name="Arial", size=14, bold=True, color="714B67")
     ws1.append([])
@@ -212,7 +212,7 @@ def export_dashboard_to_excel(db: Session) -> str:
 
     export_dir = os.path.join(settings.UPLOAD_DIR, "reports")
     os.makedirs(export_dir, exist_ok=True)
-    filename = f"SunPower_Executive_Report_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    filename = f"RoofRay_Executive_Report_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.xlsx"
     file_path = os.path.join(export_dir, filename)
     wb.save(file_path)
     return file_path

@@ -1,6 +1,6 @@
-# SunPower Solutions - Solar Installation Management System (ERP)
+# RoofRay Solutions - Solar Installation Management System (ERP)
 
-A comprehensive, production-grade Solar Installation Management System built for **SunPower Solutions** (~40 rooftop solar projects a month, 15 field technicians). The system manages the entire operational lifecycle from public web lead capture, site survey feasibility gating, dynamic BOM explosion, serialized warehouse dispatch, technician mobile PWA installation with on-site signature and test capture, automated warranty lifecycle, after-sales helpdesk with auto-invoicing, National Solar Subsidy tracking, and executive director dashboard with profit-per-job analytics.
+A comprehensive, production-grade Solar Installation Management System built for **RoofRay Solutions** (~40 rooftop solar projects a month, 15 field technicians). The system manages the entire operational lifecycle from public web lead capture, site survey feasibility gating, dynamic BOM explosion, serialized warehouse dispatch, technician mobile PWA installation with on-site signature and test capture, automated warranty lifecycle, after-sales helpdesk with auto-invoicing, National Solar Subsidy tracking, and executive director dashboard with profit-per-job analytics.
 
 The staff web portal is styled according to the **Odoo ERP UI/UX paradigm** (Odoo purple `#714B67`, teal accent `#017E84`, dense layout, statusbars with chevron stages, smart buttons, notebook tabs, inline editable lines, kanban/list/form/calendar views, and live chatter audit logs).
 
@@ -211,11 +211,11 @@ The platform enforces 5 distinct roles with backend endpoint and object-level pe
 
 | Role | Default Email | Firebase Dev Token | Login Redirect | Accessible Views & Duties |
 | :--- | :--- | :--- | :--- | :--- |
-| **Admin** | `admin@sunpower.com` | `admin_uid` | `/web/dashboard` | Executive director dashboard, User Management (staff CRUD & status toggles), Accounting & Subsidies, Technician payout approval, all CRM/Survey/Dispatch/Helpdesk apps. |
-| **Sales** | `sales@sunpower.com` | `sales_uid` | `/web/crm` | Lead capture & Kanban, Call checklist, Technician survey scheduling, BOM Quotation builder & PDF generation, Sales metrics & 2.5% commission tracking. |
-| **Warehouse** | `warehouse@sunpower.com` | `warehouse_uid` | `/web/dispatch` | Stock inventory management, Barcode scanning & dispatch fulfillment queue, serial inwarding, delivery dispatch gate enforcement, warranty date activation. |
-| **Technician** (15 crew) | `tech@sunpower.com` or `tech1@sunpower.com` - `tech15@sunpower.com` | `tech_uid`, `tech_uid_1` - `tech_uid_15` | `/technician` (`/pwa/tech`) | Mobile-first touch PWA: Site feasibility survey report submission, installation job start/finish, generation test (> 0 kW required), customer signature canvas, timesheet tracking. |
-| **Customer** | `customer@sunpower.com` | `customer_uid` | `/customer` | Odoo-website-style customer portal: Solar package catalog, PM Surya Ghar subsidy estimator, measurements enquiry submission, 13-stage live project tracker, quote acceptance, equipment & warranty lookup, service tickets. |
+| **Admin** | `admin@roofray.com` | `admin_uid` | `/web/dashboard` | Executive director dashboard, User Management (staff CRUD & status toggles), Accounting & Subsidies, Technician payout approval, all CRM/Survey/Dispatch/Helpdesk apps. |
+| **Sales** | `sales@roofray.com` | `sales_uid` | `/web/crm` | Lead capture & Kanban, Call checklist, Technician survey scheduling, BOM Quotation builder & PDF generation, Sales metrics & 2.5% commission tracking. |
+| **Warehouse** | `warehouse@roofray.com` | `warehouse_uid` | `/web/dispatch` | Stock inventory management, Barcode scanning & dispatch fulfillment queue, serial inwarding, delivery dispatch gate enforcement, warranty date activation. |
+| **Technician** (15 crew) | `tech@roofray.com` or `tech1@roofray.com` - `tech15@roofray.com` | `tech_uid`, `tech_uid_1` - `tech_uid_15` | `/technician` (`/pwa/tech`) | Mobile-first touch PWA: Site feasibility survey report submission, installation job start/finish, generation test (> 0 kW required), customer signature canvas, timesheet tracking. |
+| **Customer** | `customer@roofray.com` | `customer_uid` | `/customer` | Odoo-website-style customer portal: Solar package catalog, PM Surya Ghar subsidy estimator, measurements enquiry submission, 13-stage live project tracker, quote acceptance, equipment & warranty lookup, service tickets. |
 
 > **Password for all seeded accounts**: Any password (or click dev persona quick login button on `/login`).
 > **Public Registration**: Self-registration on `/login` strictly creates `role=customer` and links a `customers` row. Any attempt to supply `role=admin` is rejected and clamped to `customer`. Staff accounts are managed exclusively by the Admin via `/web/users`.
@@ -256,7 +256,7 @@ npm run build
 
 ## 📖 Step-by-Step Interactive Demo Walkthrough
 
-Follow this step-by-step path to experience the complete SunPower Solutions workflow:
+Follow this step-by-step path to experience the complete RoofRay Solutions workflow:
 
 ### Step 1: Public Website & Enquiry (`/`)
 1. Open `http://localhost:5173/` in your browser.
@@ -369,4 +369,4 @@ Follow this step-by-step path to experience the complete SunPower Solutions work
 ---
 
 ## 📄 License
-Proprietary software developed for **SunPower Solutions**. All rights reserved.
+Proprietary software developed for **RoofRay Solutions**. All rights reserved.

@@ -16,7 +16,7 @@ def setup_catalog():
     # 1. Create products
     p_panel = client.post("/api/products", headers=admin_headers, json={
         "sku": f"PANEL-{run_id}",
-        "name": "SunPower 540W Mono PERC Solar Panel",
+        "name": "RoofRay 540W Mono PERC Solar Panel",
         "category": "panel",
         "warranty_years": 20,
         "is_serialised": True,

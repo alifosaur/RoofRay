@@ -170,12 +170,12 @@ export const PublicWebsitePage: React.FC = () => {
           left={
             <div className="flex flex-col">
               <ScriptHeading as="h1" underline className="mb-8">
-                About SunPower
+                About RoofRay
               </ScriptHeading>
 
               <div className="space-y-6 body-paragraph">
                 <p>
-                  SunPower Solutions is an end-to-end rooftop solar engineering and installation company powering over 40 homes and commercial rooftops every single month. We specialize in residential bungalows, housing societies, and small-factory rooftops, turning unused terrace space into high-yield clean power plants.
+                  RoofRay Solutions is an end-to-end rooftop solar engineering and installation company powering over 40 homes and commercial rooftops every single month. We specialize in residential bungalows, housing societies, and small-factory rooftops, turning unused terrace space into high-yield clean power plants.
                 </p>
 
                 <p>
@@ -183,7 +183,7 @@ export const PublicWebsitePage: React.FC = () => {
                 </p>
 
                 <p>
-                  Today, SunPower handles the entire journey from structural shadow analysis to DISCOM net-metering synchronization and direct-to-bank{' '}
+                  Today, RoofRay handles the entire journey from structural shadow analysis to DISCOM net-metering synchronization and direct-to-bank{' '}
                   <SquiggleLink to="/schemes">government subsidy</SquiggleLink>{' '}
                   paperwork, delivering uninterrupted clean energy with complete peace of mind.
                 </p>
@@ -212,7 +212,7 @@ export const PublicWebsitePage: React.FC = () => {
         {/* 3. FeatureBand matching Screenshot 2 */}
         <FeatureBand
           id="features"
-          title="Why go solar with SunPower?"
+          title="Why go solar with RoofRay?"
           items={featureItems}
         />
 
@@ -320,7 +320,7 @@ export const PublicWebsitePage: React.FC = () => {
           items={infoBullets}
           secondaryTitle="What if you switch?"
           secondaryParagraphs={[
-            'Switching to solar with SunPower is designed to be frictionless. Our engineers take full responsibility for roof structural safety, shadow-free positioning, and liaison with your local DISCOM electricity board.',
+            'Switching to solar with RoofRay is designed to be frictionless. Our engineers take full responsibility for roof structural safety, shadow-free positioning, and liaison with your local DISCOM electricity board.',
             'From the day your bi-directional meter is energized, you stop paying commercial and residential peak tariffs. Every kilowatt-hour generated is tracked through your live customer portal.',
           ]}
           sideIllustrationCaption="Power from your own roof!"

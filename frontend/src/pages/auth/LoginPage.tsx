@@ -106,7 +106,7 @@ export const LoginPage: React.FC = () => {
             </span>
             <div className="mt-2 flex justify-center">
               <ScriptHeading as="h1" align="center">
-                {mode === 'login' ? 'Sign in to SunPower' : 'Create Customer Account'}
+                {mode === 'login' ? 'Sign in to RoofRay' : 'Create Customer Account'}
               </ScriptHeading>
             </div>
             <p className="mt-3 text-sm text-[#6C757D]">
@@ -170,7 +170,7 @@ export const LoginPage: React.FC = () => {
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="e.g. customer@sunpower.com"
+                      placeholder="e.g. customer@roofray.com"
                       required
                       className="w-full pl-10 pr-3.5 py-2.5 border border-gray-300 rounded text-sm text-[#212529] focus:outline-none focus:border-[#6B4B63] focus:ring-2 focus:ring-[#6B4B63]/20"
                     />

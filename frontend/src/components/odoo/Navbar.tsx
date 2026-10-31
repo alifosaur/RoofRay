@@ -46,7 +46,7 @@ export const Navbar: React.FC<NavbarProps> = ({ appName, onToggleHomeMenu, isHom
 
         <span className="font-semibold tracking-wide flex items-center gap-2">
           <FontAwesomeIcon icon={faSun} className="text-amber-400" />
-          <span>SunPower</span>
+          <span>RoofRay</span>
           <span className="text-white/60">/</span>
           <span className="text-white font-medium">{appName}</span>
         </span>

@@ -38,7 +38,7 @@ export const StyleguidePage: React.FC = () => {
             </span>
             <div className="mt-3 flex justify-center">
               <ScriptHeading as="h1" underline align="center">
-                SunPower Styleguide
+                RoofRay Styleguide
               </ScriptHeading>
             </div>
             <p className="mt-6 text-lg text-[#6C757D] max-w-2xl mx-auto">
@@ -91,14 +91,14 @@ export const StyleguidePage: React.FC = () => {
             <div>
               <p className="text-xs text-gray-400 uppercase tracking-wider mb-2 font-mono">ScriptHeading with Teal Brush Underline</p>
               <ScriptHeading underline as="h2">
-                About SunPower
+                About RoofRay
               </ScriptHeading>
             </div>
 
             <div>
               <p className="text-xs text-gray-400 uppercase tracking-wider mb-2 font-mono">Body Paragraph (~18px, Line-height 1.9, Justified)</p>
               <p className="body-paragraph max-w-3xl">
-                SunPower rooftop installations are engineered for maximum solar energy yield, allowing homeowners and small factories to power their daily appliances through clean rooftop generation. Every project is backed by our certified 15-technician crew and an authentic 20-year performance guarantee with automated{' '}
+                RoofRay rooftop installations are engineered for maximum solar energy yield, allowing homeowners and small factories to power their daily appliances through clean rooftop generation. Every project is backed by our certified 15-technician crew and an authentic 20-year performance guarantee with automated{' '}
                 <SquiggleLink to="/schemes">government subsidy</SquiggleLink> paperwork.
               </p>
             </div>
@@ -148,7 +148,7 @@ export const StyleguidePage: React.FC = () => {
                   Clean Energy for Every Roof
                 </ScriptHeading>
                 <p className="body-paragraph mb-4">
-                  SunPower rooftop systems turn unused roof space into an independent clean energy generator. Save up to 90% on electricity bills every month.
+                  RoofRay rooftop systems turn unused roof space into an independent clean energy generator. Save up to 90% on electricity bills every month.
                 </p>
                 <div className="flex items-center space-x-4 mt-8">
                   <button className="bg-[#6B4B63] hover:bg-[#583D51] text-white text-[15px] font-medium px-6 py-2.5 rounded transition-colors shadow-xs">
@@ -163,7 +163,7 @@ export const StyleguidePage: React.FC = () => {
 
         {/* 5. FeatureBand Preview */}
         <FeatureBand
-          title="Why go solar with SunPower?"
+          title="Why go solar with RoofRay?"
           items={sampleFeatures}
         />
 

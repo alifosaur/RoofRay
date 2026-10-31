@@ -68,7 +68,7 @@ export const SiteFooter: React.FC = () => {
             </h4>
             <div className="space-y-4 text-[14.5px] text-[#495057] leading-[1.75]">
               <p>
-                SunPower Solutions is an end-to-end rooftop solar engineering and installation provider powering over 40 residential and commercial rooftops each month with certified tier-1 monocrystalline technology.
+                RoofRay Solutions is an end-to-end rooftop solar engineering and installation provider powering over 40 residential and commercial rooftops each month with certified tier-1 monocrystalline technology.
               </p>
               <p>
                 With 100% serial-tracked component traceability, an in-house crew of 15 certified technicians, 25-year panel performance warranties, and seamless PM Surya Ghar direct-benefit subsidy management, we deliver complete rooftop energy independence.
@@ -90,8 +90,8 @@ export const SiteFooter: React.FC = () => {
               </div>
               <div className="flex items-center space-x-2.5">
                 <FontAwesomeIcon icon={faEnvelope} className="text-[#6B4B63] text-sm w-4" />
-                <a href="mailto:contact@sunpower.com" className="hover:underline text-[#495057]">
-                  contact@sunpower.com
+                <a href="mailto:contact@roofray.com" className="hover:underline text-[#495057]">
+                  contact@roofray.com
                 </a>
               </div>
             </div>
@@ -141,7 +141,7 @@ export const SiteFooter: React.FC = () => {
               <Link
                 to="/"
                 className="w-10 h-10 rounded-full bg-white shadow-xs border border-gray-200/70 flex items-center justify-center text-[#6B4B63] hover:bg-[#6B4B63] hover:text-white transition-all transform hover:-translate-y-0.5"
-                aria-label="SunPower Website"
+                aria-label="RoofRay Website"
               >
                 <FontAwesomeIcon icon={faGlobe} className="text-sm" />
               </Link>
@@ -151,7 +151,7 @@ export const SiteFooter: React.FC = () => {
 
         {/* Bottom Sub-footer */}
         <div className="border-t border-gray-200 mt-12 pt-6 flex flex-col sm:flex-row items-center justify-between text-xs text-[#6C757D]">
-          <p>© 2026 SunPower Solutions Inc. All rights reserved.</p>
+          <p>© 2026 RoofRay Solutions Inc. All rights reserved.</p>
           <p className="mt-2 sm:mt-0 font-medium">
             Certified ISO 9001:2015 Rooftop Solar Engineering & Operations
           </p>

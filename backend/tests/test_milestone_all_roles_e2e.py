@@ -29,7 +29,7 @@ def test_complete_milestone_role_based_workflows_and_all_gates():
     admin_user = db.query(User).filter(User.role == UserRole.ADMIN).first()
     if not admin_user:
         admin_user = User(
-            email=f"admin_{uid_suffix}@sunpower.com",
+            email=f"admin_{uid_suffix}@roofray.com",
             full_name="Rajesh Singhania (Admin)",
             role=UserRole.ADMIN,
             firebase_uid="admin_uid",
@@ -39,7 +39,7 @@ def test_complete_milestone_role_based_workflows_and_all_gates():
     sales_user = db.query(User).filter(User.role == UserRole.SALES).first()
     if not sales_user:
         sales_user = User(
-            email=f"sales_{uid_suffix}@sunpower.com",
+            email=f"sales_{uid_suffix}@roofray.com",
             full_name="Rohan Sharma (Sales)",
             role=UserRole.SALES,
             firebase_uid="sales_uid",
@@ -49,7 +49,7 @@ def test_complete_milestone_role_based_workflows_and_all_gates():
     tech1_user = db.query(User).filter(User.firebase_uid == "tech_uid_1").first()
     if not tech1_user:
         tech1_user = User(
-            email=f"tech1_{uid_suffix}@sunpower.com",
+            email=f"tech1_{uid_suffix}@roofray.com",
             full_name="Amit Verma (Tech 1)",
             role=UserRole.TECHNICIAN,
             firebase_uid="tech_uid_1",
@@ -60,7 +60,7 @@ def test_complete_milestone_role_based_workflows_and_all_gates():
     tech2_user = db.query(User).filter(User.firebase_uid == "tech_uid_2").first()
     if not tech2_user:
         tech2_user = User(
-            email=f"tech2_{uid_suffix}@sunpower.com",
+            email=f"tech2_{uid_suffix}@roofray.com",
             full_name="Sunil Yadav (Tech 2)",
             role=UserRole.TECHNICIAN,
             firebase_uid="tech_uid_2",
@@ -71,7 +71,7 @@ def test_complete_milestone_role_based_workflows_and_all_gates():
     wh_user = db.query(User).filter(User.role == UserRole.WAREHOUSE).first()
     if not wh_user:
         wh_user = User(
-            email=f"wh_{uid_suffix}@sunpower.com",
+            email=f"wh_{uid_suffix}@roofray.com",
             full_name="Deepak Kumar (Warehouse)",
             role=UserRole.WAREHOUSE,
             firebase_uid="warehouse_uid",
@@ -81,7 +81,7 @@ def test_complete_milestone_role_based_workflows_and_all_gates():
     # Products & BOM Template
     pnl = Product(
         sku=f"PNL-{uid_suffix}",
-        name=f"SunPower Mono PERC 550W {uid_suffix}",
+        name=f"RoofRay Mono PERC 550W {uid_suffix}",
         category=ProductCategory.PANEL,
         is_serialised=False,
         warranty_years=25,
@@ -378,7 +378,7 @@ def test_complete_milestone_role_based_workflows_and_all_gates():
     # =========================================================================
     # 1. User Management (Staff creation and editing)
     new_staff_res = client.post("/api/users", headers=admin_headers, json={
-        "email": f"new_sales_{uid_suffix}@sunpower.com",
+        "email": f"new_sales_{uid_suffix}@roofray.com",
         "full_name": "Kavita Rao",
         "role": "sales",
         "firebase_uid": f"sales_kavita_{uid_suffix}",

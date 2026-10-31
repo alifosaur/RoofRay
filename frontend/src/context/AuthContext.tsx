@@ -37,11 +37,11 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 
 export const DEMO_TOKENS: Record<UserRole, { uid: string; email: string; name: string }> = {
-  admin: { uid: 'admin_uid', email: 'admin@sunpower.com', name: 'Rajesh Singhania (Director)' },
-  sales: { uid: 'sales_uid', email: 'sales@sunpower.com', name: 'Rohan Sharma (Sales)' },
-  technician: { uid: 'tech_uid', email: 'tech@sunpower.com', name: 'Amit Verma (Lead Technician)' },
-  warehouse: { uid: 'warehouse_uid', email: 'warehouse@sunpower.com', name: 'Deepak Kumar (Warehouse Lead)' },
-  customer: { uid: 'customer_uid', email: 'customer@sunpower.com', name: 'Vikram Malhotra (Customer)' },
+  admin: { uid: 'admin_uid', email: 'admin@roofray.com', name: 'Rajesh Singhania (Director)' },
+  sales: { uid: 'sales_uid', email: 'sales@roofray.com', name: 'Rohan Sharma (Sales)' },
+  technician: { uid: 'tech_uid', email: 'tech@roofray.com', name: 'Amit Verma (Lead Technician)' },
+  warehouse: { uid: 'warehouse_uid', email: 'warehouse@roofray.com', name: 'Deepak Kumar (Warehouse Lead)' },
+  customer: { uid: 'customer_uid', email: 'customer@roofray.com', name: 'Vikram Malhotra (Customer)' },
 };
 
 export function getRoleHomePath(role: UserRole): string {

@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "SunPower Solutions"
+    PROJECT_NAME: str = "RoofRay Solutions"
     ENV: str = "development"
     DEBUG: bool = True
     API_V1_PREFIX: str = "/api"

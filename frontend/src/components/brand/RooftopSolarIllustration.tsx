@@ -14,10 +14,10 @@ export const RooftopSolarIllustration: React.FC<RooftopSolarIllustrationProps> =
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
         className="w-full h-auto max-w-full drop-shadow-sm select-none"
-        aria-label="SunPower Rooftop Solar Installation Diagram"
+        aria-label="RoofRay Rooftop Solar Installation Diagram"
         role="img"
       >
-        <title>SunPower Rooftop Solar Installation</title>
+        <title>RoofRay Rooftop Solar Installation</title>
         
         {/* Sky & Sun Glow */}
         <circle cx="480" cy="90" r="75" fill="#5CC9B0" fillOpacity="0.12" />

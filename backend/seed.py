@@ -26,7 +26,7 @@ from app.models.scheme import GovernmentScheme
 
 
 def run_seed():
-    print("Initializing SunPower Solutions Demo Seeder...")
+    print("Initializing RoofRay Solutions Demo Seeder...")
     Base.metadata.create_all(bind=engine)
     with engine.connect() as conn:
         alter_cols = [
@@ -56,11 +56,11 @@ def run_seed():
     # 1. SEED USERS & 15-TECHNICIAN CREW
     print("--- Seeding Staff & Technicians ---")
     core_users = [
-        {"email": "admin@sunpower.com", "full_name": "Rajesh Singhania (Director & Admin)", "role": UserRole.ADMIN, "uid": "admin_uid", "phone": "+91 98110 00001"},
-        {"email": "sales@sunpower.com", "full_name": "Rohan Sharma (Sr. Sales)", "role": UserRole.SALES, "uid": "sales_uid", "phone": "+91 98110 00002"},
-        {"email": "sales2@sunpower.com", "full_name": "Ananya Joshi (Sales)", "role": UserRole.SALES, "uid": "sales2_uid", "phone": "+91 98110 00003"},
-        {"email": "warehouse@sunpower.com", "full_name": "Deepak Kumar (Warehouse Lead)", "role": UserRole.WAREHOUSE, "uid": "warehouse_uid", "phone": "+91 98110 00004"},
-        {"email": "customer@sunpower.com", "full_name": "Vikram Malhotra (Customer)", "role": UserRole.CUSTOMER, "uid": "customer_uid", "phone": "+91 98110 00007"},
+        {"email": "admin@roofray.com", "full_name": "Rajesh Singhania (Director & Admin)", "role": UserRole.ADMIN, "uid": "admin_uid", "phone": "+91 98110 00001"},
+        {"email": "sales@roofray.com", "full_name": "Rohan Sharma (Sr. Sales)", "role": UserRole.SALES, "uid": "sales_uid", "phone": "+91 98110 00002"},
+        {"email": "sales2@roofray.com", "full_name": "Ananya Joshi (Sales)", "role": UserRole.SALES, "uid": "sales2_uid", "phone": "+91 98110 00003"},
+        {"email": "warehouse@roofray.com", "full_name": "Deepak Kumar (Warehouse Lead)", "role": UserRole.WAREHOUSE, "uid": "warehouse_uid", "phone": "+91 98110 00004"},
+        {"email": "customer@roofray.com", "full_name": "Vikram Malhotra (Customer)", "role": UserRole.CUSTOMER, "uid": "customer_uid", "phone": "+91 98110 00007"},
     ]
 
     # Add 15 Technicians
@@ -75,7 +75,7 @@ def run_seed():
     for idx, name in enumerate(tech_names, start=1):
         uid = "tech_uid" if idx == 1 else f"tech_{idx}_uid"
         all_users.append({
-            "email": f"tech{idx}@sunpower.com" if idx > 1 else "tech@sunpower.com",
+            "email": f"tech{idx}@roofray.com" if idx > 1 else "tech@roofray.com",
             "full_name": f"{name} (Tech #{idx})",
             "role": UserRole.TECHNICIAN,
             "uid": uid,
@@ -84,7 +84,10 @@ def run_seed():
 
     user_map = {}
     for u in all_users:
-        existing = db.query(User).filter(User.email == u["email"]).first()
+        old_email = u["email"].replace("@roofray.com", "@sunpower.com")
+        existing = db.query(User).filter(
+            (User.email == u["email"]) | (User.email == old_email) | (User.firebase_uid == u["uid"])
+        ).first()
         if not existing:
             user = User(
                 email=u["email"],
@@ -99,6 +102,7 @@ def run_seed():
             db.flush()
             user_map[u["role"]] = user_map.get(u["role"], []) + [user]
         else:
+            existing.email = u["email"]
             # Migrate any deprecated roles to ADMIN
             if existing.role not in [UserRole.CUSTOMER, UserRole.SALES, UserRole.TECHNICIAN, UserRole.WAREHOUSE, UserRole.ADMIN]:
                 existing.role = UserRole.ADMIN
@@ -379,7 +383,7 @@ def run_seed():
         {
             "cust_name": "Vikram Malhotra",
             "phone": "+91 98110 00007",
-            "email": "customer@sunpower.com",
+            "email": "customer@roofray.com",
             "address": "Boring Road, Patna",
             "stage": "CLOSED",
             "kw": 3.0,
@@ -391,7 +395,7 @@ def run_seed():
         # Create or find customer
         cust = db.query(Customer).filter((Customer.phone == sc["phone"]) | (Customer.email == sc["email"])).first()
         if not cust:
-            user_link_id = customer_user.id if sc["email"] == "customer@sunpower.com" else None
+            user_link_id = customer_user.id if sc["email"] in ["customer@roofray.com", "customer@sunpower.com"] else None
             cust = Customer(
                 user_id=user_link_id,
                 name=sc["cust_name"],
@@ -402,8 +406,9 @@ def run_seed():
             db.add(cust)
             db.flush()
         else:
-            if sc["email"] == "customer@sunpower.com":
+            if sc["email"] in ["customer@roofray.com", "customer@sunpower.com"]:
                 cust.user_id = customer_user.id
+                cust.email = sc["email"]
                 db.flush()
 
         # Create Lead
@@ -703,7 +708,7 @@ def run_seed():
             description="Flagship national rooftop solar initiative by the Ministry of New and Renewable Energy (MNRE), Government of India, enabling households to generate up to 300 free units of electricity every month with direct bank transfer subsidies.",
             eligibility="Residential households, registered Indian citizen, valid electricity connection and consumer number with local DISCOM, suitable shadow-free rooftop, grid-tied solar system with net-metering. Note: Off-Grid systems are NOT eligible for central subsidies.",
             benefit_amounts="• 1 kW System: ₹30,000 fixed central financial assistance (CFA)\n• 2 kW System: ₹60,000 CFA (₹30,000/kW)\n• 3 kW & Above: ₹78,000 maximum fixed CFA\n• Off-Grid Systems: ₹0 (No central subsidy)",
-            how_to_apply="1. Register on the official National Portal (https://pmsuryaghar.gov.in) with your DISCOM consumer number.\n2. Submit online rooftop solar application and obtain Technical Feasibility Approval.\n3. Execute agreement with an empaneled installer (SunPower Solutions).\n4. Post-installation, submit work completion report and net-metering request.\n5. DISCOM inspection and commissioning certificate generation.\n6. Direct Benefit Transfer (DBT) credited straight to customer bank account within 30 days.",
+            how_to_apply="1. Register on the official National Portal (https://pmsuryaghar.gov.in) with your DISCOM consumer number.\n2. Submit online rooftop solar application and obtain Technical Feasibility Approval.\n3. Execute agreement with an empaneled installer (RoofRay Solutions).\n4. Post-installation, submit work completion report and net-metering request.\n5. DISCOM inspection and commissioning certificate generation.\n6. Direct Benefit Transfer (DBT) credited straight to customer bank account within 30 days.",
             official_link="https://pmsuryaghar.gov.in",
             state="National / All India",
             is_active=True,
@@ -719,7 +724,7 @@ def run_seed():
             description="Additional state generation-based incentive (GBI) of ₹3.00/kWh for residential consumers on top of central PM Surya Ghar subsidy.",
             eligibility="Residential consumers under BSES Rajdhani, BSES Yamuna, or TPDDL within NCT of Delhi.",
             benefit_amounts="Generation-based incentive of ₹3.00 per unit generated for 5 years, credited monthly directly against power bills.",
-            how_to_apply="Applied automatically upon net-meter installation and DISCOM GBI registration through SunPower Solutions.",
+            how_to_apply="Applied automatically upon net-meter installation and DISCOM GBI registration through RoofRay Solutions.",
             official_link="https://delhi.gov.in",
             state="Delhi NCT",
             is_active=True,
@@ -729,7 +734,7 @@ def run_seed():
 
     db.commit()
     db.close()
-    print("✓ Full SunPower Solutions demo dataset successfully seeded!")
+    print("✓ Full RoofRay Solutions demo dataset successfully seeded!")
 
 
 if __name__ == "__main__":

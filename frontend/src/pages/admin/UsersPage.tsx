@@ -319,7 +319,7 @@ export const UsersPage: React.FC = () => {
                   required
                   value={newUser.email}
                   onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-                  placeholder="user@sunpower.com"
+                  placeholder="user@roofray.com"
                   className="w-full border border-gray-300 rounded px-3 py-2"
                 />
               </div>

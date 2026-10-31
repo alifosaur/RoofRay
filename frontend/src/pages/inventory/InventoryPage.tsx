@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { api } from '../../api/client';
 import { ControlPanel } from '../../components/odoo/ControlPanel';
 import { ListView } from '../../components/odoo/ListView';
@@ -21,7 +22,9 @@ import {
 import { Html5QrcodeScanner } from 'html5-qrcode';
 
 export const InventoryPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'stock' | 'picklists'>('stock');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = searchParams.get('tab') === 'stock' ? 'stock' : 'picklists';
+  const [activeTab, setActiveTab] = useState<'stock' | 'picklists'>(initialTab);
   const [products, setProducts] = useState<any[]>([]);
   const [pickLists, setPickLists] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,7 +48,6 @@ export const InventoryPage: React.FC = () => {
 
   const fetchData = async () => {
     try {
-      setLoading(true);
       const [prodsData, picksData] = await Promise.all([
         api.get<any[]>(`/inventory/stock?low_stock_only=${lowStockOnly}`),
         api.get<any[]>('/inventory/pick-lists'),
@@ -56,6 +58,16 @@ export const InventoryPage: React.FC = () => {
         setSelectedProductId(prodsData[0].id);
         setPurchaseCost(prodsData[0].cost_price || 0);
       }
+
+      // Check if URL specifies a pick_list_id to open automatically
+      const pickIdParam = searchParams.get('pick_list_id');
+      if (pickIdParam && picksData) {
+        const match = picksData.find((p: any) => String(p.id) === pickIdParam);
+        if (match) {
+          setSelectedPickList(match);
+          setActiveTab('picklists');
+        }
+      }
     } catch (err) {
       console.error('Failed to load inventory data', err);
     } finally {
@@ -65,7 +77,10 @@ export const InventoryPage: React.FC = () => {
 
   useEffect(() => {
     fetchData();
-  }, [lowStockOnly]);
+    // Auto-poll every 10 seconds for real-time incoming items from sales
+    const interval = setInterval(fetchData, 10000);
+    return () => clearInterval(interval);
+  }, [lowStockOnly, searchParams]);
 
   // Camera scanner effect for PickList modal
   useEffect(() => {
@@ -373,6 +388,18 @@ export const InventoryPage: React.FC = () => {
   const modalAllCompleted = modalLines.length > 0 && modalCompletedCount === modalLines.length;
   const modalPct = modalLines.length > 0 ? Math.round((modalCompletedCount / modalLines.length) * 100) : 0;
 
+  const pendingPickLists = pickLists.filter((pl) => pl.status === 'PENDING');
+  const filteredPickLists = pickLists.filter((pl) => {
+    if (!searchTerm) return true;
+    const term = searchTerm.toLowerCase();
+    return (
+      (pl.order_number && pl.order_number.toLowerCase().includes(term)) ||
+      (pl.customer_name && pl.customer_name.toLowerCase().includes(term)) ||
+      String(pl.id).includes(term) ||
+      (pl.lines && pl.lines.some((l: any) => l.product?.name?.toLowerCase().includes(term) || l.product?.sku?.toLowerCase().includes(term)))
+    );
+  });
+
   return (
     <div className="flex-1 flex flex-col">
       <ControlPanel
@@ -383,9 +410,59 @@ export const InventoryPage: React.FC = () => {
         onSearchChange={setSearchTerm}
       />
 
+      {/* Sales Orders & Items Dispatched from Sales Alert Banner */}
+      <div className="bg-gradient-to-r from-purple-50 via-purple-50/40 to-white border-b border-purple-200 px-6 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+        <div className="flex items-center gap-2.5">
+          <span className="font-bold bg-[#6B4B63] text-white px-2 py-0.5 rounded text-[10px] uppercase tracking-wide flex items-center gap-1">
+            <FontAwesomeIcon icon={faDolly} />
+            <span>Items From Sales</span>
+          </span>
+          <span className="text-[#212529]">
+            {pendingPickLists.length > 0 ? (
+              <>
+                <strong>{pendingPickLists.length} installation checklist{pendingPickLists.length > 1 ? 's' : ''}</strong> received from Sales Team awaiting warehouse verification and scanning.
+              </>
+            ) : (
+              <>All sales installation checklists are verified and packed.</>
+            )}
+          </span>
+        </div>
+        {pendingPickLists[0] && (
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('picklists');
+              setSelectedPickList(pendingPickLists[0]);
+              setScanMessage(null);
+            }}
+            className="bg-[#6B4B63] hover:bg-[#583D51] text-white px-3 py-1 rounded font-bold text-xs shadow-xs transition-colors self-start sm:self-auto flex items-center gap-1.5"
+          >
+            <span>Scan Latest: {pendingPickLists[0].order_number} ({pendingPickLists[0].customer_name})</span>
+            <FontAwesomeIcon icon={faBarcode} />
+          </button>
+        )}
+      </div>
+
       {/* Tabs bar */}
       <div className="bg-white border-b border-gray-200 px-6 pt-3 flex items-center justify-between">
         <div className="flex space-x-6">
+          <button
+            onClick={() => setActiveTab('picklists')}
+            className={`pb-3 text-xs font-bold uppercase tracking-wider border-b-2 flex items-center gap-1.5 transition-colors ${
+              activeTab === 'picklists'
+                ? 'border-odoo-primary text-odoo-primary'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <FontAwesomeIcon icon={faListCheck} />
+            <span>Items & Pick Lists ({pickLists.length})</span>
+            {pendingPickLists.length > 0 && (
+              <span className="ml-1 px-1.5 py-0.2 bg-amber-100 text-amber-800 rounded-full text-[10px] font-bold">
+                {pendingPickLists.length} Pending
+              </span>
+            )}
+          </button>
+
           <button
             onClick={() => setActiveTab('stock')}
             className={`pb-3 text-xs font-bold uppercase tracking-wider border-b-2 flex items-center gap-1.5 transition-colors ${
@@ -401,18 +478,6 @@ export const InventoryPage: React.FC = () => {
                 {lowStockCount} low
               </span>
             )}
-          </button>
-
-          <button
-            onClick={() => setActiveTab('picklists')}
-            className={`pb-3 text-xs font-bold uppercase tracking-wider border-b-2 flex items-center gap-1.5 transition-colors ${
-              activeTab === 'picklists'
-                ? 'border-odoo-primary text-odoo-primary'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            <FontAwesomeIcon icon={faListCheck} />
-            <span>Warehouse Pick Lists ({pickLists.length})</span>
           </button>
         </div>
 
@@ -441,7 +506,7 @@ export const InventoryPage: React.FC = () => {
         ) : (
           <ListView
             columns={pickListColumns}
-            data={pickLists}
+            data={filteredPickLists}
             onRowClick={(row) => {
               setSelectedPickList(row);
               setScanMessage(null);

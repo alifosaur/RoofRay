@@ -363,10 +363,10 @@ export const LeadFormPage: React.FC = () => {
             </span>
           </div>
           <Link
-            to="/web/inventory"
+            to={`/web/inventory?tab=picklists&pick_list_id=${submissionSuccess.pick_list_id}`}
             className="bg-[#5CC9B0] hover:bg-teal-500 text-gray-900 px-3 py-1 rounded font-bold text-xs flex items-center gap-1.5 shadow-xs transition-colors"
           >
-            <span>Open Warehouse Pick List</span>
+            <span>Open Warehouse Pick List #{submissionSuccess.pick_list_id}</span>
             <FontAwesomeIcon icon={faArrowRight} />
           </Link>
         </div>

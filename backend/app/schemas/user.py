@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional, Any
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.models.user import UserRole
 
 
@@ -18,10 +18,6 @@ class UserBase(BaseModel):
         if isinstance(v, str):
             return v.lower()
         return v
-
-
-class UserCreate(UserBase):
-    firebase_uid: str
 
 
 class UserUpdate(BaseModel):
@@ -50,34 +46,51 @@ class UserOut(UserBase):
 
 
 class UserRegisterRequest(BaseModel):
-    email: str
-    full_name: str
-    phone: str
-    password: Optional[str] = None
+    """Public self-registration. Always creates a CUSTOMER; any role field is ignored."""
+    full_name: str = Field(min_length=2)
+    phone: str = Field(min_length=6)
+    email: Optional[str] = None      # local mode (Firebase mode takes it from the ID token)
+    password: Optional[str] = None   # local mode only
     address: Optional[str] = None
     city: Optional[str] = None
     pincode: Optional[str] = None
-    firebase_uid: Optional[str] = None
-    # Any role field provided is ignored/discarded for security
 
 
-class StaffRegisterRequest(BaseModel):
+class StaffCreateRequest(BaseModel):
     email: str
-    full_name: str
-    phone: str
-    role: str = "sales"
-    password: Optional[str] = None
-    department: Optional[str] = None
-    firebase_uid: Optional[str] = None
+    full_name: str = Field(min_length=2)
+    role: UserRole
+    phone: Optional[str] = None
+    hourly_rate: int = 0
+    is_active: bool = True
+
+    @field_validator("role", mode="before")
+    @classmethod
+    def parse_role(cls, v: Any) -> Any:
+        return v.lower() if isinstance(v, str) else v
 
 
 class UserLoginRequest(BaseModel):
     email: str
-    password: Optional[str] = None
-    role: Optional[str] = None
+    password: str
+
+
+class PasswordSetupRequest(BaseModel):
+    token: str
+    password: str = Field(min_length=8)
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
 
 
 class AuthResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: UserOut
+
+
+class StaffCreateResponse(BaseModel):
+    user: UserOut
+    auth_mode: str
+    password_setup_url: Optional[str] = None  # local mode: share with the staff member

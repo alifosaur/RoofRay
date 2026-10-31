@@ -47,6 +47,12 @@ with engine.connect() as conn:
         "ALTER TABLE leads ADD COLUMN source VARCHAR(64) DEFAULT 'customer_portal'",
         "ALTER TABLE subsidy_records ADD COLUMN sanctioned_amount FLOAT DEFAULT 0.0",
         "ALTER TABLE subsidy_records ADD COLUMN rejection_notes TEXT",
+        "ALTER TABLE users ADD COLUMN password_hash VARCHAR(255)",
+        "ALTER TABLE government_schemes ADD COLUMN cfa_per_kw_first_2kw FLOAT DEFAULT 0 NOT NULL",
+        "ALTER TABLE government_schemes ADD COLUMN cfa_per_kw_3rd_kw FLOAT DEFAULT 0 NOT NULL",
+        "ALTER TABLE government_schemes ADD COLUMN cfa_max FLOAT DEFAULT 0 NOT NULL",
+        "ALTER TABLE government_schemes ADD COLUMN state_topup_per_kw FLOAT DEFAULT 0 NOT NULL",
+        "ALTER TABLE government_schemes ADD COLUMN grid_connected_only BOOLEAN DEFAULT TRUE NOT NULL",
     ]
     for stmt in alter_cols:
         try:

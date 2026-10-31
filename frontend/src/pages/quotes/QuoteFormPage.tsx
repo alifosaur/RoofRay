@@ -35,21 +35,13 @@ export const QuoteFormPage: React.FC = () => {
     { key: 'REJECTED', label: 'Cancelled' },
   ];
 
-  const handleSubmitToWarehouse = async () => {
-    if (!window.confirm('Submit this quotation to the warehouse? This will confirm the order and generate the warehouse pick list.')) return;
+  const handleRecordAcceptance = async () => {
+    if (!window.confirm('Record that the customer accepted this quotation? A draft Sales Order will be created for payment and confirmation.')) return;
     try {
       const res = await api.post<any>(`/quotes/${id}/accept`);
-      if (res.order_id) {
-        try {
-          await api.post(`/orders/${res.order_id}/confirm`);
-        } catch (e) {
-          console.warn('Order confirmation handled or already confirmed', e);
-        }
-      }
-      alert(`Quotation successfully submitted to warehouse! Sales Order ${res.order_number} confirmed and warehouse pick list generated.`);
       navigate(`/web/orders/${res.order_id}`);
     } catch (err: any) {
-      alert(err.message || 'Error submitting quotation to warehouse');
+      alert(err.message || 'Could not record acceptance');
     }
   };
 
@@ -167,11 +159,11 @@ export const QuoteFormPage: React.FC = () => {
           <>
             {quote.status !== 'ACCEPTED' && (
               <button
-                onClick={handleSubmitToWarehouse}
+                onClick={handleRecordAcceptance}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded text-xs font-semibold flex items-center gap-1.5 shadow-xs"
               >
                 <FontAwesomeIcon icon={faCheckCircle} />
-                <span>Submit to Warehouse (Confirm Order & Generate Pick List)</span>
+                <span>Record Customer Acceptance</span>
               </button>
             )}
             <button

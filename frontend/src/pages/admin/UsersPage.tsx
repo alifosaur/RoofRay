@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../api/client';
+import { useAuth } from '../../context/AuthContext';
 import { ControlPanel } from '../../components/odoo/ControlPanel';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -42,8 +43,9 @@ export const UsersPage: React.FC = () => {
     role: 'sales',
     phone: '',
     hourly_rate: 0,
-    firebase_uid: '',
   });
+  const { sendStaffPasswordEmail } = useAuth();
+  const [setupLink, setSetupLink] = useState<string | null>(null);
 
   const fetchUsers = async () => {
     try {
@@ -65,15 +67,18 @@ export const UsersPage: React.FC = () => {
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const uid = newUser.firebase_uid.trim() || `${newUser.role}_${Date.now()}`;
-      await api.post('/users', {
+      const res = await api.post<any>('/users', {
         ...newUser,
         role: newUser.role.toLowerCase(),
-        firebase_uid: uid,
         hourly_rate: Number(newUser.hourly_rate),
         is_active: true,
       });
-      alert(`Staff user ${newUser.full_name} created successfully!`);
+      if (res.auth_mode === 'firebase') {
+        await sendStaffPasswordEmail(newUser.email);
+        alert(`${newUser.full_name} created. A password setup email has been sent to ${newUser.email}.`);
+      } else {
+        setSetupLink(`${window.location.origin}${res.password_setup_url}`);
+      }
       setShowCreateModal(false);
       setNewUser({
         email: '',
@@ -81,7 +86,6 @@ export const UsersPage: React.FC = () => {
         role: 'sales',
         phone: '',
         hourly_rate: 0,
-        firebase_uid: '',
       });
       fetchUsers();
     } catch (err: any) {
@@ -152,6 +156,17 @@ export const UsersPage: React.FC = () => {
         searchTerm={search}
         onSearchChange={setSearch}
       />
+
+      {setupLink && (
+        <div className="mx-6 mt-3 p-3 bg-emerald-50 border border-emerald-200 rounded text-xs text-emerald-900">
+          <div className="font-bold mb-1">Staff account created. Share this one-time password setup link (valid 48 hours):</div>
+          <div className="flex items-center gap-2">
+            <code className="flex-1 break-all bg-white border border-emerald-200 rounded px-2 py-1">{setupLink}</code>
+            <button onClick={() => navigator.clipboard.writeText(setupLink)} className="px-2 py-1 bg-emerald-700 text-white rounded">Copy</button>
+            <button onClick={() => setSetupLink(null)} className="px-2 py-1 border border-emerald-300 rounded">Dismiss</button>
+          </div>
+        </div>
+      )}
 
       {/* Role Filter Pills */}
       <div className="bg-white border-b border-gray-200 px-6 py-2.5 flex items-center gap-2 overflow-x-auto text-xs">
@@ -335,17 +350,6 @@ export const UsersPage: React.FC = () => {
                   />
                 </div>
               )}
-
-              <div>
-                <label className="block text-gray-700 font-semibold mb-1">Firebase UID / Login ID</label>
-                <input
-                  type="text"
-                  value={newUser.firebase_uid}
-                  onChange={(e) => setNewUser({ ...newUser, firebase_uid: e.target.value })}
-                  placeholder="Leave blank to auto-generate"
-                  className="w-full border border-gray-300 rounded px-3 py-2 font-mono text-[11px]"
-                />
-              </div>
 
               <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">
                 <button

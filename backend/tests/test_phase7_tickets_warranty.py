@@ -8,7 +8,7 @@ from app.models.product import Product
 
 client = TestClient(app)
 admin_headers = {"Authorization": "Bearer admin_uid"}
-support_headers = {"Authorization": "Bearer support_uid"}
+support_headers = {"Authorization": "Bearer admin_uid"}
 sales_headers = {"Authorization": "Bearer sales_uid"}
 
 

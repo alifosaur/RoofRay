@@ -3,21 +3,18 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core import access
 from app.core.security import get_current_user, require_role
 from app.models.user import User, UserRole
 from app.models.lead import Lead, LeadStatus
-from app.models.survey import SurveyStatus
 from app.models.audit import AuditLog
 from app.schemas.lead import (
     LeadPublicCreate,
     LeadUpdate,
     LeadOut,
     CallChecklistCreate,
-    SubmitToWarehouseIn,
-    SubmitToWarehouseOut,
 )
-from app.schemas.quote import QuoteCreate
-from app.services import lead_service, survey_service, quote_service, order_service
+from app.services import lead_service
 
 router = APIRouter(prefix="/leads", tags=["Leads & CRM"])
 
@@ -38,22 +35,11 @@ def list_leads(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role(UserRole.SALES, UserRole.ADMIN, UserRole.CUSTOMER)),
 ):
-    if current_user.role in (UserRole.TECHNICIAN, UserRole.WAREHOUSE):
-        raise HTTPException(
-            status_code=403,
-            detail="Forbidden: Technicians and warehouse staff cannot view CRM leads",
-        )
-
-    query = db.query(Lead)
+    query = access.scope_leads(db.query(Lead), current_user)
     if not include_deleted:
         query = query.filter(Lead.is_deleted == False)
 
-    # Object-level access control: Customer can only view their own leads
-    if current_user.role == UserRole.CUSTOMER:
-        query = query.filter(
-            (Lead.phone == current_user.phone) | (Lead.email == current_user.email)
-        )
-    elif assigned_to_id:
+    if assigned_to_id and current_user.role == UserRole.ADMIN:
         query = query.filter(Lead.assigned_to_id == assigned_to_id)
 
     if status:
@@ -66,15 +52,6 @@ def list_leads(
             | (Lead.email.ilike(search_filter))
         )
     leads = query.order_by(Lead.created_at.desc()).all()
-    # Automatically shift stage to SURVEY_APPROVED if linked survey is approved
-    has_updates = False
-    for l in leads:
-        if l.survey and l.survey.status == SurveyStatus.APPROVED and l.status == LeadStatus.SURVEY_SCHEDULED:
-            l.status = LeadStatus.SURVEY_APPROVED
-            db.add(l)
-            has_updates = True
-    if has_updates:
-        db.commit()
     return leads
 
 
@@ -84,86 +61,11 @@ def get_lead(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role in (UserRole.TECHNICIAN, UserRole.WAREHOUSE):
-        raise HTTPException(
-            status_code=403,
-            detail="Forbidden: Technicians and warehouse staff cannot view CRM leads",
-        )
-
     lead = db.query(Lead).filter(Lead.id == lead_id).first()
     if not lead:
         raise HTTPException(status_code=404, detail="Lead not found")
-
-    # Object-level check: Customer can only view their own lead
-    if current_user.role == UserRole.CUSTOMER:
-        if (lead.phone != current_user.phone) and (lead.email != current_user.email):
-            raise HTTPException(
-                status_code=403,
-                detail="Forbidden: You cannot view another customer's lead",
-            )
-
-    # Automatically shift stage to SURVEY_APPROVED if survey is approved
-    if lead.survey and lead.survey.status == SurveyStatus.APPROVED and lead.status == LeadStatus.SURVEY_SCHEDULED:
-        lead.status = LeadStatus.SURVEY_APPROVED
-        db.commit()
-        db.refresh(lead)
-
+    access.ensure_lead_access(lead, current_user)
     return lead
-
-
-@router.post("/{lead_id}/submit-to-warehouse", response_model=SubmitToWarehouseOut)
-def submit_lead_items_to_warehouse(
-    lead_id: int,
-    payload: SubmitToWarehouseIn,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.SALES, UserRole.ADMIN)),
-):
-    """
-    Salesman prepares quotation according to client from BOM template and
-    directly dispatches the required item checklist to the warehouse.
-    Generates Quote, Order, and Warehouse Pick List in one atomic workflow.
-    """
-    lead = db.query(Lead).filter(Lead.id == lead_id).first()
-    if not lead:
-        raise HTTPException(status_code=404, detail="Lead not found")
-
-    # Verify survey is approved (or if scheduled/completed, approve it)
-    if lead.survey:
-        if lead.survey.status != SurveyStatus.APPROVED:
-            survey_service.approve_survey(db, lead.survey.id, current_user.id)
-    else:
-        raise HTTPException(
-            status_code=400,
-            detail="Site survey must be scheduled and approved before sending items to warehouse.",
-        )
-
-    # 1. Create quote from BOM
-    quote_payload = QuoteCreate(
-        lead_id=lead.id,
-        template_id=payload.template_id,
-        subsidy_amount=payload.subsidy_amount,
-        notes=payload.notes or f"Generated for {lead.name} based on approved site survey.",
-    )
-    quote = quote_service.create_quote_from_bom(db, quote_payload, current_user.id)
-
-    # 2. Accept quote and create Order
-    order = quote_service.accept_quote(db, quote.id, current_user.id)
-
-    # 3. Confirm order to create warehouse pick list with required items
-    order = order_service.confirm_order(db, order.id, current_user.id)
-
-    pick_list_id = order.pick_list.id if order.pick_list else 0
-    items_count = len(order.pick_list.lines) if order.pick_list else len(quote.lines)
-
-    return SubmitToWarehouseOut(
-        success=True,
-        message=f"Item details sent to warehouse! Sales Order {order.order_number} confirmed and Pick List #{pick_list_id} generated.",
-        quote_number=quote.quote_number,
-        order_id=order.id,
-        order_number=order.order_number,
-        pick_list_id=pick_list_id,
-        items_count=items_count,
-    )
 
 
 @router.put("/{lead_id}", response_model=LeadOut)
@@ -176,6 +78,7 @@ def update_lead(
     lead = db.query(Lead).filter(Lead.id == lead_id, Lead.is_deleted == False).first()
     if not lead:
         raise HTTPException(status_code=404, detail="Lead not found")
+    access.ensure_lead_access(lead, current_user)
 
     old_status = lead.status.value
     update_dict = payload.model_dump(exclude_unset=True)
@@ -207,6 +110,7 @@ def delete_lead(
     current_user: User = Depends(require_role(UserRole.SALES, UserRole.ADMIN)),
 ):
     """Soft-delete lead as required by business rules."""
+    _ensure_lead(db, lead_id, current_user)
     return lead_service.soft_delete_lead(db, lead_id, current_user.id)
 
 
@@ -218,6 +122,7 @@ def record_call_checklist(
     current_user: User = Depends(require_role(UserRole.SALES, UserRole.ADMIN)),
 ):
     """Records shadow-free roof area, electricity bill, and grid check."""
+    _ensure_lead(db, lead_id, current_user)
     return lead_service.process_call_checklist(db, lead_id, payload, current_user.id)
 
 
@@ -228,6 +133,7 @@ def get_lead_chatter(
     current_user: User = Depends(get_current_user),
 ):
     """Returns audit log trail for the lead to power Odoo chatter view."""
+    _ensure_lead(db, lead_id, current_user)
     logs = db.query(AuditLog).filter(
         AuditLog.record_type == "lead", AuditLog.record_id == lead_id
     ).order_by(AuditLog.created_at.desc()).all()
@@ -245,3 +151,11 @@ def get_lead_chatter(
         for log in logs
     ]
 
+
+
+def _ensure_lead(db: Session, lead_id: int, current_user: User) -> Lead:
+    lead = db.query(Lead).filter(Lead.id == lead_id).first()
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    access.ensure_lead_access(lead, current_user)
+    return lead

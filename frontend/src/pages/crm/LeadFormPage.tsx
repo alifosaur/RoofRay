@@ -31,8 +31,8 @@ export const LeadFormPage: React.FC = () => {
   const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
   const [submittingToWarehouse, setSubmittingToWarehouse] = useState(false);
   const [warehouseNotes, setWarehouseNotes] = useState('');
-  const [subsidyAmount, setSubsidyAmount] = useState<number>(78000);
-  const [submissionSuccess, setSubmissionSuccess] = useState<any>(null);
+  // null = let the backend compute the subsidy from the schemes table
+  const [subsidyAmount, setSubsidyAmount] = useState<number | null>(null);
 
   const [checklist, setChecklist] = useState({
     shadow_free_area_sqft: 350.0,
@@ -87,10 +87,6 @@ export const LeadFormPage: React.FC = () => {
     try {
       const data = await api.get<any>(`/leads/${id}`);
       setLead(data);
-      if (data.required_capacity) {
-        const sub = data.required_capacity >= 3 ? 78000 : data.required_capacity >= 2 ? 60000 : 30000;
-        setSubsidyAmount(sub);
-      }
       fetchBomTemplates(data.required_capacity);
       const chat = await api.get<any[]>(`/leads/${id}/chatter`);
       setChatter(chat);
@@ -166,22 +162,21 @@ export const LeadFormPage: React.FC = () => {
   const handleSendToWarehouse = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedTemplateId) {
-      alert('Please select a pre-engineered BOM template.');
+      alert('Please select a BOM template.');
       return;
     }
     setSubmittingToWarehouse(true);
     try {
-      const res = await api.post<any>(`/leads/${id}/submit-to-warehouse`, {
+      const quote = await api.post<any>('/quotes', {
+        lead_id: lead.id,
         template_id: selectedTemplateId,
-        subsidy_amount: subsidyAmount,
-        notes: warehouseNotes || `Item checklist dispatched for ${lead.name} (${lead.required_capacity} kW ${lead.system_type}).`,
+        subsidy_amount: subsidyAmount ?? undefined,
+        notes: warehouseNotes || undefined,
       });
-      setSubmissionSuccess(res);
       setShowSendItemsModal(false);
-      fetchLeadData();
-      alert(`Success! ${res.message}`);
+      navigate(`/web/quotes/${quote.id}`);
     } catch (err: any) {
-      alert(err.message || 'Failed to dispatch items to warehouse');
+      alert(err.message || 'Failed to create quotation');
     } finally {
       setSubmittingToWarehouse(false);
     }
@@ -341,7 +336,7 @@ export const LeadFormPage: React.FC = () => {
           <div className="flex items-center gap-2">
             <FontAwesomeIcon icon={faCheckCircle} className="text-emerald-600 text-sm" />
             <span>
-              <strong>Site Survey Feasibility Approved!</strong> Shadow analysis and roof structure verified. Now send the required installation items checklist to the warehouse.
+              <strong>Site Survey Feasibility Approved!</strong> Shadow analysis and roof structure verified. Now create the quotation for the customer.
             </span>
           </div>
           <button
@@ -349,28 +344,11 @@ export const LeadFormPage: React.FC = () => {
             className="bg-[#6B4B63] hover:bg-[#583D51] text-white px-3.5 py-1.5 rounded font-bold text-xs flex items-center gap-1.5 shadow-xs transition-colors"
           >
             <FontAwesomeIcon icon={faDolly} />
-            <span>Send Item Details Required to Warehouse</span>
+            <span>Create Quotation from BOM Template</span>
           </button>
         </div>
       )}
 
-      {submissionSuccess && (
-        <div className="bg-teal-50 border-b border-teal-200 px-6 py-2.5 flex items-center justify-between text-xs text-teal-950">
-          <div className="flex items-center gap-2">
-            <FontAwesomeIcon icon={faBoxes} className="text-teal-600 text-sm" />
-            <span>
-              <strong>Items Dispatched to Warehouse!</strong> Sales Order <strong>{submissionSuccess.order_number}</strong> confirmed and Pick List <strong>#{submissionSuccess.pick_list_id}</strong> ({submissionSuccess.items_count} items) generated for barcode scanning.
-            </span>
-          </div>
-          <Link
-            to={`/web/inventory?tab=picklists&pick_list_id=${submissionSuccess.pick_list_id}`}
-            className="bg-[#5CC9B0] hover:bg-teal-500 text-gray-900 px-3 py-1 rounded font-bold text-xs flex items-center gap-1.5 shadow-xs transition-colors"
-          >
-            <span>Open Warehouse Pick List #{submissionSuccess.pick_list_id}</span>
-            <FontAwesomeIcon icon={faArrowRight} />
-          </Link>
-        </div>
-      )}
 
       <FormView
         title={lead.name}
@@ -414,7 +392,7 @@ export const LeadFormPage: React.FC = () => {
                 className="bg-[#6B4B63] hover:bg-[#583D51] text-white px-3 py-1 rounded text-xs font-bold shadow-xs flex items-center gap-1.5"
               >
                 <FontAwesomeIcon icon={faDolly} />
-                <span>Send Item Details Required to Warehouse</span>
+                <span>Create Quotation from BOM Template</span>
               </button>
             )}
 
@@ -485,7 +463,7 @@ export const LeadFormPage: React.FC = () => {
             <div className="bg-[#6B4B63] text-white px-5 py-3 flex items-center justify-between font-semibold">
               <div className="flex items-center gap-2">
                 <FontAwesomeIcon icon={faDolly} className="text-white text-sm" />
-                <span>Send Item Details Required to Warehouse (BOM Checklist)</span>
+                <span>Create Quotation from BOM Template</span>
               </div>
               <button onClick={() => setShowSendItemsModal(false)} className="hover:text-gray-300 text-sm">✕</button>
             </div>
@@ -629,10 +607,10 @@ export const LeadFormPage: React.FC = () => {
                   </label>
                   <input
                     type="number"
-                    value={subsidyAmount}
-                    onChange={(e) => setSubsidyAmount(Number(e.target.value))}
+                    value={subsidyAmount ?? ''}
+                    placeholder="Leave blank to use current scheme amounts"
+                    onChange={(e) => setSubsidyAmount(e.target.value === '' ? null : Number(e.target.value))}
                     className="w-full border border-gray-300 rounded px-2.5 py-1.5 focus:border-[#6B4B63] focus:outline-none"
-                    placeholder="e.g. 78000"
                   />
                   <span className="text-[10px] text-gray-400 mt-0.5 block">
                     Direct benefit credited to customer's DISCOM account.
@@ -641,13 +619,13 @@ export const LeadFormPage: React.FC = () => {
 
                 <div>
                   <label className="block font-semibold text-gray-700 mb-1">
-                    Warehouse Dispatch Instructions
+                    Quotation Notes
                   </label>
                   <textarea
                     rows={2}
                     value={warehouseNotes}
                     onChange={(e) => setWarehouseNotes(e.target.value)}
-                    placeholder="e.g. Priority dispatch. Verify tier-1 mono PERC serial barcodes before staging."
+                    placeholder="Notes printed on the quotation"
                     className="w-full border border-gray-300 rounded px-2.5 py-1.5 focus:border-[#6B4B63] focus:outline-none"
                   />
                 </div>
@@ -657,8 +635,8 @@ export const LeadFormPage: React.FC = () => {
               <div className="p-3 bg-purple-50/70 border border-purple-200 rounded-lg flex items-start gap-2.5 text-xs text-purple-900">
                 <FontAwesomeIcon icon={faInfoCircle} className="text-[#6B4B63] mt-0.5" />
                 <div>
-                  <span className="font-bold block">Warehouse Handover Workflow:</span>
-                  Submitting will create the confirmed Sales Order and automatically send the required item checklist to the warehouse. Warehouse staff will tick and scan each component's barcode before order dispatch.
+                  <span className="font-bold block">Next steps:</span>
+                  Creates a DRAFT quotation with the template's BOM (adjustable on the quote). Send it to the customer, record acceptance and payment, then confirm the order: the pick list is sent to the warehouse automatically on confirmation.
                 </div>
               </div>
 
@@ -680,12 +658,12 @@ export const LeadFormPage: React.FC = () => {
                   {submittingToWarehouse ? (
                     <>
                       <FontAwesomeIcon icon={faSpinner} className="animate-spin" />
-                      <span>Sending Item Checklist to Warehouse...</span>
+                      <span>Creating quotation...</span>
                     </>
                   ) : (
                     <>
                       <FontAwesomeIcon icon={faDolly} />
-                      <span>Confirm & Send Item Details to Warehouse</span>
+                      <span>Create Quotation</span>
                     </>
                   )}
                 </button>

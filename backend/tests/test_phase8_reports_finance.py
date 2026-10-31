@@ -3,7 +3,7 @@ from app.main import app
 
 client = TestClient(app)
 admin_headers = {"Authorization": "Bearer admin_uid"}
-accounts_headers = {"Authorization": "Bearer accounts_uid"}
+accounts_headers = {"Authorization": "Bearer admin_uid"}
 
 
 def test_director_dashboard_and_profit_metrics():

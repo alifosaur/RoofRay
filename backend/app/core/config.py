@@ -15,7 +15,11 @@ class Settings(BaseSettings):
 
     DATABASE_URL: str = "sqlite:///./sunpower.db"
     FIREBASE_CREDENTIALS_PATH: str = "firebase-service-account.json"
-    DEV_AUTH_BYPASS: bool = True
+    # Firebase web config served to the frontend by /auth/config (public values)
+    FIREBASE_WEB_API_KEY: str = ""
+    FIREBASE_WEB_AUTH_DOMAIN: str = ""
+    FIREBASE_WEB_PROJECT_ID: str = ""
+    FIREBASE_WEB_APP_ID: str = ""
 
     UPLOAD_DIR: str = "./uploads"
     SECRET_KEY: str = "sunpower-secret-key-change-in-production"

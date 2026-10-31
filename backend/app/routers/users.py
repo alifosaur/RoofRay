@@ -2,9 +2,12 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
+from app.core import security
 from app.core.security import require_role
+from app.models.audit import AuditLog
 from app.models.user import User, UserRole
-from app.schemas.user import UserCreate, UserUpdate, UserOut
+from app.schemas.user import StaffCreateRequest, StaffCreateResponse, UserUpdate, UserOut
+from app.services import audit_service
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -25,34 +28,42 @@ def list_users(
     return query.order_by(User.id.asc()).all()
 
 
-@router.post("", response_model=UserOut, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=StaffCreateResponse, status_code=status.HTTP_201_CREATED)
 def create_user(
-    payload: UserCreate,
+    payload: StaffCreateRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role(UserRole.ADMIN)),
 ):
-    existing = db.query(User).filter(
-        (User.email == payload.email) | (User.firebase_uid == payload.firebase_uid)
-    ).first()
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User with this email or firebase_uid already exists",
-        )
+    """
+    Admin-only staff account creation. Creates the identity account (Firebase or local) plus the DB row.
+    Firebase mode: the admin UI then triggers Firebase's password-reset email for the new user.
+    Local mode: returns a one-time password setup link to hand to the staff member.
+    """
+    if payload.role == UserRole.CUSTOMER:
+        raise HTTPException(status_code=400, detail="Customers register themselves through the portal")
+    email = payload.email.lower().strip()
+    if db.query(User).filter(User.email == email).first():
+        raise HTTPException(status_code=400, detail="A user with this email already exists")
 
     user = User(
-        email=payload.email,
-        full_name=payload.full_name,
+        email=email,
+        full_name=payload.full_name.strip(),
         role=payload.role,
-        firebase_uid=payload.firebase_uid,
+        firebase_uid=security.create_auth_account(email, payload.full_name),
         phone=payload.phone,
-        hourly_rate=payload.hourly_rate,
+        hourly_rate=payload.hourly_rate if payload.role == UserRole.TECHNICIAN else 0,
         is_active=payload.is_active,
     )
     db.add(user)
+    db.flush()
+    db.add(AuditLog(record_type="user", record_id=user.id, action="USER_CREATED", to_status=user.role.value,
+                    notes=f"Staff account {email} created with role {user.role.value}.", user_id=current_user.id))
     db.commit()
     db.refresh(user)
-    return user
+    setup_url = None
+    if security.AUTH_MODE == "local":
+        setup_url = f"/set-password?token={security.issue_password_setup_token(user.firebase_uid)}"
+    return StaffCreateResponse(user=user, auth_mode=security.AUTH_MODE, password_setup_url=setup_url)
 
 
 @router.get("/{user_id}", response_model=UserOut)
@@ -79,8 +90,9 @@ def update_user(
         raise HTTPException(status_code=404, detail="User not found")
 
     update_data = payload.model_dump(exclude_unset=True)
-    for field, val in update_data.items():
-        setattr(user, field, val)
+    if user.id == current_user.id and (update_data.get("is_active") is False or update_data.get("role", UserRole.ADMIN) != UserRole.ADMIN):
+        raise HTTPException(status_code=400, detail="You cannot deactivate or demote your own admin account")
+    audit_service.apply_changes(db, "user", user, update_data, current_user.id)
 
     db.commit()
     db.refresh(user)

@@ -10,6 +10,20 @@ os.environ["DATABASE_URL"] = f"sqlite:///{os.path.join(_tmp_dir, 'test.db')}"
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.load_catalog import load_catalog  # noqa: E402
+from app.core import security  # noqa: E402
+
+# Test-only: treat the bearer string as the user's UID so tests can act as any seeded test account.
+# Production code has no such bypass; tests of the real local-token flow use security.issue_session_token.
+_real_verify = security.verify_firebase_token
+
+
+def _test_verify(token: str) -> dict:
+    if token.count(".") == 2:  # a real signed session token
+        return _real_verify(token)
+    return {"uid": token}
+
+
+security.verify_firebase_token = _test_verify
 from app.core.database import SessionLocal  # noqa: E402
 from app.models.user import User, UserRole  # noqa: E402
 

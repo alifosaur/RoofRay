@@ -128,6 +128,7 @@ def test_complete_milestone_role_based_workflows_and_all_gates():
     # =========================================================================
     cust_email = f"customer_{uid_suffix}@gmail.com"
     reg_res = client.post("/api/auth/register", json={
+        "password": "testpass123",
         "email": cust_email,
         "full_name": f"Pooja Mehta {uid_suffix}",
         "phone": f"+91 9811{uid_suffix[:6]}",
@@ -392,7 +393,7 @@ def test_complete_milestone_role_based_workflows_and_all_gates():
         "is_active": True,
     })
     assert new_staff_res.status_code == 201
-    new_staff_id = new_staff_res.json()["id"]
+    new_staff_id = new_staff_res.json()["user"]["id"]
 
     # Toggle user active status
     deact_res = client.put(f"/api/users/{new_staff_id}", headers=admin_headers, json={"is_active": False})

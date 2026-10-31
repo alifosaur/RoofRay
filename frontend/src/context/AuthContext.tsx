@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { api } from '../api/client';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { api, setTokenProvider, TOKEN_KEY } from '../api/client';
 
 export type UserRole = 'customer' | 'sales' | 'technician' | 'warehouse' | 'admin';
 
@@ -15,36 +15,30 @@ export interface UserProfile {
 
 export interface RegisterPayload {
   email: string;
+  password: string;
   full_name: string;
   phone: string;
-  role?: UserRole;
-  password?: string;
   address?: string;
   city?: string;
   pincode?: string;
-  department?: string;
 }
+
+type AuthMode = 'firebase' | 'local';
 
 interface AuthContextType {
   user: UserProfile | null;
-  role: UserRole;
+  role: UserRole | null;
+  authMode: AuthMode | null;
   isLoading: boolean;
-  login: (email: string, password?: string) => Promise<UserProfile>;
-  loginWithToken: (token: string, targetRole: UserRole) => Promise<UserProfile>;
+  login: (email: string, password: string) => Promise<UserProfile>;
   register: (payload: RegisterPayload) => Promise<UserProfile>;
-  logout: () => void;
-  switchRole: (newRole: UserRole) => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<void>;
+  sendStaffPasswordEmail: (email: string) => Promise<void>;
+  completePasswordSetup: (token: string, password: string) => Promise<UserProfile>;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
-
-export const DEMO_TOKENS: Record<UserRole, { uid: string; email: string; name: string }> = {
-  admin: { uid: 'admin_uid', email: 'admin@roofray.com', name: 'Rajesh Singhania (Director)' },
-  sales: { uid: 'sales_uid', email: 'sales@roofray.com', name: 'Rohan Sharma (Sales)' },
-  technician: { uid: 'tech_uid', email: 'tech@roofray.com', name: 'Amit Verma (Lead Technician)' },
-  warehouse: { uid: 'warehouse_uid', email: 'warehouse@roofray.com', name: 'Deepak Kumar (Warehouse Lead)' },
-  customer: { uid: 'customer_uid', email: 'customer@roofray.com', name: 'Vikram Malhotra (Customer)' },
-};
 
 export function getRoleHomePath(role: UserRole): string {
   switch (role) {
@@ -64,131 +58,120 @@ export function getRoleHomePath(role: UserRole): string {
 }
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [role, setRole] = useState<UserRole>(
-    (localStorage.getItem('roofray_role') as UserRole) ||
-    (localStorage.getItem('sunpower_role') as UserRole) ||
-    'customer'
-  );
   const [user, setUser] = useState<UserProfile | null>(null);
+  const [authMode, setAuthMode] = useState<AuthMode | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  // Firebase Auth instance + SDK module, loaded only in Firebase mode
+  const fb = useRef<{ auth: any; sdk: typeof import('firebase/auth') } | null>(null);
 
-  const fetchProfile = async (): Promise<UserProfile | null> => {
-    const token = localStorage.getItem('roofray_token') || localStorage.getItem('sunpower_token');
-    if (!token) {
-      setUser(null);
-      setRole('customer');
-      setIsLoading(false);
-      return null;
-    }
-
+  const loadProfile = async (): Promise<UserProfile | null> => {
     try {
       const profile = await api.get<UserProfile>('/auth/me');
       setUser(profile);
-      setRole(profile.role);
-      localStorage.setItem('roofray_role', profile.role);
       return profile;
-    } catch (err) {
-      console.warn('Session not active or token expired:', err);
-      // Clean up invalid/expired session
-      localStorage.removeItem('roofray_token');
-      localStorage.removeItem('roofray_role');
-      localStorage.removeItem('sunpower_token');
-      localStorage.removeItem('sunpower_role');
+    } catch {
       setUser(null);
-      setRole('customer');
       return null;
-    } finally {
-      setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    // Clear any legacy auto-injected admin session so users start unauthenticated on the landing page
-    const token = localStorage.getItem('roofray_token') || localStorage.getItem('sunpower_token');
-    if (token === 'admin_uid' && !localStorage.getItem('roofray_user_explicit')) {
-      localStorage.removeItem('roofray_token');
-      localStorage.removeItem('roofray_role');
-      localStorage.removeItem('sunpower_token');
-      localStorage.removeItem('sunpower_role');
-    }
-    fetchProfile();
+    (async () => {
+      try {
+        const cfg = await api.get<{ mode: AuthMode; firebase: Record<string, string> | null }>('/auth/config');
+        setAuthMode(cfg.mode);
+        if (cfg.mode === 'firebase' && cfg.firebase) {
+          const [{ initializeApp }, sdk] = await Promise.all([import('firebase/app'), import('firebase/auth')]);
+          const auth = sdk.getAuth(initializeApp(cfg.firebase));
+          fb.current = { auth, sdk };
+          setTokenProvider(async () => (auth.currentUser ? auth.currentUser.getIdToken() : null));
+          sdk.onAuthStateChanged(auth, async (fbUser) => {
+            if (fbUser) await loadProfile();
+            else setUser(null);
+            setIsLoading(false);
+          });
+          return;
+        }
+        if (localStorage.getItem(TOKEN_KEY)) {
+          if (!(await loadProfile())) localStorage.removeItem(TOKEN_KEY);
+        }
+      } catch (err) {
+        console.error('Auth initialisation failed', err);
+      }
+      setIsLoading(false);
+    })();
   }, []);
 
-  const login = async (email: string, password?: string): Promise<UserProfile> => {
-    setIsLoading(true);
-    try {
-      const res = await api.post<{ access_token: string; user: UserProfile }>('/auth/login', {
-        email,
-        password: password || 'demo123',
-      });
-      localStorage.setItem('roofray_token', res.access_token);
-      localStorage.setItem('roofray_role', res.user.role);
-      localStorage.setItem('roofray_user_explicit', 'true');
+  const requireProfile = async (): Promise<UserProfile> => {
+    const profile = await loadProfile();
+    if (!profile) throw new Error('Your account is not registered in the system. Please contact an administrator.');
+    return profile;
+  };
+
+  const login = async (email: string, password: string) => {
+    if (fb.current) {
+      await fb.current.sdk.signInWithEmailAndPassword(fb.current.auth, email, password);
+      return requireProfile();
+    }
+    const res = await api.post<{ access_token: string; user: UserProfile }>('/auth/login', { email, password });
+    localStorage.setItem(TOKEN_KEY, res.access_token);
+    setUser(res.user);
+    return res.user;
+  };
+
+  const register = async (payload: RegisterPayload) => {
+    if (fb.current) {
+      await fb.current.sdk.createUserWithEmailAndPassword(fb.current.auth, payload.email, payload.password);
+      const { password, ...profile } = payload;
+      const res = await api.post<{ user: UserProfile }>('/auth/register', profile);
       setUser(res.user);
-      setRole(res.user.role);
       return res.user;
-    } finally {
-      setIsLoading(false);
     }
+    const res = await api.post<{ access_token: string; user: UserProfile }>('/auth/register', payload);
+    localStorage.setItem(TOKEN_KEY, res.access_token);
+    setUser(res.user);
+    return res.user;
   };
 
-  const loginWithToken = async (token: string, targetRole: UserRole): Promise<UserProfile> => {
-    setIsLoading(true);
-    try {
-      localStorage.setItem('roofray_token', token);
-      localStorage.setItem('roofray_role', targetRole);
-      localStorage.setItem('roofray_user_explicit', 'true');
-      const profile = await api.get<UserProfile>('/auth/me');
-      setUser(profile);
-      setRole(profile.role);
-      return profile;
-    } finally {
-      setIsLoading(false);
+  const requestPasswordReset = async (email: string) => {
+    if (fb.current) {
+      await fb.current.sdk.sendPasswordResetEmail(fb.current.auth, email);
+      return;
     }
+    await api.post('/auth/forgot-password', { email });
   };
 
-  const register = async (payload: RegisterPayload): Promise<UserProfile> => {
-    setIsLoading(true);
-    try {
-      const endpoint = payload.role && payload.role !== 'customer' ? '/auth/staff-register' : '/auth/register';
-      const res = await api.post<{ access_token: string; user: UserProfile }>(endpoint, payload);
-      localStorage.setItem('roofray_token', res.access_token);
-      localStorage.setItem('roofray_role', res.user.role);
-      localStorage.setItem('roofray_user_explicit', 'true');
-      setUser(res.user);
-      setRole(res.user.role);
-      return res.user;
-    } finally {
-      setIsLoading(false);
-    }
+  // Firebase mode: newly created staff get Firebase's password-reset email to set their password
+  const sendStaffPasswordEmail = async (email: string) => {
+    if (fb.current) await fb.current.sdk.sendPasswordResetEmail(fb.current.auth, email);
   };
 
-  const logout = () => {
-    localStorage.removeItem('roofray_token');
-    localStorage.removeItem('roofray_role');
-    localStorage.removeItem('roofray_user_explicit');
-    localStorage.removeItem('sunpower_token');
-    localStorage.removeItem('sunpower_role');
+  const completePasswordSetup = async (token: string, password: string) => {
+    const res = await api.post<{ access_token: string; user: UserProfile }>('/auth/set-password', { token, password });
+    localStorage.setItem(TOKEN_KEY, res.access_token);
+    setUser(res.user);
+    return res.user;
+  };
+
+  const logout = async () => {
+    if (fb.current) await fb.current.sdk.signOut(fb.current.auth);
+    localStorage.removeItem(TOKEN_KEY);
     setUser(null);
-    setRole('customer');
-  };
-
-  const switchRole = async (newRole: UserRole) => {
-    const demo = DEMO_TOKENS[newRole] || DEMO_TOKENS.admin;
-    await loginWithToken(demo.uid, newRole);
   };
 
   return (
     <AuthContext.Provider
       value={{
         user,
-        role,
+        role: user?.role ?? null,
+        authMode,
         isLoading,
         login,
-        loginWithToken,
         register,
+        requestPasswordReset,
+        sendStaffPasswordEmail,
+        completePasswordSetup,
         logout,
-        switchRole,
       }}
     >
       {children}

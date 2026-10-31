@@ -1,5 +1,12 @@
+import hashlib
+import hmac
 import os
+import secrets
+import uuid
+from datetime import datetime, timedelta
 from typing import Optional, List
+
+import jwt
 import firebase_admin
 from firebase_admin import auth as fb_auth, credentials
 from fastapi import Depends, HTTPException, status
@@ -26,36 +33,78 @@ else:
 security_scheme = HTTPBearer(auto_error=False)
 
 
+AUTH_MODE = "firebase" if _firebase_initialized else "local"
+if AUTH_MODE == "local":
+    print("[INFO] Auth mode: local password + signed session tokens (configure Firebase credentials for production).")
+
+_SESSION_HOURS = 12
+_RESET_HOURS = 48
+
+
+def hash_password(password: str) -> str:
+    salt = secrets.token_hex(16)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode(), bytes.fromhex(salt), 200_000).hex()
+    return f"pbkdf2_sha256$200000${salt}${digest}"
+
+
+def verify_password(password: str, stored: Optional[str]) -> bool:
+    if not stored:
+        return False
+    try:
+        _, iterations, salt, digest = stored.split("$")
+    except ValueError:
+        return False
+    candidate = hashlib.pbkdf2_hmac("sha256", password.encode(), bytes.fromhex(salt), int(iterations)).hex()
+    return hmac.compare_digest(candidate, digest)
+
+
+def _issue_token(uid: str, purpose: str, hours: int) -> str:
+    now = datetime.utcnow()
+    return jwt.encode({"sub": uid, "purpose": purpose, "iat": now, "exp": now + timedelta(hours=hours)},
+                      settings.SECRET_KEY, algorithm="HS256")
+
+
+def issue_session_token(uid: str) -> str:
+    return _issue_token(uid, "session", _SESSION_HOURS)
+
+
+def issue_password_setup_token(uid: str) -> str:
+    return _issue_token(uid, "password_setup", _RESET_HOURS)
+
+
+def decode_local_token(token: str, purpose: str) -> str:
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token",
+                            headers={"WWW-Authenticate": "Bearer"})
+    if payload.get("purpose") != purpose:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token purpose")
+    return payload["sub"]
+
+
 def verify_firebase_token(token: str) -> dict:
-    """
-    Verifies Firebase ID token.
-    Falls back to mock verification in dev mode if credentials file is not configured.
-    """
-    if _firebase_initialized:
+    """Verifies a Firebase ID token, or a local session token when Firebase is not configured."""
+    if AUTH_MODE == "firebase":
         try:
-            decoded_token = fb_auth.verify_id_token(token)
-            return decoded_token
+            return fb_auth.verify_id_token(token)
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail=f"Invalid Firebase ID token: {str(e)}",
                 headers={"WWW-Authenticate": "Bearer"},
             )
+    return {"uid": decode_local_token(token, "session")}
 
-    # Dev / Local bypass mode
-    if settings.DEV_AUTH_BYPASS:
-        # If token format is mock-<role>-<uid> or mock-<uid>
-        if token.startswith("dev-") or token.startswith("mock-"):
-            parts = token.split("-")
-            uid = parts[-1]
-            return {"uid": uid, "email": f"{uid}@sunpower.local"}
-        # Allow standard email or uid string in dev mode
-        return {"uid": token, "email": f"{token}@sunpower.local"}
 
-    raise HTTPException(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        detail="Firebase Admin SDK is not configured and dev bypass is disabled.",
-    )
+def create_auth_account(email: str, full_name: str) -> str:
+    """Creates (or reuses) the identity-provider account for a staff member and returns its UID."""
+    if AUTH_MODE == "firebase":
+        try:
+            return fb_auth.get_user_by_email(email).uid
+        except fb_auth.UserNotFoundError:
+            return fb_auth.create_user(email=email, display_name=full_name).uid
+    return f"local_{uuid.uuid4().hex}"
 
 
 def get_current_user(
@@ -81,10 +130,7 @@ def get_current_user(
 
     # Check database for user
     user = db.query(User).filter(User.firebase_uid == uid).first()
-    if not user and uid in ("support_uid", "accounts_uid"):
-        # Admin performs accounts and support duties per specification
-        user = db.query(User).filter(User.role == UserRole.ADMIN).first()
-    if not user:
+    if not user and AUTH_MODE == "firebase":
         # Check by email if available in decoded token
         email = decoded.get("email")
         if email:

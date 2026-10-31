@@ -3,6 +3,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core import access
+from app.models.lead import Lead
 from app.core.security import get_current_user, require_role
 from app.models.user import User, UserRole
 from app.models.survey import Survey, SurveyStatus
@@ -19,6 +21,10 @@ def schedule_survey(
     current_user: User = Depends(require_role(UserRole.SALES, UserRole.ADMIN)),
 ):
     """Schedule a technician visit for a site survey."""
+    lead = db.query(Lead).filter(Lead.id == payload.lead_id).first()
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    access.ensure_lead_access(lead, current_user)
     return survey_service.schedule_survey(db, payload, current_user.id)
 
 
@@ -29,16 +35,15 @@ def list_surveys(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role == UserRole.CUSTOMER:
-        raise HTTPException(
-            status_code=403,
-            detail="Forbidden: Customers cannot access site surveys",
-        )
+    if current_user.role in (UserRole.CUSTOMER, UserRole.WAREHOUSE):
+        raise HTTPException(status_code=403, detail="Forbidden: site surveys are for sales and technicians")
 
     query = db.query(Survey)
     if current_user.role == UserRole.TECHNICIAN:
-        query = query.filter((Survey.technician_id == current_user.id) | (Survey.technician_id == None))
-    elif technician_id and current_user.role in [UserRole.ADMIN, UserRole.SALES]:
+        query = query.filter(Survey.technician_id == current_user.id)
+    elif current_user.role == UserRole.SALES:
+        query = query.join(Lead, Survey.lead_id == Lead.id).filter(Lead.assigned_to_id == current_user.id)
+    if technician_id and current_user.role in [UserRole.ADMIN, UserRole.SALES]:
         query = query.filter(Survey.technician_id == technician_id)
 
     if status:
@@ -52,15 +57,14 @@ def get_survey(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role == UserRole.CUSTOMER:
-        raise HTTPException(
-            status_code=403,
-            detail="Forbidden: Customers cannot access site surveys",
-        )
+    if current_user.role in (UserRole.CUSTOMER, UserRole.WAREHOUSE):
+        raise HTTPException(status_code=403, detail="Forbidden: site surveys are for sales and technicians")
 
     survey = db.query(Survey).filter(Survey.id == survey_id).first()
     if not survey:
         raise HTTPException(status_code=404, detail="Survey not found")
+    if current_user.role == UserRole.SALES:
+        access.ensure_lead_access(survey.lead, current_user)
 
     if current_user.role == UserRole.TECHNICIAN and survey.technician_id != current_user.id:
         raise HTTPException(
@@ -96,9 +100,10 @@ def complete_survey(
 def approve_survey(
     survey_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.ADMIN, UserRole.SALES, UserRole.TECHNICIAN)),
+    current_user: User = Depends(require_role(UserRole.ADMIN, UserRole.SALES)),
 ):
-    """Manager/Admin/Technician approves the survey (required gate for quote generation)."""
+    """Sales reviews and approves the submitted survey (required gate for quote generation)."""
+    _ensure_sales_owns_survey(db, survey_id, current_user)
     return survey_service.approve_survey(db, survey_id, current_user.id)
 
 
@@ -109,7 +114,15 @@ def reject_survey(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role(UserRole.ADMIN, UserRole.SALES)),
 ):
-    """Manager/Admin rejects the survey (marks linked lead as LOST)."""
+    """Sales/Admin rejects the survey (marks linked lead as LOST)."""
+    _ensure_sales_owns_survey(db, survey_id, current_user)
     return survey_service.reject_survey(db, survey_id, reason, current_user.id)
+
+
+def _ensure_sales_owns_survey(db: Session, survey_id: int, current_user: User) -> None:
+    survey = db.query(Survey).filter(Survey.id == survey_id).first()
+    if not survey:
+        raise HTTPException(status_code=404, detail="Survey not found")
+    access.ensure_lead_access(survey.lead, current_user)
 
 

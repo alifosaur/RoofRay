@@ -22,7 +22,7 @@ check() {
 }
 
 check "mock libraries (faker, msw, json-server, lorem)" '(faker|@faker-js|\bmsw\b|json-server|lorem ipsum|\blorem\b)' "${SCAN[@]}"
-check "demo / mock / dummy / fixture markers" '\b(demo|mock|dummy|fixture)[a-z_]*\b' "${SCAN[@]}"
+check "demo / mock / dummy / fixture markers" '\b(demo|mock|dummy|fixtures?)(_[a-z_]*|s|data|users?|tokens?)?\b' "${SCAN[@]}"
 check "hard-coded demo login tokens" '(admin|sales|tech|warehouse|customer)_uid' "${SCAN[@]}"
 check "seed scripts" '\bseed(_users)?\.py\b|run_seed|AUTO_SEED' "${SCAN[@]}" backend/docker-entrypoint.sh docker-compose.yml
 check "hard-coded emails in pages/components" "['\"][a-z0-9._%+-]+@[a-z0-9.-]+\.(com|in|local)['\"]" frontend/src

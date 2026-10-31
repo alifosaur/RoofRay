@@ -23,6 +23,7 @@ def test_public_self_registration_creates_only_customer_and_links_customer_row()
     phone = f"999{unique_suffix[:7]}"
 
     reg_payload = {
+        "password": "testpass123",
         "email": email,
         "full_name": "Test Customer",
         "phone": phone,
@@ -51,17 +52,49 @@ def test_public_self_registration_creates_only_customer_and_links_customer_row()
     assert me_res.json()["customer_id"] == user_info["customer_id"]
 
 
-def test_login_unified_endpoint():
-    """Verify login returns token and profile for customer and admin."""
-    # Test customer login (supports both new @roofray.com and legacy @sunpower.com)
-    cust_login = client.post("/api/auth/login", json={"email": "customer@roofray.com"})
-    assert cust_login.status_code == 200
-    assert cust_login.json()["user"]["role"] == "customer"
+def test_login_requires_correct_password():
+    """Login checks the password; the returned token works on /auth/me; staff self-registration is gone."""
+    email = f"login_{uuid.uuid4().hex[:6]}@example.com"
+    reg = client.post("/api/auth/register", json={
+        "email": email, "password": "correct-horse", "full_name": "Login Test", "phone": f"955{uuid.uuid4().hex[:7]}",
+    })
+    assert reg.status_code == 201
 
-    # Test admin login
-    admin_login = client.post("/api/auth/login", json={"email": "admin@test.local"})
-    assert admin_login.status_code == 200
-    assert admin_login.json()["user"]["role"] == "admin"
+    assert client.post("/api/auth/login", json={"email": email, "password": "wrong-password"}).status_code == 401
+    assert client.post("/api/auth/login", json={"email": email}).status_code == 422
+    ok = client.post("/api/auth/login", json={"email": email, "password": "correct-horse"})
+    assert ok.status_code == 200
+    me = client.get("/api/auth/me", headers={"Authorization": f"Bearer {ok.json()['access_token']}"})
+    assert me.status_code == 200 and me.json()["role"] == "customer"
+
+    # Forged / unsigned tokens are rejected
+    assert client.get("/api/auth/me", headers={"Authorization": "Bearer not.a.jwt"}).status_code == 401
+    # Public staff self-registration no longer exists
+    assert client.post("/api/auth/staff-register", json={"email": "x@example.com", "role": "admin"}).status_code in (404, 405)
+    # Short passwords are refused
+    assert client.post("/api/auth/register", json={
+        "email": f"short_{uuid.uuid4().hex[:6]}@example.com", "password": "123", "full_name": "Short", "phone": "9000000001",
+    }).status_code == 400
+
+
+def test_admin_creates_staff_with_password_setup_link():
+    email = f"staff_{uuid.uuid4().hex[:6]}@example.com"
+    res = client.post("/api/users", headers=admin_headers, json={
+        "email": email, "full_name": "New Tech", "role": "technician", "hourly_rate": 550,
+    })
+    assert res.status_code == 201, res.text
+    body = res.json()
+    assert body["user"]["role"] == "technician" and body["user"]["hourly_rate"] == 550
+    assert body["password_setup_url"].startswith("/set-password?token=")
+
+    # Non-admins cannot create staff; customers cannot be created here
+    assert client.post("/api/users", headers=customer_headers, json={"email": "a@example.com", "full_name": "Ann", "role": "sales"}).status_code == 403
+    assert client.post("/api/users", headers=admin_headers, json={"email": "b@example.com", "full_name": "Bee", "role": "customer"}).status_code == 400
+
+    token = body["password_setup_url"].split("token=")[1]
+    assert client.post("/api/auth/set-password", json={"token": token, "password": "tech-password-1"}).status_code == 200
+    login = client.post("/api/auth/login", json={"email": email, "password": "tech-password-1"})
+    assert login.status_code == 200 and login.json()["user"]["role"] == "technician"
 
 
 def test_customer_privilege_escalation_blocked():
@@ -132,6 +165,7 @@ def test_customer_object_level_isolation():
     # Register customer A
     u1 = f"c1_{uuid.uuid4().hex[:6]}"
     res_a = client.post("/api/auth/register", json={
+        "password": "testpass123",
         "email": f"{u1}@example.com",
         "full_name": "Customer A",
         "phone": f"911{uuid.uuid4().hex[:7]}",
@@ -141,6 +175,7 @@ def test_customer_object_level_isolation():
     # Register customer B
     u2 = f"c2_{uuid.uuid4().hex[:6]}"
     res_b = client.post("/api/auth/register", json={
+        "password": "testpass123",
         "email": f"{u2}@example.com",
         "full_name": "Customer B",
         "phone": f"922{uuid.uuid4().hex[:7]}",

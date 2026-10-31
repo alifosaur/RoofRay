@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core import access
 from app.core.security import get_current_user, require_role
 from app.models.user import User, UserRole
 from app.models.order import Order, OrderStatus
@@ -12,35 +13,16 @@ from app.services import order_service
 router = APIRouter(prefix="/orders", tags=["Sales Orders"])
 
 
-WAREHOUSE_ALLOWED_STAGES = [
-    OrderStatus.CONFIRMED,
-    OrderStatus.PACKED,
-    OrderStatus.DISPATCHED,
-    OrderStatus.DELIVERED,
-]
-
-
 def _validate_order_access(order: Order, current_user: User):
-    if current_user.role == UserRole.ADMIN:
-        return
-    if current_user.role == UserRole.TECHNICIAN:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Forbidden: Technicians access assigned installation jobs, not orders",
-        )
-    if current_user.role == UserRole.CUSTOMER:
-        cust_id = current_user.customer_profile.id if current_user.customer_profile else None
-        if order.customer_id != cust_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Forbidden: You can only view your own order",
-            )
-    elif current_user.role == UserRole.WAREHOUSE:
-        if order.status not in WAREHOUSE_ALLOWED_STAGES:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Forbidden: Warehouse can only view orders in packing or dispatch stages. Current stage: {order.status.value}",
-            )
+    access.ensure_order_access(order, current_user)
+
+
+def _load_accessible(db: Session, order_id: int, current_user: User) -> Order:
+    order = db.query(Order).filter(Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    access.ensure_order_access(order, current_user)
+    return order
 
 
 @router.get("", response_model=List[OrderOut])
@@ -50,18 +32,7 @@ def list_orders(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role == UserRole.TECHNICIAN:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Forbidden: Technicians access assigned installation jobs, not orders",
-        )
-
-    query = db.query(Order)
-    if current_user.role == UserRole.CUSTOMER:
-        cust_id = current_user.customer_profile.id if current_user.customer_profile else -1
-        query = query.filter(Order.customer_id == cust_id)
-    elif current_user.role == UserRole.WAREHOUSE:
-        query = query.filter(Order.status.in_(WAREHOUSE_ALLOWED_STAGES))
+    query = access.scope_orders(db.query(Order), current_user)
 
     if status:
         query = query.filter(Order.status == status)
@@ -96,6 +67,7 @@ def confirm_order(
     (b) creates an installation job on the crew schedule
     (c) sends notifications to warehouse and crew.
     """
+    _load_accessible(db, order_id, current_user)
     return order_service.confirm_order(db, order_id, current_user.id)
 
 
@@ -107,5 +79,6 @@ def record_payment(
     current_user: User = Depends(require_role(UserRole.SALES, UserRole.ADMIN)),
 ):
     """Records advance or full payment (cash, UPI, bank, cheque)."""
+    _load_accessible(db, order_id, current_user)
     return order_service.record_payment(db, order_id, payload, current_user.id)
 

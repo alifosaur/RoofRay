@@ -206,7 +206,7 @@ def test_full_solar_lifecycle_and_all_gates(client: TestClient):
     # -------------------------------------------------------------
     # STEP 6: RECORD ADVANCE PAYMENT & CONFIRM ORDER
     # -------------------------------------------------------------
-    pay_res = client.post(f"/api/orders/{order_id}/payments", headers={"Authorization": "Bearer accounts_uid"}, json={
+    pay_res = client.post(f"/api/orders/{order_id}/payments", headers={"Authorization": "Bearer admin_uid"}, json={
         "amount": 50000.0,
         "method": "UPI",
         "transaction_ref": f"UPI-{uid_suffix}",
@@ -310,7 +310,7 @@ def test_full_solar_lifecycle_and_all_gates(client: TestClient):
     # -------------------------------------------------------------
     # STEP 9: AFTER-SALES WARRANTY LOOKUP & TICKET AUTO-BILLING (GATE 4)
     # -------------------------------------------------------------
-    lookup_res = client.get(f"/api/tickets/lookup?query={test_serial_no}", headers={"Authorization": "Bearer support_uid"})
+    lookup_res = client.get(f"/api/tickets/lookup?query={test_serial_no}", headers={"Authorization": "Bearer admin_uid"})
     assert lookup_res.status_code == 200
     lookup_data = lookup_res.json()
     assert len(lookup_data) == 1
@@ -318,7 +318,7 @@ def test_full_solar_lifecycle_and_all_gates(client: TestClient):
     serial_id = lookup_data[0]["serial_id"]
 
     # Ticket 1: In-warranty complaint (Gate 4: must set is_billable = False)
-    t1_res = client.post("/api/tickets", headers={"Authorization": "Bearer support_uid"}, json={
+    t1_res = client.post("/api/tickets", headers={"Authorization": "Bearer admin_uid"}, json={
         "subject": "Minor inverter noise check",
         "description": "Customer notices hum during peak generation",
         "customer_id": customer_id,
@@ -332,23 +332,23 @@ def test_full_solar_lifecycle_and_all_gates(client: TestClient):
     # GATE 5: TICKET CLOSURE GATE (Cannot close without customer confirmation)
     # -------------------------------------------------------------
     # Resolve ticket
-    client.put(f"/api/tickets/{t1_id}/resolve", headers={"Authorization": "Bearer support_uid"}, json={
+    client.put(f"/api/tickets/{t1_id}/resolve", headers={"Authorization": "Bearer admin_uid"}, json={
         "resolution_notes": "Cleaned heat sink fan, noise resolved.",
         "parts_cost": 0.0,
         "labour_cost": 0.0
     })
 
     # Attempt premature close -> HTTP 400
-    early_close_res = client.post(f"/api/tickets/{t1_id}/close", headers={"Authorization": "Bearer support_uid"})
+    early_close_res = client.post(f"/api/tickets/{t1_id}/close", headers={"Authorization": "Bearer admin_uid"})
     assert early_close_res.status_code == 400, "Gate 5 failed: Ticket closed without customer confirmation!"
 
     # Customer confirms satisfaction
-    confirm_ticket_res = client.post(f"/api/tickets/{t1_id}/customer-confirm", headers={"Authorization": "Bearer support_uid"})
+    confirm_ticket_res = client.post(f"/api/tickets/{t1_id}/customer-confirm", headers={"Authorization": "Bearer admin_uid"})
     assert confirm_ticket_res.status_code == 200
     assert confirm_ticket_res.json()["status"] == "CUSTOMER_CONFIRMED"
 
     # Now close ticket -> Succeeds
-    close_ticket_res = client.post(f"/api/tickets/{t1_id}/close", headers={"Authorization": "Bearer support_uid"})
+    close_ticket_res = client.post(f"/api/tickets/{t1_id}/close", headers={"Authorization": "Bearer admin_uid"})
     assert close_ticket_res.status_code == 200
     assert close_ticket_res.json()["status"] == "CLOSED"
 

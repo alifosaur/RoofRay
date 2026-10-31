@@ -24,6 +24,7 @@ class User(Base):
     phone = Column(String(32), nullable=True)
     hourly_rate = Column(Integer, default=500, nullable=False)  # For technician payouts (in INR)
     is_active = Column(Boolean, default=True, nullable=False)
+    password_hash = Column(String(255), nullable=True)  # local auth mode only; Firebase holds passwords otherwise
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 

@@ -134,7 +134,7 @@ def scan_serial_to_order(
 def deliver_order(
     order_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.WAREHOUSE, UserRole.ADMIN, UserRole.TECHNICIAN)),
+    current_user: User = Depends(require_role(UserRole.WAREHOUSE, UserRole.ADMIN)),
 ):
     """
     Confirms order delivery.

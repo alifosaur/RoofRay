@@ -5,6 +5,8 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core import access
+from app.models.lead import Lead
 from app.core.security import get_current_user, require_role
 from app.models.user import User, UserRole
 from app.models.quote import Quote, QuoteStatus
@@ -24,26 +26,15 @@ def create_quote(
     Creates quotation by exploding BOM template.
     GATE: Blocks creation (HTTP 400) if linked site survey is not APPROVED.
     """
+    lead = db.query(Lead).filter(Lead.id == payload.lead_id).first()
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    access.ensure_lead_access(lead, current_user)
     return quote_service.create_quote_from_bom(db, payload, current_user.id)
 
 
 def _validate_quote_access(quote: Quote, current_user: User):
-    if current_user.role in (UserRole.ADMIN, UserRole.SALES):
-        return
-    if current_user.role in (UserRole.TECHNICIAN, UserRole.WAREHOUSE):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Forbidden: Technicians and warehouse staff cannot access quotations",
-        )
-    if current_user.role == UserRole.CUSTOMER:
-        cust_id = current_user.customer_profile.id if current_user.customer_profile else None
-        phone_match = quote.lead and quote.lead.phone == current_user.phone
-        email_match = quote.lead and quote.lead.email == current_user.email
-        if quote.customer_id != cust_id and not phone_match and not email_match:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Forbidden: You can only view your own quotation",
-            )
+    access.ensure_quote_access(quote, current_user)
 
 
 @router.get("", response_model=List[QuoteOut])
@@ -54,16 +45,7 @@ def list_quotes(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role in (UserRole.TECHNICIAN, UserRole.WAREHOUSE):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Forbidden: Technicians and warehouse staff cannot access quotations",
-        )
-
-    query = db.query(Quote)
-    if current_user.role == UserRole.CUSTOMER:
-        cust_id = current_user.customer_profile.id if current_user.customer_profile else -1
-        query = query.filter(Quote.customer_id == cust_id)
+    query = access.scope_quotes(db.query(Quote), current_user)
 
     if lead_id:
         query = query.filter(Quote.lead_id == lead_id)

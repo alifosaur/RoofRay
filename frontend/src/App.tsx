@@ -6,6 +6,7 @@ import { AppLayout } from './components/odoo/AppLayout';
 
 // Pages
 import { LoginPage } from './pages/auth/LoginPage';
+import { SetPasswordPage } from './pages/auth/SetPasswordPage';
 import { Forbidden403Page } from './pages/auth/Forbidden403Page';
 import { PublicWebsitePage } from './pages/public/PublicWebsitePage';
 import { PackagesPage } from './pages/public/PackagesPage';
@@ -41,6 +42,7 @@ export const App: React.FC = () => {
 
           {/* Unified Login & Customer Self-Registration Page */}
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/set-password" element={<SetPasswordPage />} />
           <Route path="/403" element={<Forbidden403Page />} />
 
           {/* Customer Portal (/customer) */}

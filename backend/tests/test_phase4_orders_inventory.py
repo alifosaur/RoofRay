@@ -7,7 +7,7 @@ client = TestClient(app)
 admin_headers = {"Authorization": "Bearer admin_uid"}
 sales_headers = {"Authorization": "Bearer sales_uid"}
 warehouse_headers = {"Authorization": "Bearer warehouse_uid"}
-accounts_headers = {"Authorization": "Bearer accounts_uid"}
+accounts_headers = {"Authorization": "Bearer admin_uid"}
 tech_headers = {"Authorization": "Bearer tech_uid"}
 
 

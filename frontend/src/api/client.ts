@@ -1,10 +1,18 @@
 const API_BASE = '/api';
+export const TOKEN_KEY = 'roofray_token';
+
+// AuthContext swaps this for Firebase's getIdToken() in Firebase mode (tokens refresh automatically)
+let tokenProvider: () => Promise<string | null> = async () => localStorage.getItem(TOKEN_KEY);
+export function setTokenProvider(provider: () => Promise<string | null>) {
+  tokenProvider = provider;
+}
+export const getAuthToken = () => tokenProvider();
 
 export async function apiRequest<T = any>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const token = localStorage.getItem('roofray_token') || localStorage.getItem('sunpower_token');
+  const token = await tokenProvider();
   
   const headers = new Headers(options.headers || {});
   if (!headers.has('Authorization') && token) {

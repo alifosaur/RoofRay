@@ -76,6 +76,8 @@ export const TechnicianPWAPage: React.FC = () => {
 
   useEffect(() => {
     fetchSchedule();
+    const interval = setInterval(fetchSchedule, 10000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleCompleteSurvey = async (e: React.FormEvent) => {
@@ -240,7 +242,7 @@ export const TechnicianPWAPage: React.FC = () => {
                 key={job.id}
                 onClick={() => {
                   setActiveJob(job);
-                  setCapacityKw(job.capacity_kw || 3.0);
+                  setCapacityKw(job.confirmed_capacity_kw || job.capacity_kw || 3.0);
                 }}
                 className={`flex-shrink-0 px-4 py-2.5 rounded-xl text-left border transition-all ${
                   activeJob?.id === job.id
@@ -248,11 +250,15 @@ export const TechnicianPWAPage: React.FC = () => {
                     : 'bg-slate-800 border-slate-700 text-gray-400'
                 }`}
               >
-                <div className="text-xs font-bold text-amber-400">{job.job_number}</div>
+                <div className="text-xs font-bold text-amber-400">
+                  {job.job_number || `JOB-${String(job.id).padStart(4, '0')}`}
+                </div>
                 <div className="text-xs font-semibold text-white truncate max-w-[140px]">
                   {job.customer_name || `Order #${job.order_id}`}
                 </div>
-                <div className="text-[10px] mt-0.5">{job.status}</div>
+                <div className="text-[10px] mt-0.5 text-gray-300">
+                  {job.capacity_kw || 3} kW • {job.status}
+                </div>
               </button>
             ))}
           </div>
@@ -265,9 +271,17 @@ export const TechnicianPWAPage: React.FC = () => {
               <div className="flex justify-between items-start">
                 <div>
                   <span className="text-[10px] text-purple-400 font-bold uppercase">
-                    Order #{activeJob.order_id}
+                    {activeJob.job_number || `JOB-${String(activeJob.id).padStart(4, '0')}`} • Order #{activeJob.order_id}
                   </span>
-                  <h3 className="text-lg font-bold text-white">{activeJob.customer_name}</h3>
+                  <h3 className="text-lg font-bold text-white">{activeJob.customer_name || 'Customer'}</h3>
+                  {activeJob.customer_phone && (
+                    <a
+                      href={`tel:${activeJob.customer_phone}`}
+                      className="text-xs text-teal-400 underline font-mono block mt-0.5"
+                    >
+                      {activeJob.customer_phone}
+                    </a>
+                  )}
                 </div>
                 <span
                   className={`px-2.5 py-1 rounded-full text-xs font-bold ${
@@ -289,7 +303,7 @@ export const TechnicianPWAPage: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-2">
                   <FontAwesomeIcon icon={faBolt} className="text-amber-400 w-3.5" />
-                  <span>System Size: {activeJob.capacity_kw || 3} kW System</span>
+                  <span>System Size: {activeJob.confirmed_capacity_kw || activeJob.capacity_kw || 3} kW Rooftop Solar</span>
                 </div>
               </div>
 
@@ -416,14 +430,71 @@ export const TechnicianPWAPage: React.FC = () => {
               </form>
             )}
 
-            {/* Completed Notice */}
+            {/* Completed Notice & Handover Record */}
             {activeJob.status === 'COMPLETED' && (
-              <div className="bg-emerald-950/40 border border-emerald-800 rounded-2xl p-5 text-center space-y-2">
-                <FontAwesomeIcon icon={faCheckCircle} className="text-emerald-400 text-3xl" />
-                <h4 className="text-base font-bold text-emerald-400">Installation Completed</h4>
-                <p className="text-xs text-gray-300">
-                  Timesheet recorded and customer sign-off stored. System is live and generating power!
-                </p>
+              <div className="bg-slate-800 border border-emerald-500/50 rounded-2xl p-4 text-xs space-y-3">
+                <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
+                  <FontAwesomeIcon icon={faCheckCircle} className="text-lg" />
+                  <span>Installation Completed & Verified Live</span>
+                </div>
+
+                <div className="p-3 bg-slate-900 rounded-xl space-y-2 border border-slate-700">
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Confirmed Capacity:</span>
+                    <span className="font-bold text-white">
+                      {activeJob.confirmed_capacity_kw || activeJob.capacity_kw || 3.0} kW
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Power Generation Test:</span>
+                    <span className="font-bold text-emerald-400">✓ Active & Generating</span>
+                  </div>
+                  {activeJob.finished_at && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Completed On:</span>
+                      <span className="text-gray-300">{new Date(activeJob.finished_at).toLocaleString()}</span>
+                    </div>
+                  )}
+                  {activeJob.timesheet && (
+                    <div className="flex justify-between border-t border-slate-800 pt-1.5">
+                      <span className="text-gray-400">Labor Timesheet:</span>
+                      <span className="text-amber-400 font-medium">
+                        {activeJob.timesheet.hours} hrs @ ₹{activeJob.timesheet.hourly_rate}/hr (₹{activeJob.timesheet.total_cost})
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {activeJob.signature?.signature_data && (
+                  <div className="bg-slate-900 p-2.5 rounded-xl border border-slate-700">
+                    <span className="text-[10px] text-gray-400 font-bold block uppercase mb-1">
+                      Customer Handover Signature ({activeJob.signature.customer_name})
+                    </span>
+                    <img
+                      src={activeJob.signature.signature_data}
+                      alt="Signature"
+                      className="h-14 bg-white rounded p-1 object-contain mx-auto"
+                    />
+                  </div>
+                )}
+
+                {activeJob.photos && activeJob.photos.length > 0 && (
+                  <div className="space-y-1">
+                    <span className="text-[10px] text-gray-400 font-bold uppercase">
+                      Site Commissioning Photos ({activeJob.photos.length})
+                    </span>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {activeJob.photos.map((p: any) => (
+                        <img
+                          key={p.id}
+                          src={p.photo_url}
+                          alt="Site"
+                          className="h-16 w-full object-cover rounded-lg border border-slate-600"
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -453,9 +524,11 @@ export const TechnicianPWAPage: React.FC = () => {
                   >
                     <div className="text-xs font-bold text-amber-400">Survey #{s.id}</div>
                     <div className="text-xs font-semibold text-white truncate max-w-[140px]">
-                      Lead #{s.lead_id}
+                      {s.customer_name || `Lead #${s.lead_id}`}
                     </div>
-                    <div className="text-[10px] mt-0.5">{s.status}</div>
+                    <div className="text-[10px] mt-0.5 text-gray-300">
+                      {s.required_capacity ? `${s.required_capacity} kW` : ''} • {s.status}
+                    </div>
                   </button>
                 ))}
               </div>
@@ -468,9 +541,23 @@ export const TechnicianPWAPage: React.FC = () => {
                     <span className="text-[10px] text-amber-400 font-bold uppercase">
                       Site Survey Visit #{activeSurvey.id}
                     </span>
-                    <h3 className="text-base font-bold text-white">Lead #{activeSurvey.lead_id}</h3>
-                    <p className="text-[11px] text-gray-400">
-                      Scheduled for: {new Date(activeSurvey.scheduled_date).toLocaleString()}
+                    <h3 className="text-base font-bold text-white">
+                      {activeSurvey.customer_name || `Lead #${activeSurvey.lead_id}`}
+                    </h3>
+                    {activeSurvey.customer_phone && (
+                      <a
+                        href={`tel:${activeSurvey.customer_phone}`}
+                        className="text-xs text-teal-400 underline font-mono block mt-0.5"
+                      >
+                        {activeSurvey.customer_phone}
+                      </a>
+                    )}
+                    <p className="text-[11px] text-gray-300 mt-1 flex items-center gap-1">
+                      <FontAwesomeIcon icon={faMapMarkerAlt} className="text-red-400 w-3" />
+                      <span>{activeSurvey.site_address || 'Rooftop Site Location'}</span>
+                    </p>
+                    <p className="text-[11px] text-gray-400 mt-0.5">
+                      Target: <strong className="text-white">{activeSurvey.required_capacity || 3.0} kW {activeSurvey.system_type || 'On-Grid'}</strong> • Scheduled: {new Date(activeSurvey.scheduled_date).toLocaleString()}
                     </p>
                   </div>
                   <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${

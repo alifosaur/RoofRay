@@ -36,3 +36,23 @@ class Survey(Base):
     technician = relationship("User", foreign_keys=[technician_id])
     approved_by = relationship("User", foreign_keys=[approved_by_id])
 
+    @property
+    def customer_name(self) -> str:
+        return self.lead.name if self.lead else "Customer"
+
+    @property
+    def customer_phone(self) -> str:
+        return self.lead.phone if self.lead else ""
+
+    @property
+    def site_address(self) -> str:
+        return self.lead.address if self.lead else "Site Location"
+
+    @property
+    def required_capacity(self) -> float:
+        return self.lead.required_capacity if self.lead else 3.0
+
+    @property
+    def system_type(self) -> str:
+        return self.lead.system_type if self.lead else "On-Grid"
+

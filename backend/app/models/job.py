@@ -37,6 +37,34 @@ class InstallationJob(Base):
     signature = relationship("JobSignature", back_populates="job", uselist=False, cascade="all, delete-orphan")
     timesheet = relationship("Timesheet", back_populates="job", uselist=False, cascade="all, delete-orphan")
 
+    @property
+    def job_number(self) -> str:
+        return f"JOB-{str(self.id).zfill(4)}"
+
+    @property
+    def customer_name(self) -> str:
+        return self.order.customer.name if (self.order and self.order.customer) else "Customer"
+
+    @property
+    def site_address(self) -> str:
+        return self.order.customer.address if (self.order and self.order.customer) else "Site Location"
+
+    @property
+    def customer_phone(self) -> str:
+        return self.order.customer.phone if (self.order and self.order.customer) else ""
+
+    @property
+    def capacity_kw(self) -> float:
+        if self.confirmed_capacity_kw:
+            return self.confirmed_capacity_kw
+        if self.order and self.order.quote:
+            return getattr(self.order.quote.bom_template, 'capacity_kw', 3.0)
+        return 3.0
+
+    @property
+    def order_number(self) -> str:
+        return self.order.order_number if self.order else ""
+
 
 class JobPhoto(Base):
     __tablename__ = "job_photos"

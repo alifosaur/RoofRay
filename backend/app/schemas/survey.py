@@ -33,6 +33,11 @@ class SurveyOut(BaseModel):
     lead_id: int
     technician_id: int
     scheduled_date: datetime
+    customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None
+    site_address: Optional[str] = None
+    required_capacity: Optional[float] = None
+    system_type: Optional[str] = None
     roof_direction: Optional[str] = None
     roof_tilt_deg: Optional[float] = None
     cable_distance_meters: Optional[float] = None

@@ -76,6 +76,12 @@ class InstallationJobOut(BaseModel):
     technician_id: int
     scheduled_date: datetime
     status: JobStatus
+    job_number: Optional[str] = None
+    order_number: Optional[str] = None
+    customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None
+    site_address: Optional[str] = None
+    capacity_kw: Optional[float] = None
     started_at: Optional[datetime] = None
     finished_at: Optional[datetime] = None
     confirmed_capacity_kw: Optional[float] = None

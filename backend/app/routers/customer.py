@@ -30,7 +30,7 @@ from app.schemas.customer import (
     GovernmentSchemeOut,
     CustomerSubsidyOut,
 )
-from app.services import lead_service, quote_service
+from app.services import lead_service, quote_service, ticket_service
 
 router = APIRouter(prefix="/customer", tags=["Customer Portal"])
 
@@ -256,7 +256,8 @@ def get_customer_tracker(
     }
 
     # Stage 5: Quotation ready
-    quote_ready = quote is not None and quote.status in [QuoteStatus.SENT, QuoteStatus.ACCEPTED]
+    # Quotes are created as DRAFT and nothing moves them to SENT, so any non-rejected quote is visible to the customer
+    quote_ready = quote is not None and quote.status != QuoteStatus.REJECTED
     evaluations["quotation_ready"] = {
         "completed": quote_ready or order is not None,
         "date": quote.created_at.strftime("%Y-%m-%d") if quote else None,
@@ -436,7 +437,7 @@ def accept_customer_quote(
         raise HTTPException(status_code=404, detail="Quotation not found")
 
     cust = _get_customer_profile(db, current_user)
-    if current_user.role == UserRole.CUSTOMER and cust and quote.customer_id != cust.id:
+    if current_user.role == UserRole.CUSTOMER and (not cust or quote.customer_id != cust.id):
         raise HTTPException(status_code=403, detail="Forbidden: You cannot accept another customer's quote")
 
     order = quote_service.accept_quote(db, quote_id, current_user.id)
@@ -570,6 +571,7 @@ def raise_customer_ticket(
         status=TicketStatus.OPEN,
         is_billable=is_billable,
     )
+    ticket_service.assign_first_technician(db, ticket)
     db.add(ticket)
     db.flush()
 
@@ -686,7 +688,7 @@ def get_customer_subsidy(
         portal_name=sub.portal_name,
         status=sub.status.value,
         eligible_amount=sub.eligible_amount,
-        sanctioned_amount=sub.sanctioned_amount or sub.eligible_amount,
+        sanctioned_amount=sub.sanctioned_amount or 0.0,
         disbursed_amount=sub.disbursed_amount,
         applied_date=sub.applied_date.strftime("%Y-%m-%d") if sub.applied_date else None,
         approved_date=sub.approved_date.strftime("%Y-%m-%d") if sub.approved_date else None,

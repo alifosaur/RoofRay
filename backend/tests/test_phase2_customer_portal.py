@@ -15,6 +15,17 @@ from app.models.scheme import GovernmentScheme
 client = TestClient(app)
 
 
+def _ensure_demo_customer_enquiry():
+    """The logged-in demo customer needs a profile; it is created by submitting an enquiry with their email."""
+    client.post("/api/customer/enquiry", json={
+        "name": "Portal Customer",
+        "phone": "+91 98110 00007",
+        "email": "customer@roofray.com",
+        "address": "12 Test Street",
+        "preferred_capacity_kw": 3.0,
+    })
+
+
 def test_customer_enquiry_submission_and_round_robin():
     """Customer submits details & measurements form; lead created, sales assigned."""
     unique_phone = f"+91 99{uuid.uuid4().int % 100000000:08d}"
@@ -63,6 +74,7 @@ def test_customer_enquiry_submission_and_round_robin():
 def test_customer_tracker_13_stages():
     """Customer views 13-stage project tracker."""
     demo_cust_headers = {"Authorization": "Bearer customer_uid"}
+    _ensure_demo_customer_enquiry()
 
     res = client.get("/api/customer/tracker", headers=demo_cust_headers)
     assert res.status_code == 200
@@ -105,6 +117,7 @@ def test_customer_equipment_and_warranty_lookup():
 def test_customer_ticket_creation():
     """Customer can raise a service ticket on equipment."""
     demo_cust_headers = {"Authorization": "Bearer customer_uid"}
+    _ensure_demo_customer_enquiry()
 
     payload = {
         "subject": "Inverter Display Flashing Error Code E04",

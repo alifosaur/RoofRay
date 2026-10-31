@@ -78,7 +78,7 @@ def test_warranty_lookup_and_ticket_billing_gate():
         "description": "System stopped generating power this morning",
     }).json()
     assert ticket_in["is_billable"] is False
-    assert ticket_in["status"] == "OPEN"
+    assert ticket_in["status"] == "ASSIGNED"  # auto-assigned to a technician
 
     # 3. CREATE TICKET FOR OUT-OF-WARRANTY SERIAL -> is_billable MUST BE True
     ticket_out = client.post("/api/tickets", headers=support_headers, json={

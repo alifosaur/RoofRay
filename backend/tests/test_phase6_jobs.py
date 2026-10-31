@@ -40,6 +40,14 @@ def test_installation_job_flow_and_timesheet():
     order_id = client.post(f"/api/quotes/{quote['id']}/accept", headers=sales_headers).json()["order_id"]
     client.post(f"/api/orders/{order_id}/confirm", headers=sales_headers)
 
+    # Packing/dispatch is covered in phase 5; jump the order to DELIVERED so installation can begin
+    from app.core.database import SessionLocal
+    from app.models.order import Order, OrderStatus
+    db = SessionLocal()
+    db.query(Order).filter(Order.id == order_id).update({"status": OrderStatus.DELIVERED})
+    db.commit()
+    db.close()
+
     # 1. Technician retrieves my-schedule
     schedule_res = client.get("/api/jobs/my-schedule", headers=tech_headers)
     assert schedule_res.status_code == 200

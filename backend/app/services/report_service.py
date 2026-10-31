@@ -37,7 +37,7 @@ def get_date_filter_range(date_range: str):
 
 def calculate_profit_per_job(db: Session, date_range: str = "this_month") -> List[Dict[str, Any]]:
     start_dt, end_dt = get_date_filter_range(date_range)
-    orders = db.query(Order).filter(Order.created_at >= start_dt, Order.created_at <= end_dt).order_by(Order.id.desc()).all()
+    orders = db.query(Order).filter(Order.created_at >= start_dt, Order.created_at <= end_dt, Order.status != OrderStatus.DRAFT).order_by(Order.id.desc()).all()
 
     breakdowns = []
     for order in orders:
@@ -74,10 +74,6 @@ def calculate_profit_per_job(db: Session, date_range: str = "this_month") -> Lis
             if order.installation_job.timesheet:
                 tech_cost = order.installation_job.timesheet.total_cost
                 tech_hours = getattr(order.installation_job.timesheet, 'hours', 0.0)
-            elif order.status in [OrderStatus.DELIVERED, OrderStatus.INSTALLED, OrderStatus.CLOSED]:
-                # Standard crew timesheet estimate if completed
-                tech_hours = 8.0
-                tech_cost = 4800.0
 
         # 3. Other logistics / transport overhead (estimated at 4% of revenue)
         other_costs = round(revenue * 0.04, 2)
@@ -108,7 +104,7 @@ def calculate_profit_per_job(db: Session, date_range: str = "this_month") -> Lis
             subsidy_info = {
                 "status": order.subsidy_record.status.value,
                 "sanctioned_amount": getattr(order.subsidy_record, 'sanctioned_amount', 0.0),
-                "application_ref": getattr(order.subsidy_record, 'application_no', None) or "PM-SURYA-2026",
+                "application_ref": getattr(order.subsidy_record, 'application_no', None),
             }
 
         breakdowns.append({
@@ -118,10 +114,10 @@ def calculate_profit_per_job(db: Session, date_range: str = "this_month") -> Lis
             "customer_phone": order.customer.phone if order.customer else "N/A",
             "customer_email": order.customer.email if order.customer else "N/A",
             "customer_address": order.customer.address if order.customer else "N/A",
-            "customer_city": order.customer.city if order.customer else "Delhi NCR",
-            "customer_pincode": order.customer.pincode if order.customer else "110001",
-            "capacity_kw": order.quote.template.capacity_kw if (order.quote and order.quote.template) else 3.0,
-            "system_type": order.quote.template.system_type if (order.quote and order.quote.template) else "On-Grid",
+            "customer_city": order.customer.city if order.customer else None,
+            "customer_pincode": order.customer.pincode if order.customer else None,
+            "capacity_kw": order.quote.template.capacity_kw if (order.quote and order.quote.template) else None,
+            "system_type": order.quote.template.system_type if (order.quote and order.quote.template) else None,
             "revenue": revenue,
             "paid_amount": order.paid_amount,
             "pending_amount": max(0.0, revenue - order.paid_amount),
@@ -151,7 +147,7 @@ def get_director_dashboard_metrics(db: Session, date_range: str = "this_month") 
     start_dt, end_dt = get_date_filter_range(date_range)
 
     # 1. Financial Metrics
-    orders = db.query(Order).filter(Order.created_at >= start_dt, Order.created_at <= end_dt).all()
+    orders = db.query(Order).filter(Order.created_at >= start_dt, Order.created_at <= end_dt, Order.status != OrderStatus.DRAFT).all()
     total_revenue = sum(o.total_amount for o in orders)
     total_collected = sum(o.paid_amount for o in orders)
     total_pending = max(0.0, total_revenue - total_collected)

@@ -30,3 +30,6 @@ frontend/.env
 # macOS
 .DS_Store
 
+
+# Local DB backups
+backups/

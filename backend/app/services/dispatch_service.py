@@ -90,13 +90,19 @@ def scan_serial_for_order(db: Session, payload: SerialScanRequest, current_user_
             detail=f"Required quantity ({quote_line.quantity}) of '{serial_item.product.name}' has already been scanned.",
         )
 
+    if order.status not in (OrderStatus.PACKED, OrderStatus.DISPATCHED):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Order {order.order_number} must be packed by the warehouse before scanning serials (current: {order.status.value}).",
+        )
+
     # Assign to order and customer
     serial_item.order_id = order.id
     serial_item.customer_id = order.customer_id
     serial_item.status = SerialStatus.DISPATCHED
 
     # Update order status to DISPATCHED if PACKED
-    if order.status in (OrderStatus.PACKED, OrderStatus.CONFIRMED):
+    if order.status == OrderStatus.PACKED:
         order.status = OrderStatus.DISPATCHED
 
     audit = AuditLog(
@@ -137,6 +143,12 @@ def deliver_order(db: Session, order_id: int, current_user_id: int) -> Order:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Cannot confirm delivery. Missing required serialized items: {', '.join(missing_items)}",
+        )
+
+    if order.status not in (OrderStatus.DISPATCHED, OrderStatus.OUT_FOR_DELIVERY):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Only dispatched orders can be delivered (current: {order.status.value}).",
         )
 
     # 2. AUTOMATIC WARRANTY CALCULATION:
@@ -196,6 +208,13 @@ def update_order_stage(db: Session, order_id: int, new_status: OrderStatus, curr
 
     if new_status == OrderStatus.DELIVERED:
         return deliver_order(db, order_id, current_user_id)
+
+    # Packing must go through the pick list so stock is deducted
+    if new_status == OrderStatus.PACKED and order.pick_list and order.pick_list.status != "PACKED":
+        from app.services import inventory_service
+        inventory_service.pack_pick_list(db, order.pick_list.id, current_user_id)
+        db.refresh(order)
+        return order
 
     old_status = order.status.value
     order.status = new_status

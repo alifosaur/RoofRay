@@ -17,3 +17,4 @@
 - [ ] End-to-end verification of warehouse checklist barcode scanning flow with newly generated pick lists.
 - [ ] Real-time WebSocket / SSE notifications for sales-to-warehouse dispatch alerts.
 - [ ] Production deployment and SSL configuration.
+

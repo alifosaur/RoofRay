@@ -9,6 +9,7 @@ from app.models.job import InstallationJob, JobStatus
 from app.models.user import User, UserRole
 from app.models.audit import AuditLog
 from app.models.notification import Notification
+from app.models.finance import Invoice, InvoiceLine, InvoiceType, InvoiceStatus
 from app.schemas.order import PaymentCreate
 
 
@@ -87,7 +88,32 @@ def confirm_order(db: Session, order_id: int, current_user_id: int) -> Order:
     from app.services import finance_service
     finance_service.get_or_create_subsidy_record(db, order.id)
 
-    # 5. Audit log
+    # 5. Sales invoice from the quote so accounting sees the receivable
+    if not order.invoice:
+        quote = order.quote
+        invoice = Invoice(
+            invoice_number=f"INV-{order.order_number}",
+            order_id=order.id,
+            customer_id=order.customer_id,
+            invoice_type=InvoiceType.SALES,
+            status=InvoiceStatus.PAID if order.paid_amount >= order.total_amount else InvoiceStatus.ISSUED,
+            subtotal=quote.subtotal if quote else order.total_amount,
+            tax_amount=quote.tax_amount if quote else 0.0,
+            total_amount=order.total_amount,
+            due_date=(datetime.utcnow() + timedelta(days=15)).date(),
+        )
+        db.add(invoice)
+        db.flush()
+        for q_line in (quote.lines if quote else []):
+            db.add(InvoiceLine(
+                invoice_id=invoice.id,
+                description=q_line.product.name if q_line.product else f"Product #{q_line.product_id}",
+                quantity=q_line.quantity,
+                unit_price=q_line.unit_price,
+                amount=q_line.subtotal,
+            ))
+
+    # 6. Audit log
     audit = AuditLog(
         record_type="order",
         record_id=order.id,
@@ -109,6 +135,12 @@ def record_payment(db: Session, order_id: int, payload: PaymentCreate, current_u
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
+    outstanding = round(order.total_amount - order.paid_amount, 2)
+    if payload.amount <= 0:
+        raise HTTPException(status_code=400, detail="Payment amount must be positive")
+    if payload.amount > outstanding + 0.01:
+        raise HTTPException(status_code=400, detail=f"Payment exceeds outstanding balance of ₹{outstanding:,.2f}")
+
     payment = Payment(
         order_id=order.id,
         amount=payload.amount,
@@ -119,6 +151,7 @@ def record_payment(db: Session, order_id: int, payload: PaymentCreate, current_u
     db.add(payment)
 
     order.paid_amount += payload.amount
+    settle_if_fully_paid(db, order, current_user_id)
 
     audit = AuditLog(
         record_type="order",
@@ -135,3 +168,22 @@ def record_payment(db: Session, order_id: int, payload: PaymentCreate, current_u
     db.refresh(payment)
     return payment
 
+
+
+def settle_if_fully_paid(db: Session, order: Order, current_user_id: int) -> None:
+    """Marks the sales invoice PAID once fully paid, and closes the order once it is also installed."""
+    if order.paid_amount + 0.01 < order.total_amount:
+        return
+    if order.invoice and order.invoice.status == InvoiceStatus.ISSUED:
+        order.invoice.status = InvoiceStatus.PAID
+    if order.status == OrderStatus.INSTALLED:
+        order.status = OrderStatus.CLOSED
+        db.add(AuditLog(
+            record_type="order",
+            record_id=order.id,
+            action="ORDER_CLOSED",
+            from_status=OrderStatus.INSTALLED.value,
+            to_status=OrderStatus.CLOSED.value,
+            notes="Order installed and fully paid. Closed automatically.",
+            user_id=current_user_id,
+        ))

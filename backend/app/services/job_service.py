@@ -11,12 +11,24 @@ from app.models.serial import SerialItem, SerialStatus
 from app.models.user import User
 from app.models.audit import AuditLog
 from app.schemas.job import JobCompleteRequest
+from app.services import order_service
+
+
+def _require_delivered(job: InstallationJob) -> None:
+    if job.order and job.order.status not in (OrderStatus.DELIVERED, OrderStatus.INSTALLED, OrderStatus.CLOSED):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Materials for {job.order.order_number} have not been delivered yet (order status: {job.order.status.value}).",
+        )
 
 
 def start_job(db: Session, job_id: int, current_user: User) -> InstallationJob:
     job = db.query(InstallationJob).filter(InstallationJob.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
+    if job.status != JobStatus.SCHEDULED:
+        raise HTTPException(status_code=400, detail=f"Only scheduled jobs can be started (current: {job.status.value})")
+    _require_delivered(job)
 
     job.started_at = datetime.utcnow()
     job.status = JobStatus.IN_PROGRESS
@@ -71,6 +83,7 @@ def complete_job(db: Session, job_id: int, payload: JobCompleteRequest, current_
 
     if job.status == JobStatus.COMPLETED:
         raise HTTPException(status_code=400, detail="Job is already completed")
+    _require_delivered(job)
 
     # If job wasn't explicitly started, assume started 4 hours ago for timesheet calculation
     if not job.started_at:
@@ -150,6 +163,7 @@ def complete_job(db: Session, job_id: int, payload: JobCompleteRequest, current_
             user_id=current_user.id,
         )
         db.add(audit_order)
+        order_service.settle_if_fully_paid(db, order, current_user.id)
 
     audit_job = AuditLog(
         record_type="job",

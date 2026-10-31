@@ -75,6 +75,11 @@ def test_dispatch_gate_and_auto_warranty():
         "serial_numbers": panel_serials,
     })
 
+    # Warehouse must pack the pick list before serials can be scanned for dispatch
+    pl = next(p for p in client.get("/api/inventory/pick-lists", headers=warehouse_headers).json() if p["order_id"] == order_id)
+    pack_res = client.put(f"/api/inventory/pick-lists/{pl['id']}/pack", headers=warehouse_headers)
+    assert pack_res.status_code == 200, pack_res.text
+
     # 4. Scan only inverter -> delivery still fails (missing panels)
     client.post("/api/dispatch/scan", headers=warehouse_headers, json={
         "order_id": order_id,

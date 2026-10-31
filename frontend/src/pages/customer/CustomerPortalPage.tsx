@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { api } from '../../api/client';
+import { api, downloadFile } from '../../api/client';
 import { SiteNavbar } from '../../components/layout/SiteNavbar';
 import { SiteFooter } from '../../components/layout/SiteFooter';
 import { ScriptHeading } from '../../components/common/ScriptHeading';
@@ -1062,15 +1062,18 @@ export const CustomerPortalPage: React.FC = () => {
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <a
-                        href={`/api/quotes/${q.id}/pdf`}
-                        target="_blank"
-                        rel="noreferrer"
+                      <button
+                        type="button"
+                        onClick={() =>
+                          downloadFile(`/quotes/${q.id}/pdf`, `Quote_${q.quote_number}.pdf`).catch((err) =>
+                            alert(err.message || 'Quotation PDF not available')
+                          )
+                        }
                         className="px-3 py-1.5 border border-gray-200 hover:bg-gray-50 text-xs font-semibold text-gray-700 rounded flex items-center gap-1.5"
                       >
                         <i className="fa-solid fa-file-pdf text-red-500"></i>
                         <span>Download PDF</span>
-                      </a>
+                      </button>
                       {q.status !== 'ACCEPTED' && (
                         <button
                           onClick={() => handleAcceptQuote(q.id)}
@@ -1453,7 +1456,7 @@ export const CustomerPortalPage: React.FC = () => {
                   <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg border border-gray-100 text-xs">
                     <div>
                       <span className="text-gray-400 block text-[10px]">Application Number:</span>
-                      <strong className="font-mono text-gray-800">{subsidy.application_no || 'MNRE-2026-88192'}</strong>
+                      <strong className="font-mono text-gray-800">{subsidy.application_no || 'Not yet applied'}</strong>
                     </div>
                     <div>
                       <span className="text-gray-400 block text-[10px]">Claim Status:</span>
@@ -1481,11 +1484,15 @@ export const CustomerPortalPage: React.FC = () => {
                       { key: 'APPROVED', label: '5. Subsidy Sanctioned' },
                       { key: 'DISBURSED', label: '6. Credited via DBT' },
                     ].map((step, idx) => {
-                      const isPast = ['DISBURSED'].includes(subsidy.status) || idx < 5;
+                      const stepIndex: Record<string, number> = {
+                        NOT_APPLIED: 0, APPLIED: 1, APPLICATION_SUBMITTED: 1, DISCOM_FEASIBILITY_APPROVED: 2,
+                        INSTALLATION_INSPECTION_DONE: 3, SUBSIDY_CLAIMED: 3, APPROVED: 4, DISBURSED: 5,
+                      };
+                      const isPast = idx <= (stepIndex[subsidy.status] ?? -1);
                       return (
                         <div key={step.key} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                          <div className="w-6 h-6 mx-auto rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px] font-bold mb-1">
-                            <i className="fa-solid fa-check"></i>
+                          <div className={`w-6 h-6 mx-auto rounded-full ${isPast ? 'bg-emerald-500 text-white' : 'bg-gray-200 text-gray-500'} flex items-center justify-center text-[10px] font-bold mb-1`}>
+                            {isPast ? <i className="fa-solid fa-check"></i> : idx + 1}
                           </div>
                           <span className="text-[11px] font-semibold text-gray-800">{step.label}</span>
                         </div>

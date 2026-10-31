@@ -8,6 +8,7 @@ from app.models.customer import Customer
 from app.models.serial import SerialItem
 from app.models.finance import Invoice, InvoiceType, InvoiceStatus, InvoiceLine
 from app.models.audit import AuditLog
+from app.models.user import User, UserRole
 from app.schemas.ticket import TicketCreate, TicketResolveRequest, WarrantyLookupResult
 
 
@@ -87,6 +88,14 @@ def lookup_customer_support(db: Session, query_str: str) -> List[WarrantyLookupR
     return results
 
 
+def assign_first_technician(db: Session, ticket: Ticket) -> None:
+    # Same assignment rule as installation jobs: first active technician
+    tech = db.query(User).filter(User.role == UserRole.TECHNICIAN, User.is_active == True).first()
+    if tech:
+        ticket.assigned_to_id = tech.id
+        ticket.status = TicketStatus.ASSIGNED
+
+
 def create_ticket(db: Session, payload: TicketCreate, current_user_id: int) -> Ticket:
     customer = db.query(Customer).filter(Customer.id == payload.customer_id).first()
     if not customer:
@@ -117,6 +126,7 @@ def create_ticket(db: Session, payload: TicketCreate, current_user_id: int) -> T
         status=TicketStatus.OPEN,
         is_billable=is_billable,
     )
+    assign_first_technician(db, ticket)
     db.add(ticket)
     db.flush()
 
@@ -209,6 +219,12 @@ def customer_confirm_ticket(db: Session, ticket_id: int, current_user_id: int) -
     ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
+
+    if ticket.status != TicketStatus.RESOLVED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Only resolved tickets can be confirmed (current: {ticket.status.value})",
+        )
 
     old_status = ticket.status.value
     ticket.status = TicketStatus.CUSTOMER_CONFIRMED

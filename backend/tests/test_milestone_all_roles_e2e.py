@@ -311,12 +311,17 @@ def test_complete_milestone_role_based_workflows_and_all_gates():
     })
     assert reg_serial_res.status_code == 201
 
+    # Warehouse must pack the pick list before serials can be scanned for dispatch
+    pl = next(p for p in client.get("/api/inventory/pick-lists", headers=wh_headers).json() if p["order_id"] == order_id)
+    pack_res = client.put(f"/api/inventory/pick-lists/{pl['id']}/pack", headers=wh_headers)
+    assert pack_res.status_code == 200, pack_res.text
+
     # Scan required inverter serial
     scan_res = client.post("/api/dispatch/scan", headers=wh_headers, json={
         "order_id": order_id,
         "serial_no": unique_serial,
     })
-    assert scan_res.status_code == 200
+    assert scan_res.status_code == 200, scan_res.text
 
     # Advance to DISPATCHED
     disp_res = client.put(f"/api/dispatch/orders/{order_id}/stage", headers=wh_headers, json={"stage": "DISPATCHED"})

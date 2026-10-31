@@ -49,13 +49,21 @@ def pack_pick_list(db: Session, pick_list_id: int, current_user_id: int) -> Pick
     if pick_list.status == "PACKED":
         raise HTTPException(status_code=400, detail="Pick list is already packed")
 
+    short = [
+        f"{l.product.name} (need {l.required_qty}, have {l.product.stock_quantity})"
+        for l in pick_list.lines
+        if l.product and l.product.stock_quantity < l.required_qty
+    ]
+    if short:
+        raise HTTPException(status_code=400, detail=f"Insufficient stock to pack: {', '.join(short)}")
+
     # Mark all lines as picked
     for line in pick_list.lines:
         line.picked_qty = line.required_qty
         # Deduct from product stock
         prod = line.product
         if prod:
-            prod.stock_quantity = max(0, prod.stock_quantity - line.required_qty)
+            prod.stock_quantity -= line.required_qty
             # Create issue movement
             movement = StockMovement(
                 product_id=prod.id,
@@ -71,13 +79,14 @@ def pack_pick_list(db: Session, pick_list_id: int, current_user_id: int) -> Pick
 
     # Update Order status to PACKED
     order = pick_list.order
-    if order and order.status == OrderStatus.CONFIRMED:
+    if order and order.status in (OrderStatus.CONFIRMED, OrderStatus.PACKING):
+        old_status = order.status.value
         order.status = OrderStatus.PACKED
         audit = AuditLog(
             record_type="order",
             record_id=order.id,
             action="ORDER_PACKED",
-            from_status=OrderStatus.CONFIRMED.value,
+            from_status=old_status,
             to_status=OrderStatus.PACKED.value,
             notes=f"Warehouse completed packing for {order.order_number}. Ready for serial assignment & dispatch.",
             user_id=current_user_id,

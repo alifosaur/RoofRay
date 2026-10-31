@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { api } from '../../api/client';
+import { api, downloadFile } from '../../api/client';
 import { FormView, FormTab } from '../../components/odoo/FormView';
 import { ControlPanel } from '../../components/odoo/ControlPanel';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -54,7 +54,9 @@ export const QuoteFormPage: React.FC = () => {
   };
 
   const handleDownloadPDF = () => {
-    window.open(`/api/quotes/${id}/pdf`, '_blank');
+    downloadFile(`/quotes/${id}/pdf`, `Quote_${id}.pdf`).catch((err) =>
+      alert(err.message || 'Quotation PDF not available')
+    );
   };
 
   const tabs: FormTab[] = [

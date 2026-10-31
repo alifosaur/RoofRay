@@ -144,6 +144,15 @@ def accept_quote(db: Session, quote_id: int, current_user_id: int) -> Order:
 
     if quote.status == QuoteStatus.ACCEPTED:
         raise HTTPException(status_code=400, detail="Quote is already accepted")
+    if quote.status == QuoteStatus.REJECTED:
+        raise HTTPException(status_code=400, detail="Rejected quotes cannot be accepted")
+
+    existing_order = db.query(Order).join(Quote, Order.quote_id == Quote.id).filter(Quote.lead_id == quote.lead_id).first()
+    if existing_order:
+        raise HTTPException(
+            status_code=400,
+            detail=f"This lead already has Sales Order {existing_order.order_number}.",
+        )
 
     old_quote_status = quote.status.value
     quote.status = QuoteStatus.ACCEPTED

@@ -235,6 +235,11 @@ def test_full_solar_lifecycle_and_all_gates(client: TestClient):
         "serial_numbers": [test_serial_no]
     })
 
+    # Warehouse must pack the pick list before serials can be scanned for dispatch
+    pl = next(p for p in client.get("/api/inventory/pick-lists", headers={"Authorization": "Bearer warehouse_uid"}).json() if p["order_id"] == order_id)
+    pack_res = client.put(f"/api/inventory/pick-lists/{pl['id']}/pack", headers={"Authorization": "Bearer warehouse_uid"})
+    assert pack_res.status_code == 200, pack_res.text
+
     scan_res = client.post("/api/dispatch/scan", headers={"Authorization": "Bearer warehouse_uid"}, json={
         "order_id": order_id,
         "product_id": inv.id,

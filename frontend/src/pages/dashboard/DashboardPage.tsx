@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { api } from '../../api/client';
+import { api, downloadFile } from '../../api/client';
 import { ControlPanel } from '../../components/odoo/ControlPanel';
 import {
   LineChart,
@@ -53,7 +53,7 @@ export const DashboardPage: React.FC = () => {
 
   const fetchDashboardData = async () => {
     try {
-      setLoading(true);
+      if (!dashboard) setLoading(true);
       if (shareToken) {
         // Read-only public share view
         const data = await api.get<any>(`/reports/shared/${shareToken}?range=${range}`);
@@ -75,10 +75,19 @@ export const DashboardPage: React.FC = () => {
 
   useEffect(() => {
     fetchDashboardData();
+    // Live view: poll every 30s and refresh when the tab regains focus
+    const interval = setInterval(fetchDashboardData, 30000);
+    window.addEventListener('focus', fetchDashboardData);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', fetchDashboardData);
+    };
   }, [range, shareToken]);
 
   const handleExportExcel = () => {
-    window.open('/api/reports/export.xlsx', '_blank');
+    downloadFile('/reports/export.xlsx', 'RoofRay_Executive_Report.xlsx').catch((err) =>
+      alert(err.message || 'Failed to export report')
+    );
   };
 
   const handleGenerateShareLink = async () => {
@@ -108,32 +117,13 @@ export const DashboardPage: React.FC = () => {
   }
 
   // Financial Trend Line Chart Data
-  const financialTrendData = (dashboard?.trend_points && dashboard.trend_points.length > 0)
-    ? dashboard.trend_points.map((tp: any) => ({
-        name: tp.date || tp.name,
-        Billed: tp.revenue,
-        Collected: tp.collected,
-        Costs: tp.costs,
-        NetProfit: tp.net_profit,
-      }))
-    : profitJobs.length > 0
-    ? profitJobs.map((j) => ({
-        name: j.order_number.replace('SO-2026-', '#'),
-        Billed: j.revenue || 0,
-        Collected: j.paid_amount || j.revenue || 0,
-        Costs: j.total_costs || (j.stock_cost + j.technician_cost + j.other_costs) || 0,
-        NetProfit: j.net_profit ?? j.profit ?? 0,
-      }))
-    : [
-        { name: 'Start', Billed: 0, Collected: 0, Costs: 0, NetProfit: 0 },
-        {
-          name: 'Period Total',
-          Billed: dashboard?.total_revenue || 0,
-          Collected: dashboard?.collected_revenue || 0,
-          Costs: (dashboard?.total_revenue || 0) - (dashboard?.net_profit || 0),
-          NetProfit: dashboard?.net_profit || 0,
-        },
-      ];
+  const financialTrendData = (dashboard?.trend_points || []).map((tp: any) => ({
+    name: tp.date || tp.name,
+    Billed: tp.revenue,
+    Collected: tp.collected,
+    Costs: tp.costs,
+    NetProfit: tp.net_profit,
+  }));
 
   const stageBreakdown = dashboard?.unfinished_jobs_by_stage
     ? Object.entries(dashboard.unfinished_jobs_by_stage).map(([stage, count]) => ({
@@ -573,11 +563,11 @@ export const DashboardPage: React.FC = () => {
                   </div>
                   <div>
                     <span className="text-gray-500 block text-[10px] uppercase font-bold">Contact Phone</span>
-                    <span className="font-semibold text-gray-800 text-xs mt-0.5 block">{selectedJob.customer_phone || '+91 98110 00000'}</span>
+                    <span className="font-semibold text-gray-800 text-xs mt-0.5 block">{selectedJob.customer_phone || '—'}</span>
                   </div>
                   <div>
                     <span className="text-gray-500 block text-[10px] uppercase font-bold">Email Address</span>
-                    <span className="font-semibold text-gray-800 text-xs mt-0.5 block">{selectedJob.customer_email || 'client@example.com'}</span>
+                    <span className="font-semibold text-gray-800 text-xs mt-0.5 block">{selectedJob.customer_email || '—'}</span>
                   </div>
                   <div>
                     <span className="text-gray-500 block text-[10px] uppercase font-bold">System Specification</span>
@@ -585,15 +575,15 @@ export const DashboardPage: React.FC = () => {
                   </div>
                   <div className="sm:col-span-2">
                     <span className="text-gray-500 block text-[10px] uppercase font-bold">Installation Rooftop Address</span>
-                    <span className="text-gray-800 text-xs mt-0.5 block">{selectedJob.customer_address || 'Sector 62, Noida, Uttar Pradesh'}</span>
+                    <span className="text-gray-800 text-xs mt-0.5 block">{selectedJob.customer_address || '—'}</span>
                   </div>
                   <div>
                     <span className="text-gray-500 block text-[10px] uppercase font-bold">City / Pincode</span>
-                    <span className="text-gray-800 text-xs mt-0.5 block">{selectedJob.customer_city || 'Delhi NCR'} - {selectedJob.customer_pincode || '110001'}</span>
+                    <span className="text-gray-800 text-xs mt-0.5 block">{[selectedJob.customer_city, selectedJob.customer_pincode].filter(Boolean).join(' - ') || '—'}</span>
                   </div>
                   <div>
                     <span className="text-gray-500 block text-[10px] uppercase font-bold">Field Crew Lead</span>
-                    <span className="font-semibold text-gray-900 text-xs mt-0.5 block">{selectedJob.technician_name || 'Amit Verma (Lead Tech)'}</span>
+                    <span className="font-semibold text-gray-900 text-xs mt-0.5 block">{selectedJob.technician_name || 'Not Assigned'}</span>
                   </div>
                 </div>
               </div>
@@ -649,7 +639,7 @@ export const DashboardPage: React.FC = () => {
                   </div>
                 ) : (
                   <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 text-gray-500 text-xs">
-                    Package BOM Hardware exploded: Mono PERC TopCon Half-Cut Modules, Dual-MPPT Smart Solar Inverter, GI Mounting Rail Framework, Lightning Arrestor, MC4 Connectors & Copper DC/AC Bus Cables.
+                    No BOM lines on this order's quote.
                   </div>
                 )}
               </div>
@@ -675,20 +665,7 @@ export const DashboardPage: React.FC = () => {
                         </div>
                       ))
                     ) : (
-                      <div className="text-gray-500 text-xs space-y-1">
-                        <div className="flex justify-between">
-                          <span className="font-mono font-bold text-[#6B4B63]">INV-2026-X8849</span>
-                          <span className="text-emerald-700 text-[10px]">Warranty: 2031-10-31</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="font-mono font-bold text-[#6B4B63]">PNL-550W-01934</span>
-                          <span className="text-emerald-700 text-[10px]">Warranty: 2051-10-31</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="font-mono font-bold text-[#6B4B63]">PNL-550W-01935</span>
-                          <span className="text-emerald-700 text-[10px]">Warranty: 2051-10-31</span>
-                        </div>
-                      </div>
+                      <div className="text-gray-500 text-xs">No serial numbers scanned for this order yet.</div>
                     )}
                   </div>
                 </div>
@@ -702,19 +679,19 @@ export const DashboardPage: React.FC = () => {
                     <div className="flex justify-between text-xs">
                       <span className="text-gray-600">Scheme Status:</span>
                       <span className="font-bold text-teal-900 uppercase">
-                        {selectedJob.subsidy?.status || 'APPROVED'}
+                        {selectedJob.subsidy?.status || 'NOT TRACKED'}
                       </span>
                     </div>
                     <div className="flex justify-between text-xs">
                       <span className="text-gray-600">Sanctioned Subsidy:</span>
                       <span className="font-bold text-emerald-700">
-                        ₹{(selectedJob.subsidy?.sanctioned_amount || 78000).toLocaleString()}
+                        ₹{(selectedJob.subsidy?.sanctioned_amount ?? 0).toLocaleString()}
                       </span>
                     </div>
                     <div className="flex justify-between text-xs">
                       <span className="text-gray-600">DISCOM Application Ref:</span>
                       <span className="font-mono text-gray-800">
-                        {selectedJob.subsidy?.application_ref || 'MNRE-2026-DL-8821'}
+                        {selectedJob.subsidy?.application_ref || '—'}
                       </span>
                     </div>
                     <div className="text-[11px] text-teal-800/80 pt-1">

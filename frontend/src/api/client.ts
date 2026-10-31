@@ -50,3 +50,14 @@ export const api = {
   delete: <T>(url: string) => apiRequest<T>(url, { method: 'DELETE' }),
 };
 
+
+// Opening /api URLs directly (window.open, <a href>) sends no bearer token, so fetch the file and save it
+export async function downloadFile(endpoint: string, filename: string): Promise<void> {
+  const res = await apiRequest<Response>(endpoint);
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}

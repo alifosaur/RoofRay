@@ -39,7 +39,7 @@ def list_tickets(
         cust_id = current_user.customer_profile.id if current_user.customer_profile else -1
         query = query.filter(Ticket.customer_id == cust_id)
     elif current_user.role == UserRole.TECHNICIAN:
-        query = query.filter(Ticket.assigned_to_id == current_user.id)
+        query = query.filter((Ticket.assigned_to_id == current_user.id) | (Ticket.assigned_to_id.is_(None)))
     elif customer_id and current_user.role == UserRole.ADMIN:
         query = query.filter(Ticket.customer_id == customer_id)
 
@@ -105,7 +105,11 @@ def resolve_ticket(
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
     if current_user.role == UserRole.TECHNICIAN and ticket.assigned_to_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Forbidden: this ticket is assigned to another technician")
+        if ticket.assigned_to_id is None:
+            ticket.assigned_to_id = current_user.id
+            db.flush()
+        else:
+            raise HTTPException(status_code=403, detail="Forbidden: this ticket is assigned to another technician")
     return ticket_service.resolve_ticket(db, ticket_id, payload, current_user.id)
 
 

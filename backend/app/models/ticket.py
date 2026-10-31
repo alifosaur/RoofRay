@@ -43,3 +43,30 @@ class Ticket(Base):
     assigned_to = relationship("User")
     repair_invoice = relationship("Invoice", back_populates="ticket", uselist=False)
 
+    @property
+    def customer_name(self):
+        return self.customer.name if self.customer else None
+
+    @property
+    def customer_phone(self):
+        return self.customer.phone if self.customer else None
+
+    @property
+    def customer_address(self):
+        if not self.customer:
+            return None
+        parts = [p for p in (self.customer.address, self.customer.city, self.customer.pincode) if p]
+        return ", ".join(parts) if parts else self.customer.address
+
+    @property
+    def serial_no(self):
+        return self.serial_item.serial_no if self.serial_item else None
+
+    @property
+    def product_name(self):
+        return self.serial_item.product.name if (self.serial_item and self.serial_item.product) else None
+
+    @property
+    def warranty_end(self):
+        return self.serial_item.warranty_end.strftime("%Y-%m-%d") if (self.serial_item and self.serial_item.warranty_end) else None
+

@@ -23,7 +23,13 @@ class TicketOut(BaseModel):
     id: int
     ticket_number: str
     customer_id: int
+    customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None
+    customer_address: Optional[str] = None
     serial_item_id: Optional[int] = None
+    serial_no: Optional[str] = None
+    product_name: Optional[str] = None
+    warranty_end: Optional[str] = None
     assigned_to_id: Optional[int] = None
     subject: str
     description: str

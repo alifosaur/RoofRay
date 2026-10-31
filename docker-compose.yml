@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sunpower_secure_password}
       POSTGRES_DB: ${POSTGRES_DB:-sunpower_db}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -22,7 +22,7 @@ services:
     container_name: sunpower_redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -49,8 +49,12 @@ services:
       AUTO_SEED: "${AUTO_SEED:-true}"
       UPLOAD_DIR: "/app/uploads"
       SECRET_KEY: "${SECRET_KEY:-sunpower-super-secret-key-production-ready}"
+      PORT: "${BACKEND_PORT:-8000}"
+      HOST: "0.0.0.0"
+      BACKEND_PORT: "${BACKEND_PORT:-8000}"
+      FRONTEND_PORT: "${FRONTEND_PORT:-5173}"
     ports:
-      - "8000:8000"
+      - "${BACKEND_PORT:-8000}:8000"
     volumes:
       - backend_uploads:/app/uploads
     healthcheck:
@@ -68,8 +72,7 @@ services:
     depends_on:
       - backend
     ports:
-      - "80:80"
-      - "5173:80"
+      - "${FRONTEND_PORT:-5173}:80"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:80/"]
       interval: 10s

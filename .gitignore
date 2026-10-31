@@ -5,7 +5,9 @@ __pycache__/
 *.so
 .Python
 backend/venv/
+.env
 backend/.env
+frontend/.env
 *.db
 *.sqlite3
 

@@ -8,6 +8,11 @@ class Settings(BaseSettings):
     DEBUG: bool = True
     API_V1_PREFIX: str = "/api"
 
+    PORT: int = 8000
+    HOST: str = "0.0.0.0"
+    BACKEND_PORT: int = 8000
+    FRONTEND_PORT: int = 5173
+
     DATABASE_URL: str = "sqlite:///./sunpower.db"
     FIREBASE_CREDENTIALS_PATH: str = "firebase-service-account.json"
     DEV_AUTH_BYPASS: bool = True

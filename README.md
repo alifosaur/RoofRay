@@ -1,372 +1,170 @@
-# RoofRay Solutions - Solar Installation Management System (ERP)
+# RoofRay Solutions: Rooftop Solar Operations ERP
 
-A comprehensive, production-grade Solar Installation Management System built for **RoofRay Solutions** (~40 rooftop solar projects a month, 15 field technicians). The system manages the entire operational lifecycle from public web lead capture, site survey feasibility gating, dynamic BOM explosion, serialized warehouse dispatch, technician mobile PWA installation with on-site signature and test capture, automated warranty lifecycle, after-sales helpdesk with auto-invoicing, National Solar Subsidy tracking, and executive director dashboard with profit-per-job analytics.
+End-to-end operations for a rooftop-solar installer: customer enquiry → sales → site survey → quotation → payment →
+order → warehouse fulfilment with serial tracking → installation → invoicing → government subsidy tracking, with
+live dashboards. FastAPI + PostgreSQL + Redis + React (Vite). Firebase Authentication in production.
 
-The staff web portal is styled according to the **Odoo ERP UI/UX paradigm** (Odoo purple `#714B67`, teal accent `#017E84`, dense layout, statusbars with chevron stages, smart buttons, notebook tabs, inline editable lines, kanban/list/form/calendar views, and live chatter audit logs).
-
----
-
-## 🏛 System Architecture & End-to-End Workflow
-
-```text
- ┌────────────────────────────────────────────────────────────────────────────────────────┐
- │                              1. PUBLIC WEBSITE & LEAD CAPTURE                          │
- │  • Public Enquiry Form (Name, Phone, City, Capacity, System Type)                     │
- │  • In-Memory Sliding-Window Rate Limiter & Round-Robin Sales Agent Assignment          │
- └───────────────────────────────────────────┬────────────────────────────────────────────┘
-                                             │ Lead Status: NEW
-                                             ▼
- ┌────────────────────────────────────────────────────────────────────────────────────────┐
- │                               2. CRM & CALL QUALIFICATION                              │
- │  • Sales Call Checklist: Shadow-free Roof Area (sqft), Monthly Bill (₹), Grid Feasible │
- │  • Outcome: QUALIFIED or LOST (with mandatory reason, soft-deleted only)               │
- └───────────────────────────────────────────┬────────────────────────────────────────────┘
-                                             │ Lead Status: QUALIFIED
-                                             ▼
- ┌────────────────────────────────────────────────────────────────────────────────────────┐
- │                                3. SITE SURVEY & GATEWAY                                │
- │  • Sales schedules Survey -> Field Technician visits site                              │
- │  • Tech records: Roof Direction, Tilt (°), AC/DC Cable Distance, Mounting Feasibility  │
- │  • Manager/Admin Approval Gate: Quote creation returns HTTP 400 until survey APPROVED! │
- └───────────────────────────────────────────┬────────────────────────────────────────────┘
-                                             │ Lead Status: SURVEY_APPROVED
-                                             ▼
- ┌────────────────────────────────────────────────────────────────────────────────────────┐
- │                             4. DYNAMIC BOM QUOTE EXPLOSION                             │
- │  • Select Package: 1kW-5kW On-Grid / Off-Grid (with Battery Bank)                      │
- │  • BOM Auto-Explosion: Panels, Inverters, ACDB/DCDB, Batteries, Structure, Earthing   │
- │  • Instant PDF Generation (ReportLab) -> Customer Accepts -> Converts to CONFIRMED Order│
- └───────────────────────────────────────────┬────────────────────────────────────────────┘
-                                             │ Order Status: CONFIRMED
-                                             ▼
- ┌────────────────────────────────────────────────────────────────────────────────────────┐
- │                            5. ORDER, PAYMENTS & PICK LISTS                             │
- │  • Record Advance/Full Payment: Cash, UPI, Bank Transfer, Cheque                       │
- │  • Automated Warehouse Pick List Generation & Stock Deductions                         │
- │  • Auto-creates Scheduled Installation Job for Field Technician Crew                   │
- └───────────────────────────────────────────┬────────────────────────────────────────────┘
-                                             │ Order Status: PACKED
-                                             ▼
- ┌────────────────────────────────────────────────────────────────────────────────────────┐
- │                       6. SERIALIZED DISPATCH & WARRANTY GATE                           │
- │  • Warehouse Scans Hardware Barcodes (Inverters, Batteries, Charge Controllers)        │
- │  • Validation Gate: Rejects duplicate/already-assigned serials                         │
- │  • Delivery Gate: Delivery BLOCKED (HTTP 400) until 100% of serialized BOM items match│
- │  • Auto Warranty Engine: On DELIVERED, automatically calculates delivered_on and       │
- │    warranty_end (today + product warranty years, e.g. 20y panel, 2y inverter/battery)  │
- └───────────────────────────────────────────┬────────────────────────────────────────────┘
-                                             │ Order Status: DELIVERED
-                                             ▼
- ┌────────────────────────────────────────────────────────────────────────────────────────┐
- │                     7. FIELD TECHNICIAN MOBILE INSTALLATION PWA                        │
- │  • Glove-Friendly Mobile UI for 15 Technicians (Today's Schedule)                      │
- │  • Captures: Start/Finish Times, Power Generation Test (kW Output Check)               │
- │  • Multiple Geotagged Site Photo Uploads (Panels, Inverter, Earthing, Net-meter)       │
- │  • Customer Digital Signature Canvas -> Marks Job COMPLETED                            │
- │  • Automatic Timesheet & Technician Hourly Payout Calculation                          │
- └───────────────────────────────────────────┬────────────────────────────────────────────┘
-                                             │ Order Status: INSTALLED
-                                             ▼
- ┌────────────────────────────────────────────────────────────────────────────────────────┐
- │                          8. BILLING, SUBSIDIES & HELPDESK                              │
- │  • Final Tax Invoice & National Solar Subsidy Tracker (APPLIED -> APPROVED -> DISBURSED│
- │  • Customer Support Serial Lookup: Instant warranty status & remaining days            │
- │  • In-Warranty: Free Service | Out-of-Warranty: Auto-Generates Repair Invoice          │
- │  • Customer Confirmation Gate: Ticket cannot close without customer approval           │
- └───────────────────────────────────────────┬────────────────────────────────────────────┘
-                                             │
-                                             ▼
- ┌────────────────────────────────────────────────────────────────────────────────────────┐
- │                          9. DIRECTOR EXECUTIVE DASHBOARD                               │
- │  • Filter by Today / This Week / This Month / All Time                                 │
- │  • Profit per Job = Invoice Revenue - Hardware Cost - Technician Labor - BOS Costs     │
- │  • Real-time Profit Waterfall, Profitable vs Loss-making, Subsidy Pipeline, Low Stock  │
- │  • Excel Report (.xlsx) Export & Read-only Shareable Dashboard Link (Expiring Token)   │
- └────────────────────────────────────────────────────────────────────────────────────────┘
-```
+There is **no demo data**. A fresh install contains one admin and the configuration catalogue; everything else is
+created by real people using the app. `scripts/check_no_mock_data.sh` enforces this.
 
 ---
 
-## ⚡ The 8 Business Invariants & Operational Gates
+## Setup
 
-Every business rule is enforced strictly in the **backend service and data layer**, not merely via UI disabling:
-
-1. **Lead Immutability & Rate Limiting**: Leads are never hard-deleted (`is_deleted` soft-delete only). Public web lead capture applies sliding-window IP rate limiting and round-robin sales agent auto-assignment.
-2. **Sales Qualification Gate**: A sales call checklist must evaluate shadow-free area, monthly power bills, and grid suitability. Unfit leads are marked `LOST` with a mandatory reason.
-3. **Survey Approval Gate**: Attempting to generate a quotation for a lead whose survey is not in `APPROVED` status raises `HTTP 400 Bad Request` (`"Cannot create quote: Site survey must be APPROVED first"`).
-4. **BOM Template Explosion**: Creating a quote from a package template (e.g. 3 kW On-Grid or 5 kW Off-Grid with battery bank) automatically explodes the exact Bill of Materials into quote lines with live catalog prices and serialized item requirements.
-5. **Dispatch Serialization Gate**: An order cannot be marked `DELIVERED` until **every required serialized BOM item** (inverters, batteries, charge controllers) has been scanned. Duplicate serial numbers or serials already assigned to other active orders are rejected with `HTTP 400 Bad Request`.
-6. **Zero-Manual-Entry Warranty Engine**: When an order transitions to `DELIVERED`, the system automatically assigns `delivered_on = date.today()` and computes `warranty_end = delivered_on + product.warranty_years` (e.g., 20 years for panels, 2 years for inverters & batteries). Zero manual date inputs are accepted.
-7. **Technician Mobile Installation Gate**: The technician PWA enforces capturing start/finish times, kW capacity confirmation, generation verification test (Yes/No), installation photo attachments, and a customer touch signature canvas before transitioning the job to `COMPLETED`. The timesheet hours and technician payout (`hours * hourly_rate`) are derived automatically.
-8. **Helpdesk Warranty Gate & Auto-Billing**: Support lookup by customer phone, name, or hardware serial returns real-time warranty eligibility. If a ticket is created for an in-warranty serial, `billable` is set to `False` (free). If out-of-warranty, `billable` is set to `True`, and resolving the ticket automatically generates a repair invoice with parts and labor. A ticket cannot transition to `CLOSED` without explicit customer confirmation.
-
----
-
-## 🛠 Tech Stack
-
-### Backend
-- **Framework**: Python 3.9+, FastAPI, Uvicorn (ASGI)
-- **Data Validation & ORM**: Pydantic v2, SQLAlchemy 2.0, Alembic migrations
-- **Database**: SQLite default (`sqlite:///./sunpower.db`), seamless PostgreSQL compatibility via `DATABASE_URL`
-- **Authentication**: Firebase Admin SDK verification with dev bypass mode (`DEV_AUTH_BYPASS=True`) for offline development/testing
-- **Role-Based Access Control**: 6 Distinct Roles (`admin`, `sales`, `technician`, `warehouse`, `support`, `accounts`) enforced via reusable `require_role(*roles)` FastAPI dependencies
-- **PDF & Excel Reporting**: ReportLab PDF generation, openpyxl Excel streaming
-- **Audit Logging**: Comprehensive `audit_logs` tracking every entity status change (`from_status` -> `to_status`, author, timestamp) powering the Odoo-style Chatter panel
-
-### Frontend
-- **Framework & Build**: React 18, TypeScript, Vite
-- **Styling**: Tailwind CSS with Odoo color palette (`#714B67` primary, `#017E84` teal accent, `#F9FAFB` canvas, Inter font)
-- **Routing & State**: React Router v6, Context API for multi-role simulation
-- **UI Components**:
-  - `KanbanView`: Drag-and-drop pipeline powered by `@dnd-kit`
-  - `ListView`: Sortable data grid with search, filter, and batch actions
-  - `FormView`: Chevron statusbar stages, action buttons, smart stat buttons, notebook tabs, and inline editable line items
-  - `Chatter`: Real-time audit history and activity feed
-  - `TechnicianPWAPage`: Touch-optimized mobile PWA with camera file upload and `react-signature-canvas`
-  - `DispatchScanner`: Live camera barcode scanning via `html5-qrcode` + manual barcode input
-  - `DashboardCharts`: Interactive revenue, cost waterfall, and profit charts via `Recharts`
-
----
-
-## 🚀 Quickstart Guide
-
-### Option A: One-Command Docker Setup (Recommended)
-
-Run the entire stack (PostgreSQL, Redis, FastAPI Backend with auto-seeding, and Nginx React Frontend) in isolated Docker containers with a single command:
+### Docker (Postgres + Redis + backend + frontend)
 
 ```bash
-docker compose up --build
+docker compose up -d --build            # runs `alembic upgrade head` on start; seeds nothing
+docker compose exec backend python -m app.bootstrap_admin --email you@company.com --name "Your Name"
+docker compose exec backend python -m app.load_catalog   # configuration only (see below)
 ```
 
-- **Frontend App & Odoo Staff Portal**: [http://localhost:5173](http://localhost:5173) or [http://localhost:80](http://localhost:80)
-- **FastAPI Backend & Interactive Swagger Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
-- **Database**: PostgreSQL 16 on `localhost:5432` (`sunpower_db`)
-- **Cache/Queue**: Redis 7 on `localhost:6379`
-- **Auto-Seeding**: The backend container automatically detects PostgreSQL and populates the complete 21-user, 40-product, 10-customer lifecycle dataset on first boot (`AUTO_SEED=true`).
+Frontend: http://localhost:5173 · API docs: http://localhost:8000/docs
 
-To stop all containers:
-```bash
-docker compose down
-```
-
-To stop and remove persistent database volumes:
-```bash
-docker compose down -v
-```
-
----
-
-### Option B: Local Development Setup (Without Docker)
-
-#### 1. Prerequisites
-- Python 3.9 or higher
-- Node.js 18 or higher (tested with Node 20 / 22 / 26)
-
-#### 2. Backend Setup & Run
-
-Open a terminal in the project root:
+### Local development
 
 ```bash
 cd backend
-
-# 1. Create and activate a virtual environment
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# 2. Install dependencies
+python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-
-# 3. Seed realistic demo dataset (users, products, BOMs, 10 customer scenarios)
-python seed.py
-
-# 4. Start the FastAPI server
+alembic upgrade head
+python -m app.bootstrap_admin --email you@company.com --name "Your Name"   # prompts for a password in local auth mode
+python -m app.load_catalog
 uvicorn app.main:app --reload --port 8000
+
+cd ../frontend && npm install && npm run dev     # http://localhost:5173 (proxies /api to :8000)
 ```
 
-The backend will be live at `http://localhost:8000`.
-- Interactive Swagger UI: `http://localhost:8000/docs`
-- ReDoc Documentation: `http://localhost:8000/redoc`
+### Commands
 
-#### 3. Frontend Setup & Run
+| Command | What it does |
+|---|---|
+| `python -m app.bootstrap_admin --email … --name …` | Creates the **first admin** (Firebase user + DB row). Nothing else. |
+| `python -m app.load_catalog` | Loads **configuration**: product catalogue (stock starts at 0), On-Grid and Off-Grid BOM templates for 1–5 kW, per-product warranty terms, PM Surya Ghar scheme content and amounts. Insert-only: never overwrites admin edits. Never runs automatically. |
+| `python -m app.reset_db --yes` | **Dev only.** Deletes all transactional data; keeps users, linked customer profiles and configuration; resets stock to 0. Refuses when `ENV=production`. |
+| `scripts/check_no_mock_data.sh` | Fails if mock libraries, demo markers, demo logins, seed scripts, hard-coded emails/phones/amounts or pre-filled sample values appear outside tests. |
 
-Open a second terminal in the project root:
+Opening stock is recorded through **Inventory → Purchases** (it appears as money spent on the dashboard).
+
+### Authentication
+
+* **Firebase mode** (production): place the service-account JSON at `FIREBASE_CREDENTIALS_PATH` and set
+  `FIREBASE_WEB_API_KEY`, `FIREBASE_WEB_AUTH_DOMAIN`, `FIREBASE_WEB_PROJECT_ID`, `FIREBASE_WEB_APP_ID`.
+  The frontend signs in with Firebase and sends ID tokens; staff receive Firebase's password-reset email on creation.
+* **Local mode** (automatic when no Firebase credentials are present): PBKDF2 password hashes and signed
+  12-hour session tokens (`SECRET_KEY`). New staff get a one-time password setup link (shown to the admin).
+  No email server is wired: forgot-password links are printed to the server log.
+
+`GET /api/auth/config` tells the frontend which mode is active. Public self-registration always creates a
+**customer**; only an admin can create staff (Users screen: name, email, role, technician hourly rate, active flag).
+
+---
+
+## Roles
+
+| Capability | Customer | Sales | Technician | Warehouse | Admin |
+|---|:-:|:-:|:-:|:-:|:-:|
+| Home after login | `/customer` | `/sales` | `/technician` | `/warehouse` | `/admin` |
+| Packages, enquiry, tracker, quotes, invoices, serials & warranty, tickets, schemes, subsidy | own | – | – | – | all |
+| Leads, call checklist, mark LOST | – | **own leads** | – | – | all |
+| Schedule survey + assign technician (calendar view) | – | own leads | – | – | ✓ |
+| Submit survey (measurements, shade, photos) | – | – | **assigned** | – | ✓ |
+| Approve / reject survey | – | own leads | – | – | ✓ |
+| Quotation (BOM edit, send), record acceptance & payment, confirm order | – | own leads | – | – | ✓ |
+| Pick lists, serial scanning, fulfilment stages, stock purchases | – | view | – | **fulfilment-stage orders** | ✓ |
+| Installation jobs (start, photos, signature, complete) | – | view | **assigned, after delivery** | – | ✓ |
+| Tickets | own | ✓ | assigned | – | ✓ |
+| Users, schemes, finance dashboard, expenses, payouts, exports | – | – | – | – | ✓ |
+
+Every endpoint uses `require_role(...)` plus the object-level rules in `backend/app/core/access.py`. Every route in
+the frontend is wrapped in `RoleRouteGuard`.
+
+---
+
+## Workflow (strict state machine, enforced in the service layer)
+
+```mermaid
+flowchart TD
+  C1[Customer: browse packages → enquiry form] -->|lead auto-assigned| S1[Sales: call checklist]
+  S1 -->|unsuitable| LOST[(Lead LOST + reason)]
+  S1 --> S2[Sales: schedule survey, assign technician]
+  S2 --> T1[Technician: submit survey + photos]
+  T1 --> S3{Sales approves survey?}
+  S3 -->|reject| LOST
+  S3 -->|approve| Q1[Quotation from BOM template, adjust BOM]
+  Q1 --> Q2[Send PDF to customer]
+  Q2 --> Q3[Customer accepts → DRAFT order]
+  Q3 --> P1[Advance / full payment recorded]
+  P1 --> O1[Order CONFIRMED → pick list + invoice + subsidy record]
+  O1 --> W1[Warehouse: scan serials → PACKING]
+  W1 --> W2[PACKED → DISPATCHED → OUT_FOR_DELIVERY → DELIVERED]
+  W2 -->|warranty dates set, job released| T2[Technician: start, photos, signature, complete]
+  T2 --> O2[Order INSTALLED → timesheet + payout]
+  O2 -->|fully paid| O3[Order CLOSED, invoice PAID]
+  O1 -.-> SUB[Subsidy tracker: 9 steps, grid-connected only]
+```
+
+**Gates** (HTTP 400 when violated):
+
+1. A quotation cannot be created before the survey is **APPROVED**; a survey can only be approved after the technician **submits** it.
+2. A quotation can only be accepted after it was **sent**; one order per lead.
+3. An order cannot be confirmed without a **recorded payment**.
+4. Serials are scanned while packing; duplicates and serials already assigned to another order are rejected (Redis lock + unique `serial_no`).
+5. **PACKED** and **DELIVERED** require every serialised BOM item to be scanned; stages cannot be skipped.
+6. Warranty start = delivery date, end = start + product warranty years. Never typed.
+7. The install job is invisible to the technician until the order is **DELIVERED**; completion needs a started job, ≥1 photo and the customer's signature.
+8. The subsidy tracker only advances one step at a time (Not applied → Eligibility checked → Registered → Feasibility approval → Installation done → Inspection & commissioning → Claim submitted → Approved → Disbursed); Off-Grid orders are not eligible.
+
+Every hand-off writes an **audit log** entry, a **notification** for the receiving users and a row in the
+**transactional outbox**, in the same DB transaction.
+
+### Live updates
+
+* `GET /api/events?token=…` is a Server-Sent Events stream that reads the outbox, filtered to the user's role/own records
+  (admin sees all). Works across workers because it reads the database.
+* All screens subscribe through `frontend/src/live/LiveEvents.tsx` (`useLiveRefresh`) and refetch on relevant events;
+  the navbar bell shows notifications live.
+* Dashboard aggregates are computed from the database and cached in Redis for 45 s; any commit that emitted an
+  event invalidates the cache. Without Redis the API simply queries the DB every time.
+
+---
+
+## Tests and checks
 
 ```bash
-cd frontend
-
-# 1. Install npm dependencies
-npm install
-
-# 2. Start the Vite dev server
-npm run dev
+cd backend && pytest                      # 35 tests, throwaway SQLite DB (never touches your data)
+scripts/check_no_mock_data.sh
+cd frontend && npm run build
 ```
 
-The frontend will be live at `http://localhost:5173`.
-
----
-
-## 👥 Roles & Demo Credentials
-
-The platform enforces 5 distinct roles with backend endpoint and object-level permission guards, plus UI routing guards:
-
-| Role | Default Email | Firebase Dev Token | Login Redirect | Accessible Views & Duties |
-| :--- | :--- | :--- | :--- | :--- |
-| **Admin** | `admin@roofray.com` | `admin_uid` | `/web/dashboard` | Executive director dashboard, User Management (staff CRUD & status toggles), Accounting & Subsidies, Technician payout approval, all CRM/Survey/Dispatch/Helpdesk apps. |
-| **Sales** | `sales@roofray.com` | `sales_uid` | `/web/crm` | Lead capture & Kanban, Call checklist, Technician survey scheduling, BOM Quotation builder & PDF generation, Sales metrics & 2.5% commission tracking. |
-| **Warehouse** | `warehouse@roofray.com` | `warehouse_uid` | `/web/dispatch` | Stock inventory management, Barcode scanning & dispatch fulfillment queue, serial inwarding, delivery dispatch gate enforcement, warranty date activation. |
-| **Technician** (15 crew) | `tech@roofray.com` or `tech1@roofray.com` - `tech15@roofray.com` | `tech_uid`, `tech_uid_1` - `tech_uid_15` | `/technician` (`/pwa/tech`) | Mobile-first touch PWA: Site feasibility survey report submission, installation job start/finish, generation test (> 0 kW required), customer signature canvas, timesheet tracking. |
-| **Customer** | `customer@roofray.com` | `customer_uid` | `/customer` | Odoo-website-style customer portal: Solar package catalog, PM Surya Ghar subsidy estimator, measurements enquiry submission, 13-stage live project tracker, quote acceptance, equipment & warranty lookup, service tickets. |
-
-> **Password for all seeded accounts**: Any password (or click dev persona quick login button on `/login`).
-> **Public Registration**: Self-registration on `/login` strictly creates `role=customer` and links a `customers` row. Any attempt to supply `role=admin` is rejected and clamped to `customer`. Staff accounts are managed exclusively by the Admin via `/web/users`.
-
----
-
-## 🧪 Automated Test Suite
-
-The backend includes a comprehensive `pytest` test suite covering every phase and business invariant.
+`tests/test_full_flow_empty_db.py` walks the whole chain on a brand-new empty database with accounts created through
+the API, and checks that dashboards show zeros before and real values after. To run the same chain over HTTP
+against a live server (e.g. a fresh Postgres after `alembic upgrade head`, `bootstrap_admin --email owner@example.com
+--password owner-password` and `load_catalog`):
 
 ```bash
-cd backend
-source venv/bin/activate
-pytest
-```
-
-**Test Coverage Highlights (30 Automated Tests Passed)**:
-- `tests/test_milestone_all_roles_e2e.py`: Complete end-to-end milestone lifecycle across all 5 roles verifying customer self-registration, enquiry submission, sales checklist, technician survey in PWA, admin survey approval gate, quotation & order confirmation, warehouse queue, serial barcode scanning & dispatch gate, auto-warranty activation on delivery, technician installation job with generation test (> 0 kW) and signature, timesheet & payout sync, admin user management, sales commissions, and subsidy stage advancement.
-- `tests/test_phase1_roles_auth_guards.py`: Strict role route guards, customer privilege escalation blocking (403 on staff endpoints), and technician object-level isolation.
-- `tests/test_phase2_customer_portal.py`: Customer portal endpoints, 13-stage timeline tracker, PM Surya Ghar subsidy estimator, equipment warranty lookup, and service ticket creation.
-- `tests/test_phase1_auth.py`: Firebase token decoding, role enforcement (`require_role`), user CRUD.
-- `tests/test_phase2_crm_survey.py`: Public lead capture, soft-delete, call qualification checklist, survey scheduling, and survey completion/approval.
-- `tests/test_phase3_catalog_quote.py`: Product catalog, BOM explosion into quote lines, ReportLab quote PDF generation, quote acceptance.
-- `tests/test_phase4_orders_inventory.py`: Order confirmation, advance payments, stock deductions, warehouse pick list generation.
-- `tests/test_phase5_dispatch_warranty.py`: Dispatch serialization gate (asserts 400 on missing serial), duplicate serial rejection, automated warranty date computation on delivery.
-- `tests/test_phase6_jobs.py`: Technician mobile workflow, photo upload, signature storage, power test verification, timesheet derivation.
-- `tests/test_phase7_tickets_warranty.py`: Support lookup, in-warranty free ticket, out-of-warranty auto-repair invoicing, customer confirmation gate.
-- `tests/test_phase8_reports_finance.py`: Subsidies, technician hourly payouts, profit-per-job calculation, sales team commissions with Quote join verification, Excel export, expiring shareable dashboard link.
-- `tests/test_phase10_e2e_all_gates.py`: End-to-end integration test verifying all 8 business invariants in a single cohesive flow.
-
-To build the frontend bundle:
-```bash
-cd frontend
-npm run build
+E2E_BASE_URL=http://localhost:8000 pytest tests/test_full_flow_empty_db.py
 ```
 
 ---
 
-## 📖 Step-by-Step Interactive Demo Walkthrough
+## Repository structure
 
-Follow this step-by-step path to experience the complete RoofRay Solutions workflow:
-
-### Step 1: Public Website & Enquiry (`/`)
-1. Open `http://localhost:5173/` in your browser.
-2. View the public-facing solar packages (1 kW to 5 kW On-Grid & Off-Grid).
-3. Fill out the **Get a Free Rooftop Solar Quote** form (e.g. Name: *Rajesh Sharma*, Phone: *9810012345*, 3 kW On-Grid) and submit.
-4. The system validates inputs, applies rate limiting, creates a lead, and round-robin assigns it to a sales agent.
-
-### Step 2: Sales Qualification & Survey Scheduling (`/web/crm`)
-1. Switch to the staff portal at `http://localhost:5173/web/crm`.
-2. Notice the Odoo dark-purple top navbar (`#714B67`) and CRM Kanban pipeline (`New`, `Contacted`, `Qualified`, `Survey Scheduled`, `Survey Approved`, `Quoted`, `Won`).
-3. Click on Rajesh Sharma's card to open the **Lead Form View**.
-4. Fill out the **Call Checklist** tab: Shadow-free area (400 sqft), Monthly bill (₹5,500), Grid suitable: Yes. Click **Save Checklist** -> Lead moves to `QUALIFIED`.
-5. Click **Schedule Survey**, pick a technician (e.g. *Ramesh Kumar - Tech 1*), and pick a survey date. Lead moves to `SURVEY_SCHEDULED`.
-
-### Step 3: Verify the Survey Approval Gate (`/web/quotes`)
-1. Try navigating directly to `/web/quotes` and creating a Quote for this lead.
-2. **GATE ACTIVATION**: The system rejects quote creation with an alert: *"Cannot create quote: Site survey must be APPROVED first"*.
-3. Navigate to `/web/surveys`, find the scheduled survey, and submit survey findings (Roof Direction: South, Tilt: 22°, Cable Distance: 15m).
-4. Click **Approve Survey**. Lead status transitions to `SURVEY_APPROVED`.
-
-### Step 4: BOM Quote Auto-Explosion & Acceptance (`/web/quotes`)
-1. Go back to `/web/quotes` and click **New**.
-2. Select Rajesh Sharma's lead and choose the template: **3 kW On-Grid System**.
-3. Watch the system automatically explode the BOM:
-   - 6x 540W Mono PERC Solar Panels
-   - 1x 3kW String Inverter
-   - 1x AC/DC Distribution Box
-   - 1x Galvanized Iron Mounting Structure
-   - 1x Chemical Earthing Kit & Cables
-4. Click **Download PDF** to inspect the server-generated branded Quote PDF.
-5. Click **Accept & Create Order**. An Order is created in `CONFIRMED` state, an automated Warehouse Pick List is generated, and an Installation Job is scheduled for the technician crew.
-
-### Step 5: Warehouse Dispatch & Serial Barcode Gate (`/web/dispatch`)
-1. Switch role to **Warehouse** in the top navbar and navigate to `/web/dispatch`.
-2. Open the newly generated order. Notice the dispatch checklist showing missing serials.
-3. Attempt to click **Confirm Delivery** immediately.
-4. **GATE ACTIVATION**: Delivery is blocked (`HTTP 400`) because required serialized components (Inverter, Panels) have not been scanned.
-5. Use either the **Camera Barcode Scanner** or the manual scanner input to scan the required inverter and panel serial numbers.
-6. Attempt to scan an already-used serial: the system immediately rejects the duplicate scan.
-7. Once all required serials are scanned, click **Confirm Delivery**.
-8. **AUTOMATED WARRANTY ENGINE**: The system marks the order `DELIVERED`, records `delivered_on = today`, and automatically calculates `warranty_end = today + 20 years` for panels and `today + 2 years` for inverters.
-
-### Step 6: Technician Mobile Installation PWA (`/pwa/tech`)
-1. Open `http://localhost:5173/pwa/tech` on a mobile browser (or in Chrome DevTools Device Mode).
-2. The technician sees their **Today's Assigned Jobs**.
-3. Tap **Start Installation Job**.
-4. Upload test photos of the inverter and panel array.
-5. Run the power generation test: enter generated output (e.g. `2.8 kW`), mark **Power Generating: YES**.
-6. Ask the customer to sign on the interactive touch signature canvas.
-7. Tap **Complete Installation**.
-8. The job transitions to `COMPLETED`, photo attachments and signatures are securely stored, and the system automatically calculates the timesheet and technician hourly labor payout.
-
-### Step 7: Billing, Subsidy Tracking & After-Sales Helpdesk (`/web/accounting` & `/web/helpdesk`)
-1. Switch role to **Accounts** and open `/web/accounting`:
-   - Inspect the generated final tax invoice.
-   - Track National Solar Subsidy status through its lifecycle: `APPLIED` -> `APPROVED` -> `DISBURSED` with government reference numbers.
-   - Review technician payout entries derived from timesheet hours.
-2. Switch role to **Support** and navigate to `/web/helpdesk`:
-   - Enter an inverter serial or customer phone number into the **Instant Warranty Lookup**.
-   - The system displays the customer, product name, installation date, warranty expiration date, and remaining days.
-   - Create a service ticket:
-     - For an **In-Warranty** component: `Billable` is automatically set to `False` (zero cost to customer).
-     - For an **Out-of-Warranty** component: `Billable` is automatically set to `True`. When the technician resolves the ticket, a **Repair Invoice** is automatically created for parts and labor.
-     - Verify the **Customer Confirmation Gate**: The ticket cannot be marked `CLOSED` until the customer confirms satisfaction.
-
-### Step 8: Director Executive Dashboard & Expiring Share Link (`/web/dashboard`)
-1. Switch role to **Admin** and navigate to `/web/dashboard`.
-2. Filter analytics by **Today**, **This Week**, **This Month**, or **All Time**.
-3. Review key metrics:
-   - Total Invoiced Revenue vs. Collected Payments
-   - Total Hardware Costs, Technician Payouts, and Net Margin
-   - **Profit per Job Waterfall**: Analyzes revenue minus stock cost minus technician labor minus BOS costs.
-   - Breakdown of Profitable vs. Loss-Making installations.
-   - Active National Subsidy Pipeline.
-   - Low Stock Inventory Alerts.
-4. Click **Export to Excel (.xlsx)** to download the raw multi-sheet financial workbook.
-5. Click **Generate Share Link**: Copies an expiring read-only dashboard link (`/shared/dashboard?token=...`) allowing board directors to inspect real-time metrics without logging in.
-
----
-
-## 📁 Repository Structure
-
-```text
-├── backend/
-│   ├── alembic/                # Database migrations
-│   ├── app/
-│   │   ├── core/               # App configuration, SQLite/PostgreSQL setup, Firebase auth & role guards
-│   │   ├── models/             # SQLAlchemy 2.0 ORM models (21 tables)
-│   │   ├── schemas/            # Pydantic v2 validation schemas
-│   │   ├── routers/            # Clean REST API endpoints (Auth, CRM, Quotes, Orders, Dispatch, Jobs, Tickets, Finance, Reports)
-│   │   ├── services/           # Core business logic & invariant gates
-│   │   └── main.py             # FastAPI entrypoint, middleware, routes, exception handlers
-│   ├── tests/                  # 16 Pytest test suites testing all 8 gates & e2e lifecycle
-│   ├── uploads/                # Local storage for site photos and digital signature images
-│   ├── seed.py                 # Comprehensive realistic demo data generator
-│   └── requirements.txt        # Python backend dependencies
-├── frontend/
-│   ├── public/                 # Static assets
-│   ├── src/
-│   │   ├── api/                # Axios API client with simulated multi-role headers
-│   │   ├── components/odoo/    # Reusable Odoo UI components (Navbar, HomeMenu, ControlPanel, FormView, ListView, KanbanView, Chatter, StatusBar, SmartButton)
-│   │   ├── pages/              # Domain screens (CRM, Surveys, Quotes, Orders, Inventory, Dispatch, Jobs, Helpdesk, Accounting, Dashboard, Public Portal, Tech PWA)
-│   │   ├── App.tsx             # Main router & role provider
-│   │   └── main.tsx            # React DOM root
-│   ├── package.json
-│   └── tailwind.config.js      # Odoo color palette configuration
-└── README.md                   # System documentation & walkthrough guide
 ```
-
----
-
-## 📄 License
-Proprietary software developed for **RoofRay Solutions**. All rights reserved.
+backend/
+  app/
+    core/        config, database, security (Firebase/local auth), access rules, events (outbox), cache, uploads
+    models/      SQLAlchemy models (incl. outbox_events, expenses, survey_photos, subsidy_events)
+    routers/     API endpoints (auth, users, leads, surveys, quotes, orders, inventory, dispatch, jobs,
+                 tickets, finance, reports, customer, events, notifications)
+    services/    workflow logic and gates
+    bootstrap_admin.py · load_catalog.py · reset_db.py
+  alembic/       migrations (baseline from models)
+  tests/         pytest suite + helpers
+frontend/src/
+  api/client.ts            fetch wrapper + authenticated downloads
+  context/AuthContext.tsx  Firebase / local sign-in
+  live/LiveEvents.tsx      SSE provider + useLiveRefresh
+  pages/                   role workspaces
+scripts/check_no_mock_data.sh
+```

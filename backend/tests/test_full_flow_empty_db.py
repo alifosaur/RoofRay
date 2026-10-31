@@ -22,6 +22,13 @@ from app.services.dispatch_service import add_years_to_date
 
 @pytest.fixture()
 def client():
+    # E2E_BASE_URL: run the same chain over HTTP against a live server whose DB has only
+    # `alembic upgrade head`, `bootstrap_admin --email owner@example.com --password owner-password` and `load_catalog`.
+    if os.environ.get("E2E_BASE_URL"):
+        import httpx
+        with httpx.Client(base_url=os.environ["E2E_BASE_URL"], timeout=30) as c:
+            yield c
+        return
     path = os.path.join(tempfile.mkdtemp(prefix="empty_db_"), "empty.db")
     engine = create_engine(f"sqlite:///{path}", connect_args={"check_same_thread": False})
     Session = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)

@@ -32,6 +32,9 @@ sys.exit(1)
 EOF
 fi
 
+echo "Running database migrations..."
+alembic upgrade head
+
 echo "Starting Uvicorn Server..."
 exec "$@"
 

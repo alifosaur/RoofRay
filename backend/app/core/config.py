@@ -15,11 +15,11 @@ class Settings(BaseSettings):
 
     DATABASE_URL: str = "sqlite:///./sunpower.db"
     # SMTP for sign-up codes and password links; with no SMTP_HOST emails are printed to the server log
-    SMTP_HOST: str = ""
+    SMTP_HOST: str = "smtp.gmail.com"
     SMTP_PORT: int = 587
-    SMTP_USER: str = ""
-    SMTP_PASSWORD: str = ""
-    SMTP_FROM: str = ""
+    SMTP_USER: str = "manvith24r@gmail.com"
+    SMTP_PASSWORD: str = "yewkpqruvssycofn"
+    SMTP_FROM: str = "manvith24r@gmail.com"
     SMTP_USE_TLS: bool = True
     PUBLIC_APP_URL: str = "http://localhost:5173"
 

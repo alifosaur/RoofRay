@@ -143,7 +143,24 @@ export const CRMPage: React.FC = () => {
     }
   };
 
+  // Stages after "Contacted" are reached through actions, so the board routes to them instead of setting them
+  const WORKFLOW_HINTS: Record<string, string> = {
+    QUALIFIED: 'Record the call checklist on the lead to qualify it.',
+    SURVEY_APPROVED: 'The technician approves the survey from the field app (or you approve a submitted survey on the lead).',
+    QUOTED: 'Create the quotation on the lead and send it to the customer.',
+    WON: 'The lead is won when the customer accepts the sent quotation.',
+  };
+
   const handleMove = async (itemId: string | number, newStatus: string) => {
+    if (newStatus === 'SURVEY_SCHEDULED') {
+      navigate(`/web/crm/${itemId}?action=schedule_survey`);
+      return;
+    }
+    if (WORKFLOW_HINTS[newStatus]) {
+      alert(WORKFLOW_HINTS[newStatus]);
+      if (newStatus === 'QUALIFIED' || newStatus === 'QUOTED') navigate(`/web/crm/${itemId}`);
+      return;
+    }
     try {
       await api.put(`/leads/${itemId}`, { status: newStatus });
       fetchLeads();

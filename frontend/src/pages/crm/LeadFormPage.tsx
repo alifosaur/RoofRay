@@ -111,6 +111,9 @@ export const LeadFormPage: React.FC = () => {
     if (params.get('action') === 'send_to_warehouse') {
       setShowSendItemsModal(true);
     }
+    if (params.get('action') === 'schedule_survey') {
+      setShowSurveyModal(true);
+    }
   }, [location.search]);
 
   if (!lead) {

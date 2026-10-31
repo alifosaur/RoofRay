@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import lottie from 'lottie-web';
 import { useLiveRefresh } from '../../live/LiveEvents';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -127,6 +128,26 @@ interface SchemeData {
   grid_connected_only: boolean;
 }
 
+const InvoiceLottieAnimation: React.FC = () => {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const anim = lottie.loadAnimation({
+      container: containerRef.current,
+      renderer: 'svg',
+      loop: true,
+      autoplay: true,
+      path: '/invoice-success.json',
+    });
+    return () => {
+      anim.destroy();
+    };
+  }, []);
+
+  return <div ref={containerRef} className="w-48 h-48 mx-auto flex items-center justify-center" />;
+};
+
 export const CustomerPortalPage: React.FC = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -145,6 +166,12 @@ export const CustomerPortalPage: React.FC = () => {
   const [myEnquiry, setMyEnquiry] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
   const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
+  const [invoiceModalData, setInvoiceModalData] = useState<{
+    invoiceNumber: string;
+    invoiceId: number;
+    totalAmount: number;
+    orderNumber: string;
+  } | null>(null);
 
   // Enquiry form state
   const [enquiryForm, setEnquiryForm] = useState({
@@ -288,7 +315,7 @@ export const CustomerPortalPage: React.FC = () => {
 
   // Handle Pay Final 50% Balance
   const handlePayBalance = async (orderId: number, balanceAmount: number) => {
-    if (!window.confirm(`Pay final balance of ₹${balanceAmount.toLocaleString()}? This will settle your solar project in full.`)) {
+    if (!window.confirm(`Pay final balance of ₹${balanceAmount.toLocaleString()}? This will mark your solar installation fully paid and generate your official tax invoice.`)) {
       return;
     }
     setLoading(true);
@@ -296,6 +323,14 @@ export const CustomerPortalPage: React.FC = () => {
       const res = await api.post<any>(`/customer/orders/${orderId}/pay-balance`);
       setNoticeMessage(res.message || 'Final balance payment settled successfully!');
       await loadData();
+      if (res.invoice) {
+        setInvoiceModalData({
+          invoiceNumber: res.invoice.invoice_number,
+          invoiceId: res.invoice.id,
+          totalAmount: res.invoice.total_amount,
+          orderNumber: res.order_number,
+        });
+      }
     } catch (err: any) {
       alert(err.message || 'Failed to settle final balance');
     } finally {
@@ -1068,16 +1103,29 @@ export const CustomerPortalPage: React.FC = () => {
               ) : (
                 <ul className="divide-y divide-gray-100 text-xs">
                   {invoices.map((inv) => (
-                    <li key={inv.id} className="py-2 flex items-center justify-between">
-                      <span className="font-mono font-semibold">{inv.invoice_number}</span>
-                      <span>₹{Math.round(inv.total_amount).toLocaleString('en-IN')}</span>
-                      <span className={inv.status === 'PAID' ? 'text-emerald-700 font-semibold' : 'text-amber-700 font-semibold'}>{inv.status}</span>
-                      <button
-                        onClick={() => downloadFile(`/finance/invoices/${inv.id}/pdf`, `${inv.invoice_number}.pdf`).catch((err) => alert(err.message))}
-                        className="underline text-odoo-purple"
-                      >
-                        PDF
-                      </button>
+                    <li key={inv.id} className="py-2.5 flex items-center justify-between border-b border-gray-100 last:border-0">
+                      <div>
+                        <span className="font-mono font-bold text-gray-900">{inv.invoice_number}</span>
+                        <span className="text-[11px] text-gray-400 ml-2">Due in 15 days</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="font-semibold text-gray-800">₹{Math.round(inv.total_amount).toLocaleString('en-IN')}</span>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${inv.status === 'PAID' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                          {inv.status}
+                        </span>
+                        <button
+                          onClick={() => setInvoiceModalData({
+                            invoiceNumber: inv.invoice_number,
+                            invoiceId: inv.id,
+                            totalAmount: inv.total_amount,
+                            orderNumber: inv.invoice_number.replace('INV-', ''),
+                          })}
+                          className="px-2.5 py-1 bg-purple-50 hover:bg-purple-100 text-[#714B67] border border-purple-200 rounded text-xs font-bold flex items-center gap-1.5"
+                        >
+                          <i className="fa-solid fa-file-invoice text-[#714B67]"></i>
+                          <span>View Invoice</span>
+                        </button>
+                      </div>
                     </li>
                   ))}
                 </ul>
@@ -1261,11 +1309,16 @@ export const CustomerPortalPage: React.FC = () => {
                           {o.invoice && (
                             <button
                               type="button"
-                              onClick={() => downloadFile(`/finance/invoices/${o.invoice.id}/pdf`, `${o.invoice.invoice_number}.pdf`).catch((err) => alert(err.message))}
-                              className="px-3 py-1.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded text-xs font-semibold flex items-center gap-1"
+                              onClick={() => setInvoiceModalData({
+                                invoiceNumber: o.invoice!.invoice_number,
+                                invoiceId: o.invoice!.id,
+                                totalAmount: o.invoice!.total_amount,
+                                orderNumber: o.order_number,
+                              })}
+                              className="px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-[#714B67] border border-purple-200 rounded text-xs font-bold flex items-center gap-1.5 shadow-2xs"
                             >
-                              <i className="fa-solid fa-file-invoice text-odoo-purple"></i>
-                              <span>Invoice</span>
+                              <i className="fa-solid fa-file-invoice text-[#714B67]"></i>
+                              <span>Tax Invoice</span>
                             </button>
                           )}
                           {o.can_pay_balance && (
@@ -1708,6 +1761,84 @@ export const CustomerPortalPage: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* FULL PAYMENT INVOICE GENERATION LOTTIE MODAL */}
+      {invoiceModalData && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-purple-100 overflow-hidden animate-in fade-in zoom-in duration-200">
+            {/* Header banner */}
+            <div className="bg-gradient-to-r from-[#714B67] to-[#8A5D7C] text-white p-5 text-center relative">
+              <span className="inline-block px-3 py-1 bg-white/20 rounded-full text-[11px] font-bold tracking-wider uppercase mb-1">
+                Official Tax Invoice Generated
+              </span>
+              <h3 className="text-xl font-extrabold tracking-tight">Full Payment Settled!</h3>
+              <p className="text-xs text-purple-100 mt-1">Order #{invoiceModalData.orderNumber} is 100% cleared.</p>
+              <button
+                type="button"
+                onClick={() => setInvoiceModalData(null)}
+                className="absolute top-4 right-4 text-white/80 hover:text-white text-lg w-8 h-8 rounded-full flex items-center justify-center hover:bg-white/10"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Lottie Animation */}
+            <div className="pt-6 pb-2 px-6 text-center bg-gradient-to-b from-purple-50/40 to-white">
+              <InvoiceLottieAnimation />
+              <div className="mt-2">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-300">
+                  <i className="fa-solid fa-circle-check text-emerald-600"></i>
+                  <span>INVOICE #{invoiceModalData.invoiceNumber}</span>
+                </span>
+              </div>
+            </div>
+
+            {/* Details Box */}
+            <div className="p-6 pt-2 space-y-4">
+              <div className="bg-gray-50 rounded-xl p-3.5 border border-gray-100 space-y-2 text-xs">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500">Invoice Number:</span>
+                  <span className="font-mono font-bold text-gray-900">{invoiceModalData.invoiceNumber}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500">Total Settled:</span>
+                  <strong className="text-emerald-700 font-bold text-sm">₹{Math.round(invoiceModalData.totalAmount).toLocaleString('en-IN')}</strong>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500">Payment Status:</span>
+                  <span className="font-semibold text-emerald-700">PAID IN FULL (100%)</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500">Warranty Coverage:</span>
+                  <span className="font-semibold text-gray-800">20-Year Active Guarantee</span>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="space-y-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    downloadFile(`/finance/invoices/${invoiceModalData.invoiceId}/pdf`, `${invoiceModalData.invoiceNumber}.pdf`)
+                      .catch((err) => alert(err.message || 'Invoice PDF generation in progress'));
+                  }}
+                  className="w-full py-3 px-4 bg-[#714B67] hover:bg-[#5C3C54] text-white font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-2 transition-transform active:scale-[0.98]"
+                >
+                  <i className="fa-solid fa-file-arrow-down text-sm"></i>
+                  <span>Download Tax Invoice (PDF)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInvoiceModalData(null)}
+                  className="w-full py-2.5 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-xs rounded-xl"
+                >
+                  Close & View Order Tracker
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

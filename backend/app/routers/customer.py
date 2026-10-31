@@ -531,6 +531,12 @@ def pay_order_balance(
         "status": order.status.value,
         "amount_paid": outstanding,
         "is_fully_paid": True,
+        "invoice": {
+            "id": order.invoice.id,
+            "invoice_number": order.invoice.invoice_number,
+            "total_amount": order.invoice.total_amount,
+            "status": order.invoice.status.value,
+        } if order.invoice else None,
     }
 
 

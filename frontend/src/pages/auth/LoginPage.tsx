@@ -60,9 +60,6 @@ export const LoginPage: React.FC = () => {
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
-  const [address, setAddress] = useState('');
-  const [city, setCity] = useState('');
-  const [pincode, setPincode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(
@@ -116,7 +113,7 @@ export const LoginPage: React.FC = () => {
         return;
       }
       run(async () => {
-        const u = await register({ email: email.trim(), password, full_name: fullName, phone, address, city, pincode });
+        const u = await register({ email: email.trim(), password, full_name: fullName, phone });
         navigate(getRoleHomePath(u.role));
       });
     } else {
@@ -218,21 +215,6 @@ export const LoginPage: React.FC = () => {
                 </Field>
               )}
 
-              {mode === 'register' && (
-                <>
-                  <Field label="Address">
-                    <input className={inputClass} value={address} onChange={(e) => setAddress(e.target.value)} autoComplete="street-address" />
-                  </Field>
-                  <div className="grid grid-cols-2 gap-3">
-                    <Field label="City">
-                      <input className={inputClass} value={city} onChange={(e) => setCity(e.target.value)} autoComplete="address-level2" />
-                    </Field>
-                    <Field label="Postal code">
-                      <input className={inputClass} value={pincode} onChange={(e) => setPincode(e.target.value)} autoComplete="postal-code" />
-                    </Field>
-                  </div>
-                </>
-              )}
 
               <button
                 type="submit"

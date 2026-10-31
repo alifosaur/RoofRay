@@ -1,7 +1,6 @@
-import React from 'react';
-import { Navigate } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth, UserRole } from '../context/AuthContext';
-import { Forbidden403Page } from '../pages/auth/Forbidden403Page';
 
 interface RoleRouteGuardProps {
   children: React.ReactElement;
@@ -31,9 +30,19 @@ export const RoleRouteGuard: React.FC<RoleRouteGuardProps> = ({ children, allowe
   const isAllowed = allowedRoles.includes(currentRole) || currentRole === 'admin';
 
   if (!isAllowed) {
-    return <Forbidden403Page requiredRoles={allowedRoles} currentRole={currentRole} />;
+    return <SignOutToLogin />;
   }
 
   return children;
 };
 
+
+/** A role that may not open this page is signed out and sent to the login page. */
+const SignOutToLogin: React.FC = () => {
+  const { logout } = useAuth();
+  const navigate = useNavigate();
+  useEffect(() => {
+    logout().then(() => navigate('/login?denied=1', { replace: true }));
+  }, []);
+  return null;
+};

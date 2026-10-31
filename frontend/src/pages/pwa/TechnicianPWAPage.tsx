@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useLiveRefresh } from '../../live/LiveEvents';
+import { useAuth } from '../../context/AuthContext';
 import { NotificationBell } from '../../components/common/NotificationBell';
 import { api } from '../../api/client';
 import { useNavigate } from 'react-router-dom';
@@ -18,6 +19,7 @@ import {
 
 export const TechnicianPWAPage: React.FC = () => {
   const navigate = useNavigate();
+  const { logout } = useAuth();
   const [activeTab, setActiveTab] = useState<'jobs' | 'surveys'>('jobs');
   const [schedule, setSchedule] = useState<any[]>([]);
   const [activeJob, setActiveJob] = useState<any | null>(null);
@@ -200,7 +202,9 @@ export const TechnicianPWAPage: React.FC = () => {
       <header className="bg-slate-800 border-b border-slate-700 px-4 py-3 flex items-center justify-between sticky top-0 z-20">
         <div className="flex items-center space-x-3">
           <button
-            onClick={() => navigate('/web/jobs')}
+            onClick={() => logout().then(() => navigate('/login', { replace: true }))}
+            title="Sign out"
+            aria-label="Sign out"
             className="text-gray-400 hover:text-white p-2 rounded-lg bg-slate-700/50"
           >
             <FontAwesomeIcon icon={faArrowLeft} />

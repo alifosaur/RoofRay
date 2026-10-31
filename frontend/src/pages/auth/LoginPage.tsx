@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth, getRoleHomePath, UserRole } from '../../context/AuthContext';
 import { SiteNavbar } from '../../components/layout/SiteNavbar';
@@ -51,7 +51,8 @@ const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, 
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const { user, login, logout, register, requestPasswordReset } = useAuth();
+  const { user, isLoading, login, logout, register, requestPasswordReset } = useAuth();
+  const signingIn = useRef(false);
   const [selectedRole, setSelectedRole] = useState<UserRole>('customer');
 
   const [mode, setMode] = useState<Mode>('login');
@@ -65,13 +66,18 @@ export const LoginPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(
-    new URLSearchParams(window.location.search).has('password_set') ? 'Password set. Select your role and sign in.' : null
+    new URLSearchParams(window.location.search).has('password_set')
+      ? 'Password set. Select your role and sign in.'
+      : new URLSearchParams(window.location.search).has('denied')
+      ? 'You were signed out because your role cannot open that page. Sign in with the right role.'
+      : null
   );
 
   // Already signed in: go straight to the role's workspace
   useEffect(() => {
-    if (user && !loading) navigate(getRoleHomePath(user.role), { replace: true });
-  }, [user, loading]);
+    // Arriving here while signed in (e.g. browser Back from a dashboard) ends the session
+    if (!isLoading && user && !signingIn.current) logout();
+  }, [isLoading]);
 
   const switchMode = (m: Mode) => {
     setMode(m);
@@ -95,6 +101,7 @@ export const LoginPage: React.FC = () => {
     e.preventDefault();
     if (mode === 'login') {
       run(async () => {
+        signingIn.current = true;
         const u = await login(email.trim(), password);
         if (u.role !== selectedRole) {
           await logout();

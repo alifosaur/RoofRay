@@ -141,7 +141,7 @@ export const HomeMenu: React.FC<HomeMenuProps> = ({ isOpen, onClose }) => {
 
   return (
     <div
-      className="fixed inset-0 top-11 bg-slate-900/90 backdrop-blur-md z-30 flex flex-col items-center pt-12 px-4 transition-all"
+      className="fixed inset-0 top-11 bg-slate-900/90 backdrop-blur-md z-50 flex flex-col items-center pt-12 px-4 transition-all"
       onClick={onClose}
     >
       {/* Search Input */}

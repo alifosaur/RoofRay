@@ -42,20 +42,20 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   actions,
 }) => {
   return (
-    <div className="bg-white border-b border-odoo-border px-4 py-2 flex flex-col md:flex-row md:items-center justify-between gap-2 text-xs shadow-[0_1px_2px_rgba(0,0,0,0.03)] z-10 sticky top-11">
+    <div className="bg-white border-b border-odoo-border px-4 py-2 flex flex-wrap items-center justify-between gap-2.5 text-xs shadow-[0_1px_2px_rgba(0,0,0,0.03)] z-30 sticky top-11 w-full">
       {/* Left: Breadcrumbs & Action Button */}
-      <div className="flex items-center space-x-3">
+      <div className="flex flex-wrap items-center gap-3">
         {onNew && (
           <button
             onClick={onNew}
-            className="bg-odoo-primary hover:bg-odoo-primary-dark text-white px-3 py-1.5 rounded font-medium flex items-center gap-1.5 shadow-sm transition-colors"
+            className="bg-odoo-primary hover:bg-odoo-primary-dark text-white px-3 py-1.5 rounded font-medium flex items-center gap-1.5 shadow-sm transition-colors shrink-0"
           >
             <FontAwesomeIcon icon={faPlus} className="text-[11px]" />
             <span>{newButtonLabel}</span>
           </button>
         )}
 
-        <div className="flex items-center space-x-1.5 font-medium text-gray-700">
+        <div className="flex items-center space-x-1.5 font-medium text-gray-700 shrink-0">
           {breadcrumbs.map((crumb, idx) => (
             <React.Fragment key={idx}>
               {idx > 0 && <span className="text-gray-400">/</span>}
@@ -73,11 +73,11 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
           ))}
         </div>
 
-        {actions && <div className="flex items-center space-x-2 pl-2 border-l border-gray-200">{actions}</div>}
+        {actions && <div className="flex flex-wrap items-center gap-2 pl-2 border-l border-gray-200">{actions}</div>}
       </div>
 
       {/* Right: Search bar & View Switcher */}
-      <div className="flex items-center space-x-2.5">
+      <div className="flex items-center space-x-2.5 shrink-0 ml-auto">
         {onSearchChange && (
           <div className="relative w-48 sm:w-64">
             <FontAwesomeIcon

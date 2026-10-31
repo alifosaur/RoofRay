@@ -38,7 +38,7 @@ export const Navbar: React.FC<NavbarProps> = ({ appName, onToggleHomeMenu, isHom
   };
 
   return (
-    <nav className="bg-odoo-primary text-white h-11 px-3 flex items-center justify-between text-sm select-none z-40 relative shadow-sm">
+    <nav className="bg-odoo-primary text-white h-11 px-3 flex items-center justify-between text-sm select-none z-40 sticky top-0 w-full shadow-sm">
       {/* Left: App Grid & App Name */}
       <div className="flex items-center space-x-3">
         <button

@@ -42,10 +42,12 @@ type Granularity = 'day' | 'week' | 'month';
 const inr = (n: number | undefined | null) => `₹${Math.round(n ?? 0).toLocaleString('en-IN')}`;
 
 const Kpi: React.FC<{ label: string; value: React.ReactNode; tone?: string; sub?: React.ReactNode }> = ({ label, value, tone = 'text-gray-900', sub }) => (
-  <div className="bg-white rounded border border-odoo-border shadow-xs p-3.5">
-    <span className="text-[10px] font-bold text-gray-500 uppercase">{label}</span>
-    <div className={`text-lg font-bold mt-1 ${tone}`}>{value}</div>
-    {sub && <div className="text-[10px] text-gray-400 mt-0.5 font-medium">{sub}</div>}
+  <div className="bg-white rounded border border-odoo-border shadow-xs p-3 sm:p-3.5 flex flex-col justify-between">
+    <div>
+      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wide block truncate">{label}</span>
+      <div className={`text-base sm:text-lg font-bold mt-1 tracking-tight truncate ${tone}`} title={typeof value === 'string' ? value : undefined}>{value}</div>
+    </div>
+    {sub && <div className="text-[10px] text-gray-400 mt-1 font-medium truncate" title={typeof sub === 'string' ? sub : undefined}>{sub}</div>}
   </div>
 );
 
@@ -255,7 +257,7 @@ export const DashboardPage: React.FC = () => {
         )}
 
         {!dashboard && loading && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 xl:grid-cols-8 gap-3 sm:gap-4">
             {Array.from({ length: 8 }).map((_, i) => (
               <div key={i} className="h-20 bg-white rounded border border-odoo-border animate-pulse" />
             ))}
@@ -264,7 +266,7 @@ export const DashboardPage: React.FC = () => {
 
         {dashboard && (
           <>
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 xl:grid-cols-8 gap-3 sm:gap-4">
               <Kpi label="Revenue (sales)" value={inr(dashboard.total_revenue)} tone="text-odoo-primary" />
               <Kpi label="Money received" value={inr(dashboard.money_received)} tone="text-emerald-700" />
               <Kpi

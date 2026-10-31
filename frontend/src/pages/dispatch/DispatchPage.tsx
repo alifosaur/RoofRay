@@ -163,6 +163,29 @@ export const DispatchPage: React.FC = () => {
     };
   }, [scanningActive]);
 
+  const [scanAllBusy, setScanAllBusy] = useState(false);
+  const handleScanAll = async () => {
+    if (!selectedOrderId) return;
+    if (!window.confirm('Link every remaining serialised item for this order? Registered serials in stock are used first; any missing units get AUTO- placeholder serials.')) return;
+    setScanAllBusy(true);
+    setActionMessage(null);
+    try {
+      const res = await api.post<any>(`/dispatch/orders/${selectedOrderId}/scan-all`);
+      setActionMessage({
+        type: 'success',
+        text: res.total === 0
+          ? 'Everything was already scanned.'
+          : `Linked ${res.total} item(s): ${res.linked_existing.length} from registered stock, ${res.generated.length} placeholder serial(s).`,
+      });
+      await fetchOrderDetails(selectedOrderId);
+      fetchOrdersAndProducts();
+    } catch (err: any) {
+      setActionMessage({ type: 'error', text: err.message || 'Could not link all items' });
+    } finally {
+      setScanAllBusy(false);
+    }
+  };
+
   const handleScanSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedOrderId || !selectedProductId || !serialNoInput.trim()) return;
@@ -427,6 +450,15 @@ export const DispatchPage: React.FC = () => {
                             className="bg-odoo-primary hover:bg-odoo-primary-dark text-white px-4 py-2 rounded text-xs font-bold shadow-xs transition-colors"
                           >
                             Scan & Link
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleScanAll}
+                            disabled={scanAllBusy || !['CONFIRMED', 'PACKING'].includes(selectedOrder.status)}
+                            title="Link every remaining serialised item: registered stock first, then AUTO- placeholder serials"
+                            className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-4 py-2 rounded text-xs font-bold shadow-xs transition-colors"
+                          >
+                            {scanAllBusy ? 'Linking…' : 'Scan & Link All'}
                           </button>
                         </div>
                       </div>

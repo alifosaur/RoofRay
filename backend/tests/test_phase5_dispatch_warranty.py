@@ -80,3 +80,20 @@ def test_scan_gate_strict_stages_and_auto_warranty():
 def test_warranty_add_years_handles_leap_day():
     assert add_years_to_date(date(2024, 2, 29), 1) == date(2025, 2, 28)
     assert add_years_to_date(date(2026, 10, 31), 20) == date(2046, 10, 31)
+
+
+def test_scan_all_links_registered_serials_then_placeholders():
+    ctx = confirmed_order(client, "Scan All Customer")
+    order_id = ctx["order_id"]
+    serialised = [l for l in ctx["quote"]["lines"] if l["product"]["is_serialised"]]
+    first = serialised[0]
+    _register(first["product_id"], [f"REAL-{order_id}-1"])
+    res = client.post(f"/api/dispatch/orders/{order_id}/scan-all", headers=WAREHOUSE)
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert f"REAL-{order_id}-1" in body["linked_existing"]
+    assert body["total"] == sum(l["quantity"] for l in serialised)
+    assert all(sn.startswith("AUTO-") for sn in body["generated"])
+    assert client.get(f"/api/orders/{order_id}", headers=ADMIN).json()["status"] == "PACKING"
+    assert advance(client, order_id, "PACKED").status_code == 200  # scan gate satisfied
+    assert client.post(f"/api/dispatch/orders/{order_id}/scan-all", headers=WAREHOUSE).status_code == 400

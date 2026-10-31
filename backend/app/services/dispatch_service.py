@@ -251,3 +251,39 @@ def update_order_stage(db: Session, order_id: int, new_status: OrderStatus, curr
     db.commit()
     db.refresh(order)
     return order
+
+
+def scan_all_for_order(db: Session, order_id: int, current_user_id: int) -> dict:
+    """
+    Links every still-missing serialised unit of an order in one go: first registered IN_STOCK serials,
+    then placeholder serials (AUTO-<SKU>-<order>-<n>) for anything not registered.
+    shortcut: placeholders stand in for real barcodes until scanners are in use; replace with real scans then.
+    """
+    order = db.query(Order).filter(Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    if order.status not in (OrderStatus.CONFIRMED, OrderStatus.PACKING):
+        raise HTTPException(status_code=400, detail=f"Serials are linked while packing; order is {order.status.value}.")
+    linked, generated = [], []
+    for line in order.quote.lines:
+        prod = line.product
+        if not prod or not prod.is_serialised:
+            continue
+        have = db.query(SerialItem).filter(SerialItem.order_id == order.id, SerialItem.product_id == prod.id).count()
+        for _ in range(line.quantity - have):
+            item = db.query(SerialItem).filter(SerialItem.product_id == prod.id, SerialItem.order_id == None,
+                                               SerialItem.status == SerialStatus.IN_STOCK).order_by(SerialItem.id).first()
+            if not item:
+                n = db.query(SerialItem).filter(SerialItem.serial_no.like(f"AUTO-{prod.sku}-{order.order_number}-%")).count() + 1
+                item = SerialItem(serial_no=f"AUTO-{prod.sku}-{order.order_number}-{n:03d}", product_id=prod.id, status=SerialStatus.IN_STOCK)
+                db.add(item)
+                db.commit()
+                generated.append(item.serial_no)
+            else:
+                linked.append(item.serial_no)
+            _scan(db, order.id, item.serial_no, current_user_id)
+    if generated:
+        db.add(AuditLog(record_type="order", record_id=order.id, action="SERIALS_AUTO_GENERATED",
+                        notes=f"Placeholder serials created (no scanner): {', '.join(generated)}", user_id=current_user_id))
+        db.commit()
+    return {"linked_existing": linked, "generated": generated, "total": len(linked) + len(generated)}

@@ -143,3 +143,13 @@ def deliver_order(
     """
     return dispatch_service.deliver_order(db, order_id, current_user.id)
 
+
+
+@router.post("/orders/{order_id}/scan-all")
+def scan_all_serials(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.WAREHOUSE, UserRole.ADMIN)),
+):
+    """Links all remaining serialised units of the order (registered stock first, then AUTO- placeholders)."""
+    return dispatch_service.scan_all_for_order(db, order_id, current_user.id)

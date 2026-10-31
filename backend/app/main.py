@@ -7,7 +7,7 @@ from app.core.config import settings
 from app.core.database import engine, Base
 import app.models  # Ensure all models are registered with Base.metadata
 
-from app.routers import auth, users, leads, surveys, products, bom, quotes, orders, inventory, dispatch, jobs
+from app.routers import auth, users, leads, surveys, products, bom, quotes, orders, inventory, dispatch, jobs, tickets
 
 # Create all tables on startup (works with both SQLite and PostgreSQL)
 Base.metadata.create_all(bind=engine)
@@ -45,6 +45,7 @@ app.include_router(orders.router, prefix=settings.API_V1_PREFIX)
 app.include_router(inventory.router, prefix=settings.API_V1_PREFIX)
 app.include_router(dispatch.router, prefix=settings.API_V1_PREFIX)
 app.include_router(jobs.router, prefix=settings.API_V1_PREFIX)
+app.include_router(tickets.router, prefix=settings.API_V1_PREFIX)
 
 
 @app.get("/")

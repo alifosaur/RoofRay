@@ -55,5 +55,13 @@ class Order(Base):
         return self.pick_list.id if self.pick_list else None
 
     @property
+    def capacity_kw(self):
+        return self.quote.template.capacity_kw if (self.quote and self.quote.template) else None
+
+    @property
+    def system_type(self):
+        return self.quote.template.system_type if (self.quote and self.quote.template) else None
+
+    @property
     def customer_name(self):
         return self.customer.name if self.customer else None

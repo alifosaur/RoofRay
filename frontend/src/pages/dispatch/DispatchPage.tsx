@@ -26,6 +26,7 @@ export const DispatchPage: React.FC = () => {
   const [orders, setOrders] = useState<any[]>([]);
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
+  const [pickList, setPickList] = useState<any | null>(null);
   const [serializedProducts, setSerializedProducts] = useState<any[]>([]);
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
   const [serialNoInput, setSerialNoInput] = useState('');
@@ -116,6 +117,7 @@ export const DispatchPage: React.FC = () => {
       ]);
       setSelectedOrder(orderData);
       setScannedItems(serialsData || []);
+      setPickList(orderData.pick_list_id ? await api.get<any>(`/inventory/pick-lists/${orderData.pick_list_id}`) : null);
     } catch (err) {
       console.error('Failed to load order details', err);
     }
@@ -241,7 +243,7 @@ export const DispatchPage: React.FC = () => {
       {activeWarehouseTab === 'fulfillment' ? (
         <div className="flex-1 p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left: Select Order */}
-          <div className="bg-white rounded border border-odoo-border shadow-xs p-5">
+          <div className="bg-white rounded border border-odoo-border shadow-xs p-5 self-start">
             <h2 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
               <FontAwesomeIcon icon={faTruck} className="text-odoo-primary" />
               <span>Orders Ready for Fulfillment</span>
@@ -270,7 +272,7 @@ export const DispatchPage: React.FC = () => {
                       </span>
                     </div>
                     <div className="text-gray-500 mt-1">
-                      {o.customer_name || `Customer #${o.customer_id}`} • {o.capacity_kw} kW {o.system_type}
+                      {o.customer_name || `Customer #${o.customer_id}`}{o.capacity_kw ? ` • ${o.capacity_kw} kW ${o.system_type || ''}` : ''}
                     </div>
                     <div className="text-odoo-primary font-semibold mt-1">
                       ₹{o.total_amount?.toLocaleString()}
@@ -323,6 +325,52 @@ export const DispatchPage: React.FC = () => {
                     <span>{actionMessage.text}</span>
                   </div>
                 )}
+
+                {/* Items to pack (pick list sent on order confirmation) */}
+                <div className="border border-gray-200 rounded-lg mb-6 overflow-x-auto">
+                  <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-200 text-xs font-bold uppercase tracking-wider text-gray-700 flex justify-between">
+                    <span>Items to pack</span>
+                    {pickList && <span className="text-gray-500 normal-case font-semibold">Pick list #{pickList.id} · {pickList.status}</span>}
+                  </div>
+                  {!pickList ? (
+                    <div className="p-4 text-xs text-gray-500">No pick list for this order.</div>
+                  ) : (
+                    <table className="w-full text-left text-xs">
+                      <thead className="text-gray-600 font-semibold border-b border-gray-100">
+                        <tr>
+                          <th className="py-2 px-3">Item</th>
+                          <th className="py-2 px-3">SKU</th>
+                          <th className="py-2 px-3 text-center">Required</th>
+                          <th className="py-2 px-3 text-center">Scanned / picked</th>
+                          <th className="py-2 px-3 text-center">In stock</th>
+                          <th className="py-2 px-3">How</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {pickList.lines.map((l: any) => {
+                          const serialised = l.product?.is_serialised;
+                          const done = serialised
+                            ? scannedItems.filter((s) => s.product_id === l.product_id).length
+                            : l.picked_qty;
+                          const isService = l.product?.category === 'service';
+                          const short = !isService && (l.product?.stock_quantity ?? 0) < l.required_qty;
+                          return (
+                            <tr key={l.id} className={done >= l.required_qty ? 'bg-emerald-50/50' : ''}>
+                              <td className="py-2 px-3 font-medium text-gray-900">{l.product?.name}</td>
+                              <td className="py-2 px-3 font-mono text-gray-500">{l.product?.sku}</td>
+                              <td className="py-2 px-3 text-center font-bold">{l.required_qty}</td>
+                              <td className={`py-2 px-3 text-center font-bold ${done >= l.required_qty ? 'text-emerald-700' : 'text-amber-700'}`}>{done}</td>
+                              <td className={`py-2 px-3 text-center ${short ? 'text-red-600 font-bold' : 'text-gray-600'}`}>
+                                {isService ? '—' : l.product?.stock_quantity}
+                              </td>
+                              <td className="py-2 px-3 text-gray-500">{isService ? 'Service' : serialised ? 'Scan each serial' : 'Counted on packing'}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
 
                 {/* Scanning Input Box */}
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">

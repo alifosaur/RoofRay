@@ -102,7 +102,11 @@ def create_ticket(db: Session, payload: TicketCreate, current_user_id: int) -> T
                 is_billable = False  # In warranty: free service!
 
     count = db.query(Ticket).count() + 1
-    ticket_number = f"TK-{datetime.utcnow().year}-{count:04d}"
+    while True:
+        ticket_number = f"TK-{datetime.utcnow().year}-{count:04d}"
+        if not db.query(Ticket).filter(Ticket.ticket_number == ticket_number).first():
+            break
+        count += 1
 
     ticket = Ticket(
         ticket_number=ticket_number,
@@ -147,7 +151,11 @@ def resolve_ticket(db: Session, ticket_id: int, payload: TicketResolveRequest, c
     # Invariant: Out of warranty means parts and labour are billed automatically as a repair invoice
     if ticket.is_billable and total_cost > 0:
         inv_count = db.query(Invoice).count() + 1
-        invoice_number = f"INV-REP-{datetime.utcnow().year}-{inv_count:04d}"
+        while True:
+            invoice_number = f"INV-REP-{datetime.utcnow().year}-{inv_count:04d}"
+            if not db.query(Invoice).filter(Invoice.invoice_number == invoice_number).first():
+                break
+            inv_count += 1
 
         tax = round(total_cost * 0.18, 2)  # 18% GST on repair & service
         repair_invoice = Invoice(

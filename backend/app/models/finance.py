@@ -20,8 +20,13 @@ class InvoiceStatus(str, enum.Enum):
 class SubsidyStatus(str, enum.Enum):
     NOT_APPLIED = "NOT_APPLIED"
     APPLIED = "APPLIED"
+    APPLICATION_SUBMITTED = "APPLICATION_SUBMITTED"
+    DISCOM_FEASIBILITY_APPROVED = "DISCOM_FEASIBILITY_APPROVED"
+    INSTALLATION_INSPECTION_DONE = "INSTALLATION_INSPECTION_DONE"
+    SUBSIDY_CLAIMED = "SUBSIDY_CLAIMED"
     APPROVED = "APPROVED"
     DISBURSED = "DISBURSED"
+    REJECTED = "REJECTED"
 
 
 class Invoice(Base):
@@ -72,11 +77,13 @@ class SubsidyRecord(Base):
 
     status = Column(Enum(SubsidyStatus), default=SubsidyStatus.NOT_APPLIED, nullable=False)
     eligible_amount = Column(Float, nullable=False, default=0.0)
+    sanctioned_amount = Column(Float, nullable=False, default=0.0)
     disbursed_amount = Column(Float, default=0.0, nullable=False)
 
     applied_date = Column(Date, nullable=True)
     approved_date = Column(Date, nullable=True)
     disbursed_date = Column(Date, nullable=True)
+    rejection_notes = Column(Text, nullable=True)
     remarks = Column(Text, nullable=True)
 
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

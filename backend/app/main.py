@@ -22,6 +22,7 @@ from app.routers import (
     tickets,
     finance,
     reports,
+    customer,
 )
 
 from sqlalchemy import text
@@ -31,11 +32,28 @@ Base.metadata.create_all(bind=engine)
 
 # Ensure newly added columns and migrated roles exist in existing schemas
 with engine.connect() as conn:
-    try:
-        conn.execute(text("ALTER TABLE customers ADD COLUMN user_id INTEGER REFERENCES users(id)"))
-        conn.commit()
-    except Exception:
-        pass
+    alter_cols = [
+        "ALTER TABLE customers ADD COLUMN user_id INTEGER REFERENCES users(id)",
+        "ALTER TABLE leads ADD COLUMN city VARCHAR(100)",
+        "ALTER TABLE leads ADD COLUMN state VARCHAR(100)",
+        "ALTER TABLE leads ADD COLUMN pincode VARCHAR(20)",
+        "ALTER TABLE leads ADD COLUMN property_type VARCHAR(64)",
+        "ALTER TABLE leads ADD COLUMN roof_type VARCHAR(64)",
+        "ALTER TABLE leads ADD COLUMN roof_area_sqft FLOAT",
+        "ALTER TABLE leads ADD COLUMN shadow_free_area_sqft FLOAT",
+        "ALTER TABLE leads ADD COLUMN floor_number INTEGER DEFAULT 1",
+        "ALTER TABLE leads ADD COLUMN roof_direction VARCHAR(64)",
+        "ALTER TABLE leads ADD COLUMN monthly_bill_amount FLOAT",
+        "ALTER TABLE leads ADD COLUMN source VARCHAR(64) DEFAULT 'customer_portal'",
+        "ALTER TABLE subsidy_records ADD COLUMN sanctioned_amount FLOAT DEFAULT 0.0",
+        "ALTER TABLE subsidy_records ADD COLUMN rejection_notes TEXT",
+    ]
+    for stmt in alter_cols:
+        try:
+            conn.execute(text(stmt))
+            conn.commit()
+        except Exception:
+            pass
     try:
         conn.execute(text("UPDATE users SET role = 'ADMIN' WHERE role IN ('SUPPORT', 'ACCOUNTS', 'support', 'accounts')"))
         conn.commit()
@@ -78,6 +96,7 @@ app.include_router(jobs.router, prefix=settings.API_V1_PREFIX)
 app.include_router(tickets.router, prefix=settings.API_V1_PREFIX)
 app.include_router(finance.router, prefix=settings.API_V1_PREFIX)
 app.include_router(reports.router, prefix=settings.API_V1_PREFIX)
+app.include_router(customer.router, prefix=settings.API_V1_PREFIX)
 
 
 @app.get("/")

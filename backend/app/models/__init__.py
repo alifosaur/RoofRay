@@ -15,6 +15,7 @@ from app.models.ticket import Ticket, TicketStatus
 from app.models.finance import Invoice, InvoiceType, InvoiceStatus, InvoiceLine, SubsidyRecord, SubsidyStatus, TechnicianPayout
 from app.models.audit import AuditLog
 from app.models.notification import Notification
+from app.models.scheme import GovernmentScheme
 
 __all__ = [
     "Base",
@@ -59,5 +60,6 @@ __all__ = [
     "TechnicianPayout",
     "AuditLog",
     "Notification",
+    "GovernmentScheme",
 ]
 

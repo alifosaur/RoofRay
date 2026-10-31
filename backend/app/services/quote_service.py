@@ -35,7 +35,11 @@ def create_quote_from_bom(db: Session, payload: QuoteCreate, current_user_id: in
 
     # Generate Quote Number
     count = db.query(Quote).count() + 1
-    quote_number = f"QT-{datetime.utcnow().year}-{count:04d}"
+    while True:
+        quote_number = f"QT-{datetime.utcnow().year}-{count:04d}"
+        if not db.query(Quote).filter(Quote.quote_number == quote_number).first():
+            break
+        count += 1
 
     quote = Quote(
         quote_number=quote_number,
@@ -162,7 +166,11 @@ def accept_quote(db: Session, quote_id: int, current_user_id: int) -> Order:
 
     # Auto-create Order in DRAFT status
     count = db.query(Order).count() + 1
-    order_number = f"SO-{datetime.utcnow().year}-{count:04d}"
+    while True:
+        order_number = f"SO-{datetime.utcnow().year}-{count:04d}"
+        if not db.query(Order).filter(Order.order_number == order_number).first():
+            break
+        count += 1
 
     order = Order(
         order_number=order_number,

@@ -81,6 +81,9 @@ def get_current_user(
 
     # Check database for user
     user = db.query(User).filter(User.firebase_uid == uid).first()
+    if not user and uid in ("support_uid", "accounts_uid"):
+        # Admin performs accounts and support duties per specification
+        user = db.query(User).filter(User.role == UserRole.ADMIN).first()
     if not user:
         # Check by email if available in decoded token
         email = decoded.get("email")

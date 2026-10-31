@@ -24,8 +24,19 @@ class Lead(Base):
     phone = Column(String(32), nullable=False, index=True)
     email = Column(String(255), nullable=True)
     address = Column(Text, nullable=False)
+    city = Column(String(100), nullable=True)
+    state = Column(String(100), nullable=True)
+    pincode = Column(String(20), nullable=True)
+    property_type = Column(String(64), nullable=True)  # "Residential", "Commercial", "Industrial"
+    roof_type = Column(String(64), nullable=True)  # "Concrete / Flat", "Tiled / Slanted", "Tin / Metal Sheet"
+    roof_area_sqft = Column(Float, nullable=True)
+    shadow_free_area_sqft = Column(Float, nullable=True)
+    floor_number = Column(Integer, nullable=True, default=1)
+    roof_direction = Column(String(64), nullable=True)  # "South", "East", "West", "North", "Unknown"
+    monthly_bill_amount = Column(Float, nullable=True)
     required_capacity = Column(Float, nullable=False, default=3.0)  # in kW
     system_type = Column(String(64), nullable=False, default="On-Grid")  # "On-Grid", "Off-Grid"
+    source = Column(String(64), default="customer_portal", nullable=False)
     notes = Column(Text, nullable=True)
     status = Column(Enum(LeadStatus), default=LeadStatus.NEW, nullable=False)
     lost_reason = Column(String(255), nullable=True)

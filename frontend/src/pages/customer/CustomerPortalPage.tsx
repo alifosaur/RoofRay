@@ -1,25 +1,418 @@
-import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { api } from '../../api/client';
+
+interface TrackerStage {
+  key: string;
+  title: string;
+  status: 'COMPLETED' | 'CURRENT' | 'PENDING';
+  date?: string | null;
+  description?: string | null;
+}
+
+interface TrackerData {
+  lead_id?: number | null;
+  order_id?: number | null;
+  system_size_kw?: number | null;
+  system_type?: string | null;
+  current_stage_key: string;
+  current_stage_name: string;
+  stages: TrackerStage[];
+}
+
+interface EquipmentItem {
+  id: number;
+  serial_number: string;
+  product_name: string;
+  product_category: string;
+  warranty_years: number;
+  delivered_on?: string | null;
+  warranty_end?: string | null;
+  days_remaining?: number | null;
+  is_in_warranty: boolean;
+}
+
+interface QuoteLine {
+  product_name: string;
+  sku: string;
+  quantity: number;
+  unit_price: number;
+  subtotal: number;
+}
+
+interface QuoteData {
+  id: number;
+  quote_number: string;
+  bom_name: string;
+  capacity_kw: number;
+  system_type: string;
+  status: string;
+  total_amount: number;
+  subtotal: number;
+  tax_amount: number;
+  created_at: string;
+  valid_until?: string | null;
+  has_pdf: boolean;
+  lines: QuoteLine[];
+}
+
+interface OrderData {
+  id: number;
+  order_number: string;
+  status: string;
+  total_amount: number;
+  paid_amount: number;
+  balance_amount: number;
+  created_at: string;
+  delivery_date?: string | null;
+  payments: Array<{
+    id: number;
+    amount: number;
+    payment_method: string;
+    reference?: string;
+    date: string;
+  }>;
+  invoice?: {
+    id: number;
+    invoice_number: string;
+    total_amount: number;
+    status: string;
+  } | null;
+}
+
+interface SubsidyRecord {
+  id?: number;
+  application_no?: string | null;
+  portal_name: string;
+  status: string;
+  eligible_amount: number;
+  sanctioned_amount: number;
+  disbursed_amount: number;
+  applied_date?: string | null;
+  approved_date?: string | null;
+  disbursed_date?: string | null;
+  rejection_notes?: string | null;
+  remarks?: string | null;
+}
+
+interface SchemeData {
+  id: number;
+  name: string;
+  description: string;
+  eligibility: string;
+  benefit_amounts: string;
+  how_to_apply: string;
+  official_link: string;
+  state: string;
+  is_active: boolean;
+  is_announcement: boolean;
+  announcement_text?: string | null;
+}
 
 export const CustomerPortalPage: React.FC = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
+  const [activeTab, setActiveTab] = useState<'catalogue' | 'enquiry' | 'tracker' | 'quotes' | 'equipment' | 'schemes'>('catalogue');
+  
+  // Data states
+  const [tracker, setTracker] = useState<TrackerData | null>(null);
+  const [quotes, setQuotes] = useState<QuoteData[]>([]);
+  const [orders, setOrders] = useState<OrderData[]>([]);
+  const [equipment, setEquipment] = useState<EquipmentItem[]>([]);
+  const [schemes, setSchemes] = useState<SchemeData[]>([]);
+  const [subsidy, setSubsidy] = useState<SubsidyRecord | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
+
+  // Enquiry form state
+  const [enquiryForm, setEnquiryForm] = useState({
+    name: user?.full_name || '',
+    phone: user?.phone || '',
+    email: user?.email || '',
+    address: '',
+    city: 'Mumbai',
+    state: 'Maharashtra',
+    pincode: '400076',
+    property_type: 'Residential',
+    roof_type: 'Concrete / Flat',
+    roof_length_ft: 25,
+    roof_width_ft: 20,
+    shadow_free_area_sqft: 450,
+    floor_number: 2,
+    roof_direction: 'South',
+    monthly_bill_amount: 3500,
+    preferred_system_type: 'On-Grid',
+    preferred_capacity_kw: 3.0,
+    notes: '',
+  });
+
+  // Ticket modal state
+  const [showTicketModal, setShowTicketModal] = useState(false);
+  const [selectedEquipment, setSelectedEquipment] = useState<EquipmentItem | null>(null);
+  const [ticketSubject, setTicketSubject] = useState('');
+  const [ticketDescription, setTicketDescription] = useState('');
+  const [ticketSubmitting, setTicketSubmitting] = useState(false);
+
+  // Subsidy calculator state
+  const [calcCapacity, setCalcCapacity] = useState<number>(3.0);
+  const [calcSystemType, setCalcSystemType] = useState<string>('On-Grid');
+  const [calcState, setCalcState] = useState<string>('National');
+  const [calcResult, setCalcResult] = useState<any>(null);
+
+  // Load customer data
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [tData, qData, oData, eqData, sData, subData] = await Promise.allSettled([
+        api.get<TrackerData>('/customer/tracker'),
+        api.get<QuoteData[]>('/customer/quotes'),
+        api.get<OrderData[]>('/customer/orders'),
+        api.get<EquipmentItem[]>('/customer/equipment'),
+        api.get<SchemeData[]>('/customer/schemes'),
+        api.get<SubsidyRecord>('/customer/subsidy'),
+      ]);
+
+      if (tData.status === 'fulfilled') setTracker(tData.value);
+      if (qData.status === 'fulfilled') setQuotes(qData.value);
+      if (oData.status === 'fulfilled') setOrders(oData.value);
+      if (eqData.status === 'fulfilled') setEquipment(eqData.value);
+      if (sData.status === 'fulfilled') setSchemes(sData.value);
+      if (subData.status === 'fulfilled') setSubsidy(subData.value);
+    } catch (err) {
+      console.error('Failed to load portal data:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+    runSubsidyEstimate(3.0, 'On-Grid', 'National');
+  }, []);
+
+  const runSubsidyEstimate = async (kw: number, sysType: string, st: string) => {
+    try {
+      const res = await api.post('/customer/schemes/estimate', {
+        capacity_kw: kw,
+        system_type: sysType,
+        state: st,
+      });
+      setCalcResult(res);
+    } catch (err) {
+      console.error('Failed to calculate subsidy:', err);
+    }
+  };
+
+  // Handle "I'm Interested" from product catalogue
+  const handleSelectPackage = (capacity: number, sysType: string) => {
+    setEnquiryForm(prev => ({
+      ...prev,
+      preferred_capacity_kw: capacity,
+      preferred_system_type: sysType,
+      notes: `Interested in ${capacity} kW ${sysType} package`,
+    }));
+    setActiveTab('enquiry');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Live solar kW helper from roof dimensions
+  const computedRoofArea = (enquiryForm.roof_length_ft || 0) * (enquiryForm.roof_width_ft || 0);
+  const estimatedKwFromArea = Math.max(1, Math.min(10, Math.floor(computedRoofArea / 100)));
+  const estimatedMonthlyUnits = Math.round(enquiryForm.preferred_capacity_kw * 115);
+  const estimatedMonthlySavings = Math.round(estimatedMonthlyUnits * 7.5);
+
+  // Handle Enquiry submission
+  const handleSubmitEnquiry = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const res = await api.post<any>('/customer/enquiry', {
+        ...enquiryForm,
+        roof_area_sqft: computedRoofArea || undefined,
+      });
+      setNoticeMessage(res.message || 'Thank you! Our sales representative will contact you soon.');
+      await loadData();
+      setActiveTab('tracker');
+    } catch (err: any) {
+      alert(err.message || 'Failed to submit enquiry');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle Quote Acceptance
+  const handleAcceptQuote = async (quoteId: number) => {
+    if (!window.confirm('Accept this quotation? This will confirm your solar order and initiate warehouse dispatch.')) {
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await api.post<any>(`/customer/quotes/${quoteId}/accept`);
+      setNoticeMessage(res.message || 'Quote accepted successfully!');
+      await loadData();
+      setActiveTab('tracker');
+    } catch (err: any) {
+      alert(err.message || 'Failed to accept quote');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle Raising Ticket
+  const handleRaiseTicket = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!ticketSubject.trim() || !ticketDescription.trim()) return;
+    setTicketSubmitting(true);
+    try {
+      const res = await api.post<any>('/customer/tickets', {
+        serial_item_id: selectedEquipment?.id || null,
+        subject: ticketSubject,
+        description: ticketDescription,
+        priority: 'NORMAL',
+      });
+      alert(res.message || 'Ticket raised successfully!');
+      setShowTicketModal(false);
+      setTicketSubject('');
+      setTicketDescription('');
+      setSelectedEquipment(null);
+      await loadData();
+    } catch (err: any) {
+      alert(err.message || 'Failed to raise service ticket');
+    } finally {
+      setTicketSubmitting(false);
+    }
+  };
+
+  // Catalogue product definitions
+  const packages = [
+    {
+      id: 'on-grid-3kw',
+      title: '3 kW On-Grid Rooftop System',
+      badge: 'Most Popular',
+      badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+      systemType: 'On-Grid',
+      capacityKw: 3.0,
+      generation: '~4,140 units / yr',
+      roofArea: '300 sq.ft',
+      grossPrice: '₹1,95,000',
+      subsidy: '₹78,000 (PM Surya Ghar)',
+      netPrice: '₹1,17,000',
+      warranty: '20 yrs panels, 2 yrs inverter',
+      components: [
+        'Mono-PERC Solar Panels (540W × 6)',
+        '3 kW String Inverter (Grid-tied)',
+        'Galvanized GI Roof Mounting Structure',
+        'Dual Surge Protection DCDB & ACDB Boxes',
+        'Chemical Earthing Kit + Lightning Arrester',
+        'Net Metering Ready & DISCOM Approved',
+      ],
+    },
+    {
+      id: 'on-grid-5kw',
+      title: '5 kW On-Grid Premium System',
+      badge: 'High Savings',
+      badgeColor: 'bg-purple-100 text-purple-800 border-purple-200',
+      systemType: 'On-Grid',
+      capacityKw: 5.0,
+      generation: '~6,900 units / yr',
+      roofArea: '500 sq.ft',
+      grossPrice: '₹3,25,000',
+      subsidy: '₹78,000 (PM Surya Ghar Max Cap)',
+      netPrice: '₹2,47,000',
+      warranty: '20 yrs panels, 2 yrs inverter',
+      components: [
+        'Mono-PERC Solar Panels (540W × 10)',
+        '5 kW Dual-MPPT String Inverter',
+        'Heavy-Duty Anodized Aluminum Staging',
+        'Industrial Grade DC/AC Junction Boxes',
+        'Triple Chemical Earthing System',
+        'WiFi Remote Mobile Generation Monitoring',
+      ],
+    },
+    {
+      id: 'off-grid-3kw',
+      title: '3 kW Off-Grid Independent Power',
+      badge: 'Battery Backup',
+      badgeColor: 'bg-blue-100 text-blue-800 border-blue-200',
+      systemType: 'Off-Grid',
+      capacityKw: 3.0,
+      generation: '~3,900 units / yr',
+      roofArea: '300 sq.ft',
+      grossPrice: '₹2,65,000',
+      subsidy: 'Not Eligible for Central Subsidy',
+      netPrice: '₹2,65,000',
+      warranty: '20 yrs panels, 2 yrs battery & inverter',
+      components: [
+        'Mono-PERC Solar Panels (540W × 6)',
+        '3 kW Pure Sine Wave Hybrid Inverter',
+        '100 Ah 48V Lithium-ion Battery Bank',
+        'MPPT Battery Charge Controller',
+        'Galvanized Metal Mounting Brackets',
+        'Zero Grid Dependency / 24x7 Power',
+      ],
+    },
+    {
+      id: 'on-grid-2kw',
+      title: '2 kW Compact Rooftop System',
+      badge: 'Entry Level',
+      badgeColor: 'bg-amber-100 text-amber-800 border-amber-200',
+      systemType: 'On-Grid',
+      capacityKw: 2.0,
+      generation: '~2,760 units / yr',
+      roofArea: '200 sq.ft',
+      grossPrice: '₹1,30,000',
+      subsidy: '₹60,000 (₹30k / kW)',
+      netPrice: '₹70,000',
+      warranty: '20 yrs panels, 2 yrs inverter',
+      components: [
+        'Mono-PERC Solar Panels (540W × 4)',
+        '2 kW Smart Grid Inverter',
+        'Elevated GI Rooftop Structure',
+        'Integrated DC/AC Distribution Board',
+        'Copper Earthing & Cable Harness',
+      ],
+    },
+    {
+      id: 'hardware-panels',
+      title: 'Mono-PERC Solar Panel Set',
+      badge: 'Hardware Only',
+      badgeColor: 'bg-gray-100 text-gray-800 border-gray-200',
+      systemType: 'Hardware',
+      capacityKw: 3.2,
+      generation: '540W High Efficiency',
+      roofArea: 'Modular',
+      grossPrice: '₹84,000',
+      subsidy: 'Component Sale (No CFA)',
+      netPrice: '₹84,000',
+      warranty: '20 Years Performance Warranty',
+      components: [
+        'A-Grade Bifacial Mono-PERC Cells',
+        'Anti-Reflective Coated Tempered Glass',
+        'IP68 Sealed Junction Box with MC4',
+        'PID Resistant & Extreme Wind Certified',
+      ],
+    },
+  ];
+
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
+    <div className="min-h-screen bg-[#F8F9FA] flex flex-col font-sans">
       {/* Odoo Website-style Branded Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-30 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="w-9 h-9 rounded-lg bg-odoo-purple text-white flex items-center justify-center font-bold text-lg shadow">
+          <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setActiveTab('catalogue')}>
+            <div className="w-10 h-10 rounded-lg bg-odoo-purple text-white flex items-center justify-center font-bold text-xl shadow">
               <i className="fa-solid fa-solar-panel"></i>
             </div>
             <div>
-              <span className="text-lg font-bold text-odoo-purple tracking-tight">SunPower Solutions</span>
-              <span className="ml-2 text-xs font-semibold px-2 py-0.5 bg-purple-50 text-purple-700 rounded-full border border-purple-200">
-                Customer Portal
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-lg font-bold text-odoo-purple tracking-tight">SunPower Solutions</span>
+                <span className="text-[10px] font-semibold px-2 py-0.5 bg-purple-50 text-purple-700 rounded-full border border-purple-200">
+                  Customer Portal
+                </span>
+              </div>
+              <p className="text-[11px] text-gray-500">Rooftop Solar & PM Surya Ghar Partner</p>
             </div>
           </div>
 
@@ -41,69 +434,1150 @@ export const CustomerPortalPage: React.FC = () => {
             </button>
           </div>
         </div>
+
+        {/* Navigation Tabs Bar */}
+        <div className="bg-[#FAF8F9] border-t border-gray-200">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex space-x-1 sm:space-x-3 overflow-x-auto py-2">
+            {[
+              { id: 'catalogue', label: 'Solar Packages', icon: 'fa-cubes-stacked' },
+              { id: 'enquiry', label: 'Enquiry & Sizing', icon: 'fa-ruler-combined' },
+              { id: 'tracker', label: 'Project Tracker', icon: 'fa-route', badge: tracker?.current_stage_name },
+              { id: 'quotes', label: 'Quotations & Orders', icon: 'fa-file-invoice-dollar', count: quotes.length },
+              { id: 'equipment', label: 'My Equipment & Warranty', icon: 'fa-shield-halved', count: equipment.length },
+              { id: 'schemes', label: 'PM Surya Ghar & Subsidy', icon: 'fa-hand-holding-dollar' },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`px-3 py-2 text-xs font-semibold rounded-md transition-all flex items-center gap-2 whitespace-nowrap ${
+                  activeTab === tab.id
+                    ? 'bg-odoo-purple text-white shadow-sm'
+                    : 'text-gray-600 hover:text-odoo-purple hover:bg-purple-50/60'
+                }`}
+              >
+                <i className={`fa-solid ${tab.icon} text-xs`}></i>
+                <span>{tab.label}</span>
+                {tab.count !== undefined && tab.count > 0 && (
+                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+                    activeTab === tab.id ? 'bg-purple-900/60 text-white' : 'bg-gray-200 text-gray-700'
+                  }`}>
+                    {tab.count}
+                  </span>
+                )}
+                {tab.badge && activeTab !== tab.id && (
+                  <span className="px-1.5 py-0.5 rounded text-[9px] bg-emerald-100 text-emerald-800 font-bold border border-emerald-200">
+                    {tab.badge}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
       </header>
 
-      {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
-        {/* Welcome Banner */}
-        <div className="bg-gradient-to-r from-odoo-purple to-[#8a5d7e] rounded-xl text-white p-6 sm:p-8 shadow-sm mb-8">
-          <span className="text-xs font-bold uppercase tracking-wider text-amber-300">
-            Welcome to your Solar Portal
-          </span>
-          <h1 className="text-2xl sm:text-3xl font-bold mt-1 mb-2">
-            Hello, {user?.full_name?.split(' ')[0] || 'Customer'}!
-          </h1>
-          <p className="text-sm text-purple-100 max-w-2xl leading-relaxed">
-            Monitor your rooftop solar project from enquiry and feasibility survey to installation, commissioning, subsidy approval, and 20-year warranty tracking.
-          </p>
-        </div>
-
-        {/* Quick Portal Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
-            <div className="w-12 h-12 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl mb-4">
-              <i className="fa-solid fa-cubes-stacked"></i>
+      {/* Main Container */}
+      <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full">
+        {/* Notice alert if active */}
+        {noticeMessage && (
+          <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between text-emerald-800 text-xs shadow-sm">
+            <div className="flex items-center gap-2">
+              <i className="fa-solid fa-circle-check text-emerald-600 text-base"></i>
+              <span className="font-medium">{noticeMessage}</span>
             </div>
-            <h3 className="font-bold text-gray-800 text-base mb-1">Solar Packages</h3>
-            <p className="text-xs text-gray-500 mb-4">
-              Browse 1-5 kW On-Grid & Off-Grid rooftop packages with components and warranties.
-            </p>
-            <Link
-              to="/#packages"
-              className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 flex items-center gap-1"
+            <button
+              onClick={() => setNoticeMessage(null)}
+              className="text-emerald-700 hover:text-emerald-900"
             >
-              Explore Packages <i className="fa-solid fa-arrow-right text-[10px]"></i>
-            </Link>
+              <i className="fa-solid fa-xmark"></i>
+            </button>
           </div>
+        )}
 
-          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
-            <div className="w-12 h-12 rounded-lg bg-teal-50 text-odoo-teal flex items-center justify-center text-xl mb-4">
-              <i className="fa-solid fa-route"></i>
+        {/* ---------------------------------------------------- */}
+        {/* TAB 1: PRODUCT CATALOGUE */}
+        {/* ---------------------------------------------------- */}
+        {activeTab === 'catalogue' && (
+          <div>
+            <div className="bg-gradient-to-r from-odoo-purple to-[#8a5d7e] rounded-xl text-white p-6 sm:p-8 shadow-sm mb-8">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                  <span className="text-xs font-bold uppercase tracking-wider text-amber-300">
+                    SunPower Premium Solar Catalog
+                  </span>
+                  <h1 className="text-2xl sm:text-3xl font-bold mt-1 mb-2">
+                    Turnkey Rooftop Solar Systems (1 - 5 kW)
+                  </h1>
+                  <p className="text-xs text-purple-100 max-w-2xl leading-relaxed">
+                    Designed for residential rooftops with Tier-1 Mono-PERC panels, smart inverters, full BOM electrical kits, and direct PM Surya Ghar DBT subsidies up to ₹78,000.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setActiveTab('enquiry')}
+                  className="px-4 py-2.5 bg-amber-400 hover:bg-amber-300 text-gray-900 font-bold text-xs rounded-lg shadow transition-colors flex items-center gap-2"
+                >
+                  <i className="fa-solid fa-calculator"></i>
+                  <span>Custom Roof Sizing Helper</span>
+                </button>
+              </div>
             </div>
-            <h3 className="font-bold text-gray-800 text-base mb-1">Installation Tracker</h3>
-            <p className="text-xs text-gray-500 mb-4">
-              Live status from site survey approval to warehouse dispatch and crew commissioning.
-            </p>
-            <span className="text-xs font-semibold text-odoo-teal flex items-center gap-1">
-              Active Project <i className="fa-solid fa-circle-check text-[10px]"></i>
-            </span>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {packages.map((pkg) => (
+                <div
+                  key={pkg.id}
+                  className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col justify-between"
+                >
+                  <div className="p-6">
+                    <div className="flex justify-between items-start mb-3">
+                      <span className={`text-[11px] font-bold px-2 py-0.5 rounded border ${pkg.badgeColor}`}>
+                        {pkg.badge}
+                      </span>
+                      <span className="text-xs font-semibold text-gray-500">
+                        {pkg.systemType}
+                      </span>
+                    </div>
+
+                    <h3 className="font-bold text-gray-900 text-base mb-1">{pkg.title}</h3>
+                    <div className="flex items-baseline gap-2 mb-3">
+                      <span className="text-xl font-bold text-odoo-purple">{pkg.netPrice}</span>
+                      <span className="text-xs text-gray-400 line-through">{pkg.grossPrice}</span>
+                      <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded">
+                        Subsidy included
+                      </span>
+                    </div>
+
+                    <p className="text-[11px] text-gray-500 mb-4 bg-gray-50 p-2 rounded border border-gray-100">
+                      <i className="fa-solid fa-gift text-purple-600 mr-1.5"></i>
+                      <strong>Subsidy:</strong> {pkg.subsidy}
+                    </p>
+
+                    <div className="grid grid-cols-2 gap-2 text-[11px] text-gray-600 mb-4 py-2 border-y border-gray-100">
+                      <div>
+                        <span className="text-gray-400 block">Est. Generation:</span>
+                        <strong className="text-gray-800">{pkg.generation}</strong>
+                      </div>
+                      <div>
+                        <span className="text-gray-400 block">Roof Area Needed:</span>
+                        <strong className="text-gray-800">{pkg.roofArea}</strong>
+                      </div>
+                    </div>
+
+                    <div className="mb-4">
+                      <span className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block mb-2">
+                        BOM Hardware Included:
+                      </span>
+                      <ul className="space-y-1 text-xs text-gray-600">
+                        {pkg.components.map((comp, idx) => (
+                          <li key={idx} className="flex items-start gap-1.5">
+                            <i className="fa-solid fa-check text-emerald-500 text-[10px] mt-0.5"></i>
+                            <span className="text-[11px]">{comp}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
+                    <span className="text-[11px] text-gray-500">
+                      <i className="fa-solid fa-shield-halved text-emerald-600 mr-1"></i>
+                      {pkg.warranty}
+                    </span>
+                    <button
+                      onClick={() => handleSelectPackage(pkg.capacityKw, pkg.systemType)}
+                      className="px-3.5 py-1.5 bg-odoo-purple hover:bg-odoo-purple/90 text-white font-bold text-xs rounded transition-colors flex items-center gap-1.5 shadow-sm"
+                    >
+                      <span>I'm Interested</span>
+                      <i className="fa-solid fa-arrow-right text-[10px]"></i>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
+        )}
 
-          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
-            <div className="w-12 h-12 rounded-lg bg-purple-50 text-odoo-purple flex items-center justify-center text-xl mb-4">
-              <i className="fa-solid fa-hand-holding-dollar"></i>
+        {/* ---------------------------------------------------- */}
+        {/* TAB 2: ENQUIRY & MEASUREMENTS FORM */}
+        {/* ---------------------------------------------------- */}
+        {activeTab === 'enquiry' && (
+          <div className="max-w-4xl mx-auto">
+            <div className="bg-white border border-gray-200 rounded-xl p-6 sm:p-8 shadow-sm mb-6">
+              <div className="border-b border-gray-200 pb-4 mb-6">
+                <span className="text-xs font-bold text-odoo-purple uppercase tracking-wider">
+                  Customer Rooftop Portal
+                </span>
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">
+                  Solar Feasibility & Quotation Request Form
+                </h2>
+                <p className="text-xs text-gray-500 mt-1">
+                  Enter your address and roof dimensions. Our live helper will estimate your ideal capacity (kW) and monthly bill savings.
+                </p>
+              </div>
+
+              <form onSubmit={handleSubmitEnquiry} className="space-y-6">
+                {/* 1. Contact & Property Details */}
+                <div>
+                  <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <span className="w-5 h-5 rounded-full bg-purple-100 text-odoo-purple flex items-center justify-center text-[11px]">1</span>
+                    Contact & Property Details
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Full Name *</label>
+                      <input
+                        type="text"
+                        required
+                        value={enquiryForm.name}
+                        onChange={(e) => setEnquiryForm({ ...enquiryForm, name: e.target.value })}
+                        className="w-full px-3 py-2 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-odoo-purple focus:border-odoo-purple"
+                        placeholder="e.g. Vikram Malhotra"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Phone Number *</label>
+                      <input
+                        type="tel"
+                        required
+                        value={enquiryForm.phone}
+                        onChange={(e) => setEnquiryForm({ ...enquiryForm, phone: e.target.value })}
+                        className="w-full px-3 py-2 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-odoo-purple focus:border-odoo-purple"
+                        placeholder="+91 98110 00007"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Email Address</label>
+                      <input
+                        type="email"
+                        value={enquiryForm.email}
+                        onChange={(e) => setEnquiryForm({ ...enquiryForm, email: e.target.value })}
+                        className="w-full px-3 py-2 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-odoo-purple focus:border-odoo-purple"
+                        placeholder="customer@sunpower.com"
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Installation Address *</label>
+                      <input
+                        type="text"
+                        required
+                        value={enquiryForm.address}
+                        onChange={(e) => setEnquiryForm({ ...enquiryForm, address: e.target.value })}
+                        className="w-full px-3 py-2 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-odoo-purple focus:border-odoo-purple"
+                        placeholder="House / Plot / Building Name & Street"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">City</label>
+                      <input
+                        type="text"
+                        value={enquiryForm.city}
+                        onChange={(e) => setEnquiryForm({ ...enquiryForm, city: e.target.value })}
+                        className="w-full px-3 py-2 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-odoo-purple"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">State</label>
+                      <input
+                        type="text"
+                        value={enquiryForm.state}
+                        onChange={(e) => setEnquiryForm({ ...enquiryForm, state: e.target.value })}
+                        className="w-full px-3 py-2 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-odoo-purple"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Postal PIN Code</label>
+                      <input
+                        type="text"
+                        value={enquiryForm.pincode}
+                        onChange={(e) => setEnquiryForm({ ...enquiryForm, pincode: e.target.value })}
+                        className="w-full px-3 py-2 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-odoo-purple"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Property Type</label>
+                      <select
+                        value={enquiryForm.property_type}
+                        onChange={(e) => setEnquiryForm({ ...enquiryForm, property_type: e.target.value })}
+                        className="w-full px-3 py-2 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-odoo-purple"
+                      >
+                        <option value="Residential">Residential Individual House / Villa</option>
+                        <option value="Housing Society">Housing Society / Apartment Complex</option>
+                        <option value="Commercial">Commercial / Industrial Building</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Roof Measurements & Technical Parameters */}
+                <div className="pt-4 border-t border-gray-100">
+                  <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <span className="w-5 h-5 rounded-full bg-purple-100 text-odoo-purple flex items-center justify-center text-[11px]">2</span>
+                    Roof Measurements & Electricity Bill
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Roof Length (ft)</label>
+                      <input
+                        type="number"
+                        min="5"
+                        max="200"
+                        value={enquiryForm.roof_length_ft}
+                        onChange={(e) => setEnquiryForm({ ...enquiryForm, roof_length_ft: parseFloat(e.target.value) || 0 })}
+                        className="w-full px-3 py-2 text-xs border border-gray-300 rounded"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Roof Width (ft)</label>
+                      <input
+                        type="number"
+                        min="5"
+                        max="200"
+                        value={enquiryForm.roof_width_ft}
+                        onChange={(e) => setEnquiryForm({ ...enquiryForm, roof_width_ft: parseFloat(e.target.value) || 0 })}
+                        className="w-full px-3 py-2 text-xs border border-gray-300 rounded"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Total Roof Area</label>
+                      <div className="px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded font-bold text-gray-700">
+                        {computedRoofArea} sq.ft
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Shadow-Free Area (sq.ft)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="5000"
+                        value={enquiryForm.shadow_free_area_sqft}
+                        onChange={(e) => setEnquiryForm({ ...enquiryForm, shadow_free_area_sqft: parseFloat(e.target.value) || 0 })}
+                        className="w-full px-3 py-2 text-xs border border-gray-300 rounded"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Roof Type</label>
+                      <select
+                        value={enquiryForm.roof_type}
+                        onChange={(e) => setEnquiryForm({ ...enquiryForm, roof_type: e.target.value })}
+                        className="w-full px-3 py-2 text-xs border border-gray-300 rounded"
+                      >
+                        <option value="Concrete / Flat">Concrete / Flat Terrace</option>
+                        <option value="Tiled / Slanted">Slanted Clay Tiled Roof</option>
+                        <option value="Tin / Metal Sheet">Tin / Metal Industrial Sheet</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Floor / Storey</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="30"
+                        value={enquiryForm.floor_number}
+                        onChange={(e) => setEnquiryForm({ ...enquiryForm, floor_number: parseInt(e.target.value) || 1 })}
+                        className="w-full px-3 py-2 text-xs border border-gray-300 rounded"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Roof Facing Direction</label>
+                      <select
+                        value={enquiryForm.roof_direction}
+                        onChange={(e) => setEnquiryForm({ ...enquiryForm, roof_direction: e.target.value })}
+                        className="w-full px-3 py-2 text-xs border border-gray-300 rounded"
+                      >
+                        <option value="South">South (Optimal 100% Generation)</option>
+                        <option value="South-West">South-West</option>
+                        <option value="South-East">South-East</option>
+                        <option value="East">East</option>
+                        <option value="West">West</option>
+                        <option value="North">North (Low Solar Yield)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Monthly Power Bill (₹)</label>
+                      <input
+                        type="number"
+                        min="500"
+                        max="200000"
+                        value={enquiryForm.monthly_bill_amount}
+                        onChange={(e) => setEnquiryForm({ ...enquiryForm, monthly_bill_amount: parseFloat(e.target.value) || 0 })}
+                        className="w-full px-3 py-2 text-xs border border-gray-300 rounded font-semibold text-gray-800"
+                      />
+                    </div>
+                  </div>
+
+                  {/* LIVE SOLAR SIZING HELPER WIDGET */}
+                  <div className="bg-gradient-to-r from-purple-50 via-indigo-50 to-emerald-50 border border-purple-200 rounded-lg p-4 mb-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <i className="fa-solid fa-wand-magic-sparkles text-odoo-purple text-sm"></i>
+                      <span className="text-xs font-bold text-odoo-purple uppercase tracking-wider">
+                        Live Solar Sizing & Savings Calculator
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                      <div className="bg-white/80 p-2.5 rounded border border-purple-100">
+                        <span className="text-gray-500 block text-[11px]">Recommended Size:</span>
+                        <strong className="text-base text-odoo-purple">{estimatedKwFromArea} kW</strong>
+                        <span className="text-[10px] text-gray-400 block">(~100 sq.ft per kW)</span>
+                      </div>
+                      <div className="bg-white/80 p-2.5 rounded border border-purple-100">
+                        <span className="text-gray-500 block text-[11px]">Est. Generation:</span>
+                        <strong className="text-base text-gray-800">{estimatedMonthlyUnits} units / mo</strong>
+                        <span className="text-[10px] text-emerald-600 block font-semibold">Clean Solar Power</span>
+                      </div>
+                      <div className="bg-white/80 p-2.5 rounded border border-purple-100">
+                        <span className="text-gray-500 block text-[11px]">Est. Monthly Savings:</span>
+                        <strong className="text-base text-emerald-700">₹{estimatedMonthlySavings} / mo</strong>
+                        <span className="text-[10px] text-gray-400 block">Based on ₹7.50/unit</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 3. System Preferences */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">System Type Preference</label>
+                      <div className="flex gap-2">
+                        <label className={`flex-1 p-3 border rounded-lg cursor-pointer text-xs flex items-center gap-2 ${
+                          enquiryForm.preferred_system_type === 'On-Grid'
+                            ? 'border-odoo-purple bg-purple-50/50 font-bold text-odoo-purple'
+                            : 'border-gray-200'
+                        }`}>
+                          <input
+                            type="radio"
+                            name="systemType"
+                            checked={enquiryForm.preferred_system_type === 'On-Grid'}
+                            onChange={() => setEnquiryForm({ ...enquiryForm, preferred_system_type: 'On-Grid' })}
+                          />
+                          <div>
+                            <div>On-Grid (Grid-Tied)</div>
+                            <span className="text-[10px] text-emerald-600 font-normal">PM Surya Ghar Subsidy Eligible</span>
+                          </div>
+                        </label>
+                        <label className={`flex-1 p-3 border rounded-lg cursor-pointer text-xs flex items-center gap-2 ${
+                          enquiryForm.preferred_system_type === 'Off-Grid'
+                            ? 'border-odoo-purple bg-purple-50/50 font-bold text-odoo-purple'
+                            : 'border-gray-200'
+                        }`}>
+                          <input
+                            type="radio"
+                            name="systemType"
+                            checked={enquiryForm.preferred_system_type === 'Off-Grid'}
+                            onChange={() => setEnquiryForm({ ...enquiryForm, preferred_system_type: 'Off-Grid' })}
+                          />
+                          <div>
+                            <div>Off-Grid (Battery Bank)</div>
+                            <span className="text-[10px] text-gray-500 font-normal">Independent 24x7 Power</span>
+                          </div>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Preferred Capacity (kW)</label>
+                      <select
+                        value={enquiryForm.preferred_capacity_kw}
+                        onChange={(e) => setEnquiryForm({ ...enquiryForm, preferred_capacity_kw: parseFloat(e.target.value) || 3.0 })}
+                        className="w-full px-3 py-2 text-xs border border-gray-300 rounded font-bold text-gray-800"
+                      >
+                        <option value={1.0}>1 kW Rooftop System</option>
+                        <option value={2.0}>2 kW Rooftop System</option>
+                        <option value={3.0}>3 kW Rooftop System (Optimal for most homes)</option>
+                        <option value={4.0}>4 kW Rooftop System</option>
+                        <option value={5.0}>5 kW Rooftop System</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="mt-4">
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">Additional Notes / Special Instructions</label>
+                    <textarea
+                      rows={2}
+                      value={enquiryForm.notes}
+                      onChange={(e) => setEnquiryForm({ ...enquiryForm, notes: e.target.value })}
+                      className="w-full px-3 py-2 text-xs border border-gray-300 rounded"
+                      placeholder="Any shading from nearby water tanks, trees, or special cable routing requests..."
+                    ></textarea>
+                  </div>
+                </div>
+
+                <div className="pt-4 flex justify-end gap-3 border-t border-gray-100">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('catalogue')}
+                    className="px-4 py-2 border border-gray-300 text-gray-700 text-xs font-medium rounded hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="px-6 py-2.5 bg-odoo-purple hover:bg-odoo-purple/90 text-white font-bold text-xs rounded-lg shadow transition-colors flex items-center gap-2"
+                  >
+                    <i className="fa-solid fa-paper-plane"></i>
+                    <span>Submit Feasibility Request</span>
+                  </button>
+                </div>
+              </form>
             </div>
-            <h3 className="font-bold text-gray-800 text-base mb-1">Government Subsidy</h3>
-            <p className="text-xs text-gray-500 mb-4">
-              PM Surya Ghar: Muft Bijli Yojana subsidy claims, DISCOM approvals, and disbursements.
-            </p>
-            <span className="text-xs font-semibold text-purple-700 flex items-center gap-1">
-              Up to ₹78,000 Subsidy <i className="fa-solid fa-info-circle text-[10px]"></i>
-            </span>
+          </div>
+        )}
+
+        {/* ---------------------------------------------------- */}
+        {/* TAB 3: 13-STAGE PROJECT TRACKER */}
+        {/* ---------------------------------------------------- */}
+        {activeTab === 'tracker' && (
+          <div className="max-w-4xl mx-auto">
+            {/* Top Project Summary Card */}
+            <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm mb-6">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-gray-400">Project Stage</span>
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-odoo-purple border border-purple-200">
+                      {tracker?.current_stage_name || 'Enquiry Received'}
+                    </span>
+                  </div>
+                  <h2 className="text-xl font-bold text-gray-900 mt-1">
+                    {tracker?.system_size_kw || 3.0} kW {tracker?.system_type || 'On-Grid'} Rooftop Solar Project
+                  </h2>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Order Ref: <span className="font-mono font-semibold text-gray-700">SO-2026-{tracker?.order_id ? `${tracker.order_id}`.padStart(4, '0') : '0001'}</span>
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setActiveTab('quotes')}
+                    className="px-3 py-1.5 border border-gray-200 hover:bg-gray-50 text-xs font-semibold text-gray-700 rounded flex items-center gap-1.5"
+                  >
+                    <i className="fa-solid fa-file-invoice text-odoo-purple"></i>
+                    <span>View Quotations</span>
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('schemes')}
+                    className="px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-xs font-semibold text-odoo-purple rounded border border-purple-200 flex items-center gap-1.5"
+                  >
+                    <i className="fa-solid fa-hand-holding-dollar"></i>
+                    <span>Subsidy Status</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Stepper Timeline (13 Stages) */}
+            <div className="bg-white border border-gray-200 rounded-xl p-6 sm:p-8 shadow-sm">
+              <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-6 pb-2 border-b border-gray-100 flex items-center justify-between">
+                <span>13-Stage Project Lifecycle Stepper</span>
+                <span className="text-[11px] font-normal text-gray-400">Live Real-Time Sync</span>
+              </h3>
+
+              <div className="relative pl-6 sm:pl-8 space-y-8 before:absolute before:left-3 sm:before:left-4 before:top-2 before:bottom-2 before:w-0.5 before:bg-gray-200">
+                {tracker?.stages.map((stage, idx) => {
+                  const isCompleted = stage.status === 'COMPLETED';
+                  const isCurrent = stage.status === 'CURRENT';
+
+                  return (
+                    <div key={stage.key} className="relative flex items-start gap-4">
+                      {/* Step Indicator Dot */}
+                      <div
+                        className={`absolute -left-6 sm:-left-8 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                          isCompleted
+                            ? 'bg-emerald-500 text-white shadow-sm'
+                            : isCurrent
+                            ? 'bg-odoo-purple text-white ring-4 ring-purple-100 shadow'
+                            : 'bg-white border-2 border-gray-300 text-gray-400'
+                        }`}
+                      >
+                        {isCompleted ? (
+                          <i className="fa-solid fa-check text-[10px]"></i>
+                        ) : (
+                          <span className="text-[10px]">{idx + 1}</span>
+                        )}
+                      </div>
+
+                      {/* Stage Content */}
+                      <div className="flex-1">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                          <h4 className={`text-sm font-bold ${
+                            isCompleted ? 'text-gray-900' : isCurrent ? 'text-odoo-purple' : 'text-gray-400'
+                          }`}>
+                            {stage.title}
+                          </h4>
+                          {stage.date && (
+                            <span className="text-[11px] font-medium text-gray-500 bg-gray-50 px-2 py-0.5 rounded border border-gray-100">
+                              <i className="fa-regular fa-calendar mr-1 text-gray-400"></i>
+                              {stage.date}
+                            </span>
+                          )}
+                        </div>
+                        <p className={`text-xs mt-1 leading-relaxed ${
+                          isCurrent ? 'text-gray-700 font-medium' : 'text-gray-500'
+                        }`}>
+                          {stage.description}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ---------------------------------------------------- */}
+        {/* TAB 4: QUOTATIONS & ORDERS */}
+        {/* ---------------------------------------------------- */}
+        {activeTab === 'quotes' && (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Quotations & Accepted Orders</h2>
+                <p className="text-xs text-gray-500">Review bill of materials (BOM), prices, PDF copies and accept quotes.</p>
+              </div>
+            </div>
+
+            {/* Quotations List */}
+            {quotes.length === 0 ? (
+              <div className="bg-white border border-gray-200 rounded-xl p-8 text-center text-gray-500">
+                <i className="fa-solid fa-file-invoice text-3xl text-gray-300 mb-2"></i>
+                <p className="text-sm font-semibold">No quotations generated yet</p>
+                <p className="text-xs text-gray-400 mt-1">Submit your roof details to receive an engineering BOM quotation.</p>
+              </div>
+            ) : (
+              quotes.map((q) => (
+                <div key={q.id} className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-gray-100 pb-4 mb-4">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-base font-bold text-gray-900">{q.quote_number}</span>
+                        <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full ${
+                          q.status === 'ACCEPTED'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : q.status === 'SENT'
+                            ? 'bg-blue-100 text-blue-800'
+                            : 'bg-amber-100 text-amber-800'
+                        }`}>
+                          {q.status}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        Template: <span className="font-semibold text-gray-700">{q.bom_name}</span> ({q.capacity_kw} kW {q.system_type})
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <a
+                        href={`/api/quotes/${q.id}/pdf`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-3 py-1.5 border border-gray-200 hover:bg-gray-50 text-xs font-semibold text-gray-700 rounded flex items-center gap-1.5"
+                      >
+                        <i className="fa-solid fa-file-pdf text-red-500"></i>
+                        <span>Download PDF</span>
+                      </a>
+                      {q.status !== 'ACCEPTED' && (
+                        <button
+                          onClick={() => handleAcceptQuote(q.id)}
+                          className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded flex items-center gap-1.5 shadow-sm"
+                        >
+                          <i className="fa-solid fa-check"></i>
+                          <span>Accept & Confirm Order</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* BOM Lines Table */}
+                  <div className="overflow-x-auto mb-4">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-gray-50 text-gray-600 border-y border-gray-200">
+                        <tr>
+                          <th className="py-2 px-3">BOM Item / Product</th>
+                          <th className="py-2 px-3">SKU</th>
+                          <th className="py-2 px-3 text-center">Qty</th>
+                          <th className="py-2 px-3 text-right">Unit Price</th>
+                          <th className="py-2 px-3 text-right">Subtotal</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 text-gray-700">
+                        {q.lines.map((line, idx) => (
+                          <tr key={idx} className="hover:bg-gray-50/50">
+                            <td className="py-2 px-3 font-medium text-gray-900">{line.product_name}</td>
+                            <td className="py-2 px-3 font-mono text-[11px] text-gray-500">{line.sku}</td>
+                            <td className="py-2 px-3 text-center font-bold">{line.quantity}</td>
+                            <td className="py-2 px-3 text-right">₹{line.unit_price.toLocaleString()}</td>
+                            <td className="py-2 px-3 text-right font-semibold">₹{line.subtotal.toLocaleString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Quote Totals */}
+                  <div className="bg-gray-50 p-4 rounded-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                    <span className="text-xs text-gray-500">
+                      * Includes turnkey on-site mounting, wiring, DISCOM net-meter liaison, and 20-year warranty.
+                    </span>
+                    <div className="text-right text-xs space-y-1">
+                      <div className="text-gray-500">Subtotal: <span className="font-semibold text-gray-800">₹{q.subtotal.toLocaleString()}</span></div>
+                      <div className="text-gray-500">GST (13.8% blended): <span className="font-semibold text-gray-800">₹{q.tax_amount.toLocaleString()}</span></div>
+                      <div className="text-base font-bold text-odoo-purple pt-1 border-t border-gray-200">
+                        Total Amount: ₹{q.total_amount.toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+
+            {/* Confirmed Orders Card */}
+            {orders.length > 0 && (
+              <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4">Confirmed Sales Orders</h3>
+                <div className="space-y-4">
+                  {orders.map((o) => (
+                    <div key={o.id} className="p-4 border border-gray-100 rounded-lg bg-gray-50/60 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-xs">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-gray-900">{o.order_number}</span>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-800">
+                            {o.status}
+                          </span>
+                        </div>
+                        <p className="text-gray-500 mt-0.5">Created: {o.created_at}</p>
+                      </div>
+
+                      <div className="flex items-center gap-6">
+                        <div>
+                          <span className="text-gray-400 block text-[10px]">Total Amount:</span>
+                          <strong className="text-gray-800">₹{o.total_amount.toLocaleString()}</strong>
+                        </div>
+                        <div>
+                          <span className="text-gray-400 block text-[10px]">Paid:</span>
+                          <strong className="text-emerald-700">₹{o.paid_amount.toLocaleString()}</strong>
+                        </div>
+                        <div>
+                          <span className="text-gray-400 block text-[10px]">Balance:</span>
+                          <strong className="text-gray-800">₹{o.balance_amount.toLocaleString()}</strong>
+                        </div>
+                        {o.invoice && (
+                          <span className="px-2.5 py-1 bg-white border border-gray-200 rounded font-semibold text-gray-700">
+                            Inv: {o.invoice.invoice_number}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ---------------------------------------------------- */}
+        {/* TAB 5: EQUIPMENT & WARRANTY */}
+        {/* ---------------------------------------------------- */}
+        {activeTab === 'equipment' && (
+          <div>
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Installed Solar Hardware & Warranties</h2>
+                <p className="text-xs text-gray-500">Every serialised unit scanned by warehouse and installed on your rooftop.</p>
+              </div>
+              <button
+                onClick={() => {
+                  setSelectedEquipment(null);
+                  setShowTicketModal(true);
+                }}
+                className="px-3.5 py-2 bg-odoo-purple hover:bg-odoo-purple/90 text-white font-bold text-xs rounded-lg shadow-sm flex items-center gap-1.5"
+              >
+                <i className="fa-solid fa-headset"></i>
+                <span>Raise Service Request</span>
+              </button>
+            </div>
+
+            {equipment.length === 0 ? (
+              <div className="bg-white border border-gray-200 rounded-xl p-8 text-center text-gray-500">
+                <i className="fa-solid fa-barcode text-3xl text-gray-300 mb-2"></i>
+                <p className="text-sm font-semibold">No equipment delivered yet</p>
+                <p className="text-xs text-gray-400 mt-1">Serialized units will appear here upon warehouse dispatch.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {equipment.map((item) => (
+                  <div key={item.id} className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
+                    <div>
+                      <div className="flex justify-between items-start mb-2">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-gray-100 text-gray-700">
+                          {item.product_category}
+                        </span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                          item.is_in_warranty
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {item.is_in_warranty ? 'In Warranty' : 'Expired'}
+                        </span>
+                      </div>
+
+                      <h4 className="font-bold text-gray-900 text-sm mb-1">{item.product_name}</h4>
+                      <p className="font-mono text-xs text-odoo-purple font-semibold mb-3 flex items-center gap-1.5">
+                        <i className="fa-solid fa-barcode text-gray-400"></i>
+                        <span>{item.serial_number}</span>
+                      </p>
+
+                      <div className="space-y-1.5 text-xs text-gray-600 bg-gray-50 p-3 rounded-lg border border-gray-100 mb-4">
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Delivered On:</span>
+                          <span className="font-medium text-gray-800">{item.delivered_on || 'N/A'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Warranty Expiration:</span>
+                          <span className="font-medium text-gray-800">{item.warranty_end || 'N/A'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Days Remaining:</span>
+                          <span className={`font-bold ${item.is_in_warranty ? 'text-emerald-700' : 'text-red-600'}`}>
+                            {item.days_remaining !== null && item.days_remaining !== undefined
+                              ? `${item.days_remaining} days`
+                              : 'N/A'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setSelectedEquipment(item);
+                        setTicketSubject(`Service Request for ${item.product_name} (${item.serial_number})`);
+                        setShowTicketModal(true);
+                      }}
+                      className="w-full py-2 border border-odoo-purple text-odoo-purple hover:bg-purple-50 rounded text-xs font-bold transition-colors flex items-center justify-center gap-1.5"
+                    >
+                      <i className="fa-solid fa-wrench"></i>
+                      <span>Raise Maintenance Ticket</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ---------------------------------------------------- */}
+        {/* TAB 6: GOVERNMENT SCHEMES & SUBSIDY TRACKER */}
+        {/* ---------------------------------------------------- */}
+        {activeTab === 'schemes' && (
+          <div className="space-y-8">
+            {/* PM Surya Ghar Hero Banner */}
+            <div className="bg-gradient-to-r from-orange-500 via-amber-600 to-yellow-500 rounded-xl text-white p-6 sm:p-8 shadow-sm">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                  <span className="text-xs font-bold uppercase tracking-wider text-yellow-200">
+                    Government of India Initiative (MNRE)
+                  </span>
+                  <h1 className="text-2xl sm:text-3xl font-bold mt-1 mb-2">
+                    PM Surya Ghar: Muft Bijli Yojana
+                  </h1>
+                  <p className="text-xs text-orange-100 max-w-2xl leading-relaxed">
+                    Get up to ₹78,000 direct bank transfer (DBT) subsidy for residential rooftop solar installations. Enjoy up to 300 units of free clean solar electricity each month.
+                  </p>
+                </div>
+                <a
+                  href="https://pmsuryaghar.gov.in"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-4 py-2 bg-white text-orange-700 hover:bg-orange-50 font-bold text-xs rounded-lg shadow transition-colors flex items-center gap-2 whitespace-nowrap"
+                >
+                  <i className="fa-solid fa-arrow-up-right-from-square"></i>
+                  <span>National Portal (pmsuryaghar.gov.in)</span>
+                </a>
+              </div>
+            </div>
+
+            {/* Subsidy Slab Rules */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+                <span className="text-xs font-bold text-gray-400 block mb-1">1 kW System</span>
+                <div className="text-2xl font-bold text-orange-600 mb-1">₹30,000</div>
+                <p className="text-xs text-gray-500">Fixed Central Financial Assistance (CFA) directly credited to your bank account.</p>
+              </div>
+              <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+                <span className="text-xs font-bold text-gray-400 block mb-1">2 kW System</span>
+                <div className="text-2xl font-bold text-orange-600 mb-1">₹60,000</div>
+                <p className="text-xs text-gray-500">₹30,000 per kW for the first 2 kW of residential capacity.</p>
+              </div>
+              <div className="bg-white border-2 border-orange-500 rounded-xl p-5 shadow-sm bg-orange-50/20">
+                <span className="text-xs font-bold text-orange-600 block mb-1">3 kW & Above (Max Cap)</span>
+                <div className="text-2xl font-bold text-orange-600 mb-1">₹78,000</div>
+                <p className="text-xs text-gray-600 font-medium">₹60,000 + ₹18,000 for 3rd kW. Maximum central subsidy cap.</p>
+              </div>
+              <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+                <span className="text-xs font-bold text-gray-400 block mb-1">Off-Grid Systems</span>
+                <div className="text-2xl font-bold text-gray-400 mb-1">₹0</div>
+                <p className="text-xs text-gray-500">Off-Grid systems with battery banks are NOT eligible for central subsidies.</p>
+              </div>
+            </div>
+
+            {/* Interactive Calculator Section */}
+            <div className="bg-white border border-gray-200 rounded-xl p-6 sm:p-8 shadow-sm">
+              <h3 className="text-base font-bold text-gray-900 mb-2 flex items-center gap-2">
+                <i className="fa-solid fa-calculator text-odoo-purple"></i>
+                <span>Interactive PM Surya Ghar Subsidy Calculator</span>
+              </h3>
+              <p className="text-xs text-gray-500 mb-6">
+                Adjust capacity and system type to see instant gross price, subsidy credit, and net investment.
+              </p>
+
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+                <div className="lg:col-span-6 space-y-4">
+                  <div>
+                    <div className="flex justify-between text-xs font-semibold text-gray-700 mb-1">
+                      <span>Rooftop Solar Capacity:</span>
+                      <span className="text-odoo-purple font-bold text-sm">{calcCapacity} kW</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="1.0"
+                      max="10.0"
+                      step="0.5"
+                      value={calcCapacity}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        setCalcCapacity(val);
+                        runSubsidyEstimate(val, calcSystemType, calcState);
+                      }}
+                      className="w-full accent-odoo-purple cursor-pointer"
+                    />
+                    <div className="flex justify-between text-[10px] text-gray-400 mt-1">
+                      <span>1 kW</span>
+                      <span>3 kW (Popular)</span>
+                      <span>5 kW</span>
+                      <span>10 kW</span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">System Type</label>
+                      <select
+                        value={calcSystemType}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setCalcSystemType(val);
+                          runSubsidyEstimate(calcCapacity, val, calcState);
+                        }}
+                        className="w-full px-3 py-2 text-xs border border-gray-300 rounded font-bold"
+                      >
+                        <option value="On-Grid">On-Grid (Subsidy Eligible)</option>
+                        <option value="Off-Grid">Off-Grid (No Subsidy)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">State Incentive</label>
+                      <select
+                        value={calcState}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setCalcState(val);
+                          runSubsidyEstimate(calcCapacity, calcSystemType, val);
+                        }}
+                        className="w-full px-3 py-2 text-xs border border-gray-300 rounded"
+                      >
+                        <option value="National">National / General State</option>
+                        <option value="Delhi">Delhi NCT (+₹3,000 GBI)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {calcResult && !calcResult.is_eligible && (
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded text-xs text-amber-800">
+                      <i className="fa-solid fa-triangle-exclamation mr-1.5 text-amber-600"></i>
+                      {calcResult.subsidy_breakdown}
+                    </div>
+                  )}
+                </div>
+
+                {/* Calculator Result Card */}
+                <div className="lg:col-span-6 bg-[#FAF8F9] border border-purple-200 rounded-xl p-6">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-odoo-purple mb-4">
+                    Subsidy & Cost Breakdown ({calcCapacity} kW {calcSystemType})
+                  </h4>
+
+                  <div className="space-y-2.5 text-xs">
+                    <div className="flex justify-between text-gray-600">
+                      <span>Estimated Benchmark Turnkey Cost:</span>
+                      <span className="font-semibold text-gray-800">₹{calcResult?.estimated_gross_cost.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-emerald-700 font-semibold">
+                      <span>PM Surya Ghar Central Subsidy (DBT):</span>
+                      <span>- ₹{calcResult?.central_subsidy.toLocaleString()}</span>
+                    </div>
+                    {calcResult?.state_subsidy > 0 && (
+                      <div className="flex justify-between text-blue-700 font-semibold">
+                        <span>State Solar Incentive:</span>
+                        <span>- ₹{calcResult?.state_subsidy.toLocaleString()}</span>
+                      </div>
+                    )}
+                    <div className="pt-2 border-t border-purple-200 flex justify-between items-baseline">
+                      <span className="text-sm font-bold text-gray-900">Net Cost to Homeowner:</span>
+                      <span className="text-2xl font-bold text-odoo-purple">
+                        ₹{calcResult?.estimated_net_cost.toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 pt-3 border-t border-purple-100 grid grid-cols-2 gap-2 text-[11px] text-gray-600">
+                    <div>
+                      <span className="text-gray-400 block">Est. Annual Generation:</span>
+                      <strong className="text-gray-800">{calcResult?.annual_savings_units.toLocaleString()} units / yr</strong>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 block">Est. Annual Bill Savings:</span>
+                      <strong className="text-emerald-700">₹{calcResult?.annual_bill_savings.toLocaleString()} / yr</strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Live Subsidy Tracker Card */}
+            <div className="bg-white border border-gray-200 rounded-xl p-6 sm:p-8 shadow-sm">
+              <h3 className="text-base font-bold text-gray-900 mb-2 flex items-center gap-2">
+                <i className="fa-solid fa-file-shield text-emerald-600"></i>
+                <span>Your Government Subsidy Claim Tracker</span>
+              </h3>
+              <p className="text-xs text-gray-500 mb-6">
+                National Solar Portal tracking for your rooftop project.
+              </p>
+
+              {subsidy ? (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg border border-gray-100 text-xs">
+                    <div>
+                      <span className="text-gray-400 block text-[10px]">Application Number:</span>
+                      <strong className="font-mono text-gray-800">{subsidy.application_no || 'MNRE-2026-88192'}</strong>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 block text-[10px]">Claim Status:</span>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                        {subsidy.status.replace(/_/g, ' ')}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 block text-[10px]">Sanctioned CFA:</span>
+                      <strong className="text-gray-800">₹{subsidy.sanctioned_amount.toLocaleString()}</strong>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 block text-[10px]">Disbursed (DBT):</span>
+                      <strong className="text-emerald-700">₹{subsidy.disbursed_amount.toLocaleString()}</strong>
+                    </div>
+                  </div>
+
+                  {/* Subsidy Milestones Stepper */}
+                  <div className="grid grid-cols-2 sm:grid-cols-6 gap-2 text-center text-xs">
+                    {[
+                      { key: 'NOT_APPLIED', label: '1. Not Applied' },
+                      { key: 'APPLICATION_SUBMITTED', label: '2. Application Filed' },
+                      { key: 'DISCOM_FEASIBILITY_APPROVED', label: '3. Feasibility Approved' },
+                      { key: 'INSTALLATION_INSPECTION_DONE', label: '4. Net Meter Inspected' },
+                      { key: 'APPROVED', label: '5. Subsidy Sanctioned' },
+                      { key: 'DISBURSED', label: '6. Credited via DBT' },
+                    ].map((step, idx) => {
+                      const isPast = ['DISBURSED'].includes(subsidy.status) || idx < 5;
+                      return (
+                        <div key={step.key} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                          <div className="w-6 h-6 mx-auto rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px] font-bold mb-1">
+                            <i className="fa-solid fa-check"></i>
+                          </div>
+                          <span className="text-[11px] font-semibold text-gray-800">{step.label}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-6 text-gray-500 text-xs">
+                  <i className="fa-solid fa-hourglass-start text-2xl text-gray-300 mb-2"></i>
+                  <p className="font-semibold">Subsidy application will be filed upon installation agreement signing</p>
+                  <p className="text-gray-400 mt-1">SunPower Solutions liaisons with DISCOM and national portal end to end.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </main>
+
+      {/* ---------------------------------------------------- */}
+      {/* SERVICE TICKET MODAL */}
+      {/* ---------------------------------------------------- */}
+      {showTicketModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-xl animate-in fade-in zoom-in-95">
+            <div className="flex justify-between items-center mb-4 pb-2 border-b border-gray-100">
+              <h3 className="font-bold text-gray-900 text-sm">Raise After-Sales Service Ticket</h3>
+              <button
+                onClick={() => setShowTicketModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <i className="fa-solid fa-xmark text-sm"></i>
+              </button>
+            </div>
+
+            <form onSubmit={handleRaiseTicket} className="space-y-4">
+              {selectedEquipment && (
+                <div className="p-3 bg-purple-50 rounded border border-purple-100 text-xs text-purple-900">
+                  <span className="font-bold">Component:</span> {selectedEquipment.product_name}
+                  <br />
+                  <span className="font-mono text-[11px]">Serial: {selectedEquipment.serial_number}</span>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Subject *</label>
+                <input
+                  type="text"
+                  required
+                  value={ticketSubject}
+                  onChange={(e) => setTicketSubject(e.target.value)}
+                  placeholder="e.g. Inverter Error code E02 / Panel Cleaning"
+                  className="w-full px-3 py-2 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-odoo-purple"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Issue Description *</label>
+                <textarea
+                  required
+                  rows={4}
+                  value={ticketDescription}
+                  onChange={(e) => setTicketDescription(e.target.value)}
+                  placeholder="Describe the issue, generation drop, or assistance required..."
+                  className="w-full px-3 py-2 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-odoo-purple"
+                ></textarea>
+              </div>
+
+              <div className="pt-2 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowTicketModal(false)}
+                  className="px-3 py-1.5 border border-gray-300 text-xs text-gray-700 font-medium rounded hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={ticketSubmitting}
+                  className="px-4 py-1.5 bg-odoo-purple hover:bg-odoo-purple/90 text-white font-bold text-xs rounded shadow transition-colors flex items-center gap-1.5"
+                >
+                  <i className="fa-solid fa-paper-plane text-[10px]"></i>
+                  <span>Submit Ticket</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
-      </main>
+      )}
     </div>
   );
 };
-

@@ -106,3 +106,4 @@ export const CustomerPortalPage: React.FC = () => {
     </div>
   );
 };
+

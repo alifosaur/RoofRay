@@ -7,6 +7,17 @@ export default {
   theme: {
     extend: {
       colors: {
+        plum: {
+          DEFAULT: '#6B4B63',
+          dark: '#55394e',
+          light: '#7e5a75',
+        },
+        'accent-plum': '#714B67',
+        'teal-brush': '#5CC9B0',
+        'page-bg': '#FFFFFF',
+        'footer-bg': '#F4F2F2',
+        'heading-dark': '#212529',
+        'body-grey': '#6C757D',
         odoo: {
           primary: '#714B67',
           'primary-dark': '#5a3b52',
@@ -25,9 +36,18 @@ export default {
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        script: ['"Caveat Brush"', 'Caveat', 'cursive'],
+      },
+      maxWidth: {
+        'site': '1320px',
+      },
+      lineHeight: {
+        'relaxed-body': '1.9',
       },
       fontSize: {
         base: ['13.5px', '20px'],
+        'body-lg': ['18px', '1.9'],
+        'display': ['68px', '1.15'],
       },
       borderRadius: {
         DEFAULT: '3.5px',

@@ -175,3 +175,4 @@ def test_warehouse_cannot_view_unconfirmed_draft_orders():
     wh_orders = client.get("/api/orders", headers=warehouse_headers).json()
     for o in wh_orders:
         assert o["status"] in ["CONFIRMED", "PACKED", "DISPATCHED", "DELIVERED"]
+

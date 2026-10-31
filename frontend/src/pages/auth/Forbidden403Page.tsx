@@ -62,3 +62,4 @@ export const Forbidden403Page: React.FC<ForbiddenProps> = ({
     </div>
   );
 };
+

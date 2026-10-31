@@ -192,7 +192,7 @@ const InvoiceReceiptAnimation: React.FC<{
           <g
             style={{
               transform: isPrinting ? 'translate(0px, 0px)' : 'translate(0px, -370px)',
-              transition: 'transform 1400ms cubic-bezier(0.12, 0.9, 0.25, 1)',
+              transition: 'transform 3200ms cubic-bezier(0.22, 1, 0.36, 1)',
             }}
           >
             {/* Native SMIL SVG animateTransform fallback */}
@@ -201,11 +201,11 @@ const InvoiceReceiptAnimation: React.FC<{
               type="translate"
               from="0 -370"
               to="0 0"
-              dur="1.4s"
+              dur="3.2s"
               fill="freeze"
               calcMode="spline"
               keyTimes="0; 1"
-              keySplines="0.12 0.9 0.25 1"
+              keySplines="0.22 1 0.36 1"
               restart="always"
             />
 

@@ -123,9 +123,11 @@ SCHEMES = [
 ]
 
 
-def load_catalog() -> dict:
-    Base.metadata.create_all(bind=engine)
-    db = SessionLocal()
+def load_catalog(db=None) -> dict:
+    own_session = db is None
+    if own_session:
+        Base.metadata.create_all(bind=engine)
+        db = SessionLocal()
     counts = {"products": 0, "bom_templates": 0, "schemes": 0}
     try:
         products = {}
@@ -159,7 +161,8 @@ def load_catalog() -> dict:
 
         db.commit()
     finally:
-        db.close()
+        if own_session:
+            db.close()
     return counts
 
 

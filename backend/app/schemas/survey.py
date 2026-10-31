@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional, Any
+from typing import List, Optional, Any
 from pydantic import BaseModel, ConfigDict, model_validator
 from app.models.survey import SurveyStatus
 
@@ -16,6 +16,12 @@ class SurveyComplete(BaseModel):
     roof_tilt_deg: float
     cable_distance_meters: float
     notes: Optional[str] = None
+    address_confirmed: Optional[bool] = None
+    roof_length_ft: Optional[float] = None
+    roof_width_ft: Optional[float] = None
+    shadow_free_area_sqft: Optional[float] = None
+    out_of_shade_zone: Optional[bool] = None
+    shade_notes: Optional[str] = None
 
     @model_validator(mode="before")
     @classmethod
@@ -26,6 +32,15 @@ class SurveyComplete(BaseModel):
             if "feasibility_notes" in data and "notes" not in data:
                 data["notes"] = data["feasibility_notes"]
         return data
+
+
+class SurveyPhotoOut(BaseModel):
+    id: int
+    photo_url: str
+    caption: Optional[str] = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class SurveyOut(BaseModel):
@@ -41,6 +56,14 @@ class SurveyOut(BaseModel):
     roof_direction: Optional[str] = None
     roof_tilt_deg: Optional[float] = None
     cable_distance_meters: Optional[float] = None
+    address_confirmed: Optional[bool] = None
+    roof_length_ft: Optional[float] = None
+    roof_width_ft: Optional[float] = None
+    shadow_free_area_sqft: Optional[float] = None
+    out_of_shade_zone: Optional[bool] = None
+    shade_notes: Optional[str] = None
+    submitted_at: Optional[datetime] = None
+    photos: List[SurveyPhotoOut] = []
     notes: Optional[str] = None
     status: SurveyStatus
     approved_by_id: Optional[int] = None

@@ -1,14 +1,15 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core import access
+from app.core.uploads import save_upload
 from app.models.lead import Lead
 from app.core.security import get_current_user, require_role
 from app.models.user import User, UserRole
-from app.models.survey import Survey, SurveyStatus
-from app.schemas.survey import SurveyCreate, SurveyComplete, SurveyOut
+from app.models.survey import Survey, SurveyStatus, SurveyPhoto
+from app.schemas.survey import SurveyCreate, SurveyComplete, SurveyOut, SurveyPhotoOut
 from app.services import survey_service
 
 router = APIRouter(prefix="/surveys", tags=["Surveys"])
@@ -126,3 +127,23 @@ def _ensure_sales_owns_survey(db: Session, survey_id: int, current_user: User) -
     access.ensure_lead_access(survey.lead, current_user)
 
 
+
+
+@router.post("/{survey_id}/photos", response_model=SurveyPhotoOut, status_code=status.HTTP_201_CREATED)
+def upload_survey_photo(
+    survey_id: int,
+    file: UploadFile = File(...),
+    caption: str = Form("Site survey photo"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.TECHNICIAN, UserRole.ADMIN)),
+):
+    survey = db.query(Survey).filter(Survey.id == survey_id).first()
+    if not survey:
+        raise HTTPException(status_code=404, detail="Survey not found")
+    if current_user.role == UserRole.TECHNICIAN and survey.technician_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Forbidden: You can only add photos to surveys assigned to you")
+    photo = SurveyPhoto(survey_id=survey.id, photo_url=save_upload(file, "photos", f"survey_{survey.id}"), caption=caption)
+    db.add(photo)
+    db.commit()
+    db.refresh(photo)
+    return photo

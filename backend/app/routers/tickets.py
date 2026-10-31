@@ -101,6 +101,11 @@ def resolve_ticket(
     Resolves ticket.
     If billable: automatically generates repair invoice for parts & labour.
     """
+    ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    if current_user.role == UserRole.TECHNICIAN and ticket.assigned_to_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Forbidden: this ticket is assigned to another technician")
     return ticket_service.resolve_ticket(db, ticket_id, payload, current_user.id)
 
 

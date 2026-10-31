@@ -11,6 +11,7 @@ from app.models.audit import AuditLog
 from app.models.notification import Notification
 from app.models.finance import Invoice, InvoiceLine, InvoiceType, InvoiceStatus
 from app.schemas.order import PaymentCreate
+from app.core import events
 
 
 def confirm_order(db: Session, order_id: int, current_user_id: int) -> Order:
@@ -23,6 +24,8 @@ def confirm_order(db: Session, order_id: int, current_user_id: int) -> Order:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Only DRAFT orders can be confirmed. Current status: {order.status.value}",
         )
+    if order.paid_amount <= 0:
+        raise HTTPException(status_code=400, detail="Record the customer's advance or full payment before confirming the order")
 
     order.status = OrderStatus.CONFIRMED
     order.confirmed_at = datetime.utcnow()
@@ -62,27 +65,22 @@ def confirm_order(db: Session, order_id: int, current_user_id: int) -> Order:
         )
         db.add(install_job)
         db.flush()
+        # The technician is notified when the warehouse marks the order DELIVERED (job release)
 
-        # Notify technician
-        if technician:
-            notif_tech = Notification(
-                user_id=technician.id,
-                title="New Installation Job Scheduled",
-                message=f"Job scheduled for {order.customer.name} at {order.customer.address} on {scheduled_install_date.strftime('%Y-%m-%d')}.",
-                link=f"/jobs/{install_job.id}",
-            )
-            db.add(notif_tech)
-
-    # 3. Notify warehouse staff
-    warehouse_users = db.query(User).filter(User.role == UserRole.WAREHOUSE, User.is_active == True).all()
-    for wh_user in warehouse_users:
-        notif_wh = Notification(
-            user_id=wh_user.id,
-            title="New Order Confirmed: Pick List Ready",
-            message=f"Pick list generated for {order.order_number} ({order.customer.name}).",
-            link=f"/inventory/pick-lists",
-        )
-        db.add(notif_wh)
+    # 3. Hand-off: pick list to the warehouse (live), status to the customer and sales owner
+    events.emit(
+        db, "order.confirmed", {"order_id": order.id, "pick_list_id": order.pick_list.id if order.pick_list else None},
+        roles=[UserRole.WAREHOUSE, UserRole.ADMIN],
+        title="New pick list",
+        message=f"Order {order.order_number} confirmed for {order.customer.name}. Pick list ready.",
+        link="/web/inventory?tab=picklists",
+    )
+    events.emit(
+        db, "order.confirmed", {"order_id": order.id},
+        user_ids=[order.customer.user_id, order.quote.lead.assigned_to_id if order.quote and order.quote.lead else None],
+        title="Order confirmed",
+        message=f"Order {order.order_number} is confirmed and has been sent to the warehouse.",
+    )
 
     # 4. Initialize subsidy tracking record
     from app.services import finance_service
@@ -152,6 +150,12 @@ def record_payment(db: Session, order_id: int, payload: PaymentCreate, current_u
 
     order.paid_amount += payload.amount
     settle_if_fully_paid(db, order, current_user_id)
+    events.emit(
+        db, "order.payment", {"order_id": order.id, "amount": payload.amount},
+        user_ids=[order.customer.user_id], roles=[UserRole.ADMIN],
+        title="Payment received",
+        message=f"₹{payload.amount:,.0f} received for {order.order_number}. Balance ₹{max(0.0, order.total_amount - order.paid_amount):,.0f}.",
+    )
 
     audit = AuditLog(
         record_type="order",
@@ -178,6 +182,7 @@ def settle_if_fully_paid(db: Session, order: Order, current_user_id: int) -> Non
         order.invoice.status = InvoiceStatus.PAID
     if order.status == OrderStatus.INSTALLED:
         order.status = OrderStatus.CLOSED
+        events.emit(db, "order.closed", {"order_id": order.id}, user_ids=[order.customer.user_id], roles=[UserRole.ADMIN])
         db.add(AuditLog(
             record_type="order",
             record_id=order.id,

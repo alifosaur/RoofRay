@@ -5,6 +5,7 @@ from fastapi import HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.uploads import save_upload
 from app.models.job import InstallationJob, JobStatus, JobPhoto, JobSignature, Timesheet
 from app.models.order import Order, OrderStatus
 from app.models.serial import SerialItem, SerialStatus
@@ -12,6 +13,9 @@ from app.models.user import User
 from app.models.audit import AuditLog
 from app.schemas.job import JobCompleteRequest
 from app.services import order_service
+from app.core import events
+from app.models.user import UserRole
+from app.models.finance import SubsidyStatus
 
 
 def _require_delivered(job: InstallationJob) -> None:
@@ -43,6 +47,8 @@ def start_job(db: Session, job_id: int, current_user: User) -> InstallationJob:
         user_id=current_user.id,
     )
     db.add(audit)
+    events.emit(db, "job.started", {"job_id": job.id, "order_id": job.order_id},
+                user_ids=[job.order.customer.user_id], roles=[UserRole.ADMIN, UserRole.SALES])
 
     db.commit()
     db.refresh(job)
@@ -54,17 +60,7 @@ def add_job_photo(db: Session, job_id: int, file: UploadFile, caption: str, curr
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
-    photos_dir = os.path.join(settings.UPLOAD_DIR, "photos")
-    os.makedirs(photos_dir, exist_ok=True)
-
-    ext = os.path.splitext(file.filename)[1] if file.filename else ".jpg"
-    unique_filename = f"job_{job.id}_{uuid.uuid4().hex[:8]}{ext}"
-    file_path = os.path.join(photos_dir, unique_filename)
-
-    with open(file_path, "wb") as buffer:
-        buffer.write(file.file.read())
-
-    photo_url = f"/uploads/photos/{unique_filename}"
+    photo_url = save_upload(file, "photos", f"job_{job.id}")
     job_photo = JobPhoto(
         job_id=job.id,
         photo_url=photo_url,
@@ -81,24 +77,25 @@ def complete_job(db: Session, job_id: int, payload: JobCompleteRequest, current_
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
-    if job.status == JobStatus.COMPLETED:
-        raise HTTPException(status_code=400, detail="Job is already completed")
+    if job.status != JobStatus.IN_PROGRESS:
+        raise HTTPException(status_code=400, detail=f"Start the job before completing it (current: {job.status.value})")
     _require_delivered(job)
+    if not job.photos:
+        raise HTTPException(status_code=400, detail="Upload at least one installation photo before completing the job")
+    if not payload.signature_data:
+        raise HTTPException(status_code=400, detail="The customer's signature is required")
 
-    # If job wasn't explicitly started, assume started 4 hours ago for timesheet calculation
-    if not job.started_at:
-        job.started_at = datetime.utcnow() - timedelta(hours=4)
-
+    if payload.start_time:
+        job.started_at = payload.start_time
     finish_time = payload.finish_time or datetime.utcnow()
     if finish_time < job.started_at:
-        finish_time = job.started_at + timedelta(hours=1)
+        raise HTTPException(status_code=400, detail="Finish time cannot be before the start time")
     job.finished_at = finish_time
 
-    # 1. Automatic Timesheet derivation
-    elapsed_seconds = max(3600, (finish_time - job.started_at).total_seconds())
-    hours = round(elapsed_seconds / 3600.0, 2)
+    # 1. Timesheet from the real start/finish times
+    hours = round((finish_time - job.started_at).total_seconds() / 3600.0, 2)
     technician = db.query(User).filter(User.id == job.technician_id).first()
-    hourly_rate = float(technician.hourly_rate) if technician else 500.0
+    hourly_rate = float(technician.hourly_rate) if technician else 0.0
     total_cost = round(hours * hourly_rate, 2)
 
     timesheet = db.query(Timesheet).filter(Timesheet.job_id == job.id).first()
@@ -179,6 +176,18 @@ def complete_job(db: Session, job_id: int, payload: JobCompleteRequest, current_
     # 5. Automatically create/sync technician payout record for accounts/admin
     from app.services import finance_service
     finance_service.create_or_sync_technician_payout(db, job.id)
+    if order and order.subsidy_record and order.subsidy_record.status == SubsidyStatus.FEASIBILITY_APPROVED:
+        finance_service.add_subsidy_step(db, order.subsidy_record, SubsidyStatus.INSTALLATION_DONE, datetime.utcnow().date(),
+                                         None, "Installation completed and signed off on site.", None, current_user.id)
+    lead = order.quote.lead if order and order.quote else None
+    events.emit(
+        db, "job.completed", {"job_id": job.id, "order_id": job.order_id},
+        user_ids=[order.customer.user_id if order else None, lead.assigned_to_id if lead else None],
+        roles=[UserRole.ADMIN],
+        title="Installation complete",
+        message=f"Your {job.confirmed_capacity_kw} kW system has been installed and tested.",
+        link="/customer",
+    )
 
     db.commit()
     db.refresh(job)

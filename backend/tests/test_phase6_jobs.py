@@ -2,6 +2,7 @@ import io
 from datetime import datetime, timedelta
 from fastapi.testclient import TestClient
 from app.main import app
+from tests.helpers import SALES, call_checklist, send_and_accept, confirm_with_advance, ship_to_delivered, scan_all_serials, advance
 
 client = TestClient(app)
 admin_headers = {"Authorization": "Bearer admin_uid"}
@@ -20,6 +21,7 @@ def test_installation_job_flow_and_timesheet():
     }).json()
 
     tech_id = client.get("/api/users?role=technician", headers=admin_headers).json()[0]["id"]
+    call_checklist(client, lead["id"], sales_headers)
     survey = client.post("/api/surveys", headers=sales_headers, json={
         "lead_id": lead["id"],
         "technician_id": tech_id,
@@ -37,8 +39,8 @@ def test_installation_job_flow_and_timesheet():
         "template_id": template_id,
     }).json()
 
-    order_id = client.post(f"/api/quotes/{quote['id']}/accept", headers=sales_headers).json()["order_id"]
-    client.post(f"/api/orders/{order_id}/confirm", headers=sales_headers)
+    order_id = send_and_accept(client, quote['id'], sales_headers).json()["order_id"]
+    confirm_with_advance(client, order_id, sales_headers)
 
     # Packing/dispatch is covered in phase 5; jump the order to DELIVERED so installation can begin
     from app.core.database import SessionLocal

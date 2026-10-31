@@ -14,7 +14,8 @@ from app.schemas.lead import (
     LeadOut,
     CallChecklistCreate,
 )
-from app.services import lead_service
+from app.services import lead_service, audit_service
+from app.core import events
 
 router = APIRouter(prefix="/leads", tags=["Leads & CRM"])
 
@@ -80,23 +81,22 @@ def update_lead(
         raise HTTPException(status_code=404, detail="Lead not found")
     access.ensure_lead_access(lead, current_user)
 
-    old_status = lead.status.value
     update_dict = payload.model_dump(exclude_unset=True)
-
-    for field, val in update_dict.items():
-        setattr(lead, field, val)
-
-    if "status" in update_dict and payload.status and payload.status.value != old_status:
-        audit = AuditLog(
-            record_type="lead",
-            record_id=lead.id,
-            action="STATUS_CHANGED",
-            from_status=old_status,
-            to_status=payload.status.value,
-            notes=f"Lead status manually changed to {payload.status.value}",
-            user_id=current_user.id,
-        )
-        db.add(audit)
+    if "assigned_to_id" in update_dict and current_user.role != UserRole.ADMIN and update_dict["assigned_to_id"] != lead.assigned_to_id:
+        raise HTTPException(status_code=403, detail="Only an admin can reassign leads")
+    new_status = update_dict.get("status")
+    if new_status and new_status != lead.status and current_user.role != UserRole.ADMIN:
+        # Sales can only mark contact made or close as LOST; every other stage is driven by the workflow
+        if new_status == LeadStatus.LOST:
+            if lead.status == LeadStatus.WON:
+                raise HTTPException(status_code=400, detail="A won lead cannot be marked lost")
+            if not (update_dict.get("lost_reason") or lead.lost_reason):
+                raise HTTPException(status_code=400, detail="A reason is required to mark a lead LOST")
+        elif not (new_status == LeadStatus.CONTACTED and lead.status == LeadStatus.NEW):
+            raise HTTPException(status_code=400, detail=f"Lead stage {new_status.value} is set by the workflow, not manually")
+    audit_service.apply_changes(db, "lead", lead, update_dict, current_user.id)
+    events.emit(db, "lead.updated", {"lead_id": lead.id, "status": lead.status.value},
+                user_ids=[lead.assigned_to_id, lead.customer.user_id if lead.customer else None], roles=[UserRole.ADMIN])
 
     db.commit()
     db.refresh(lead)

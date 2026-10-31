@@ -10,14 +10,14 @@ class CustomerEnquiryCreate(BaseModel):
     city: Optional[str] = None
     state: Optional[str] = None
     pincode: Optional[str] = None
-    property_type: Optional[str] = "Residential"
-    roof_type: Optional[str] = "Concrete / Flat"
+    property_type: Optional[str] = None
+    roof_type: Optional[str] = None
     roof_length_ft: Optional[float] = None
     roof_width_ft: Optional[float] = None
     roof_area_sqft: Optional[float] = None
     shadow_free_area_sqft: Optional[float] = None
     floor_number: Optional[int] = 1
-    roof_direction: Optional[str] = "South"
+    roof_direction: Optional[str] = None  # if known
     monthly_bill_amount: Optional[float] = None
     preferred_system_type: str = "On-Grid"
     preferred_capacity_kw: float = 3.0

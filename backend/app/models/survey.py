@@ -1,6 +1,6 @@
 import enum
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Float, Text, Enum, ForeignKey, DateTime
+from sqlalchemy import Boolean, Column, Integer, String, Float, Text, Enum, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 
@@ -20,6 +20,14 @@ class Survey(Base):
     technician_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     scheduled_date = Column(DateTime, nullable=False)
 
+    # Technician site measurements (submitted with the survey)
+    address_confirmed = Column(Boolean, nullable=True)
+    roof_length_ft = Column(Float, nullable=True)
+    roof_width_ft = Column(Float, nullable=True)
+    shadow_free_area_sqft = Column(Float, nullable=True)
+    out_of_shade_zone = Column(Boolean, nullable=True)
+    shade_notes = Column(Text, nullable=True)
+    submitted_at = Column(DateTime, nullable=True)
     roof_direction = Column(String(64), nullable=True)  # e.g. "South", "South-West"
     roof_tilt_deg = Column(Float, nullable=True)        # e.g. 15.0 to 25.0 degrees
     cable_distance_meters = Column(Float, nullable=True) # e.g. 20 meters
@@ -35,6 +43,19 @@ class Survey(Base):
     lead = relationship("Lead", back_populates="survey")
     technician = relationship("User", foreign_keys=[technician_id])
     approved_by = relationship("User", foreign_keys=[approved_by_id])
+    photos = relationship("SurveyPhoto", back_populates="survey", cascade="all, delete-orphan")
+
+
+class SurveyPhoto(Base):
+    __tablename__ = "survey_photos"
+
+    id = Column(Integer, primary_key=True, index=True)
+    survey_id = Column(Integer, ForeignKey("surveys.id"), nullable=False, index=True)
+    photo_url = Column(String(512), nullable=False)
+    caption = Column(String(255), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    survey = relationship("Survey", back_populates="photos")
 
     @property
     def customer_name(self) -> str:

@@ -2,15 +2,17 @@ from datetime import date
 from typing import List, Optional
 
 from pydantic import BaseModel, Field
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import get_current_user, require_role
 from app.models.user import User, UserRole
-from app.models.finance import Invoice, SubsidyRecord, TechnicianPayout
+from app.models.finance import Invoice, SubsidyRecord, SubsidyStatus, TechnicianPayout
 from app.schemas.finance import InvoiceOut, SubsidyRecordOut, SubsidyRecordUpdate, TechnicianPayoutOut
-from app.services import finance_service
+from app.services import finance_service, pdf_service
+from app.core.uploads import save_upload, DOC_EXT
 from app.core import events
 from app.models.expense import Expense
 
@@ -69,8 +71,8 @@ def list_subsidies(
     current_user: User = Depends(get_current_user),
 ):
     """Tracks national solar subsidy paperwork stages."""
-    if current_user.role == UserRole.TECHNICIAN:
-        raise HTTPException(status_code=403, detail="Forbidden: Technicians cannot view subsidy records")
+    if current_user.role in (UserRole.TECHNICIAN, UserRole.WAREHOUSE):
+        raise HTTPException(status_code=403, detail="Forbidden: subsidy records are for sales, admin and the customer")
 
     query = db.query(SubsidyRecord)
     if current_user.role == UserRole.CUSTOMER:
@@ -152,3 +154,36 @@ def record_expense(payload: ExpenseIn, db: Session = Depends(get_db), current_us
     events.emit(db, "finance.expense_recorded", {"expense_id": exp.id, "amount": exp.amount}, roles=[UserRole.ADMIN])
     db.commit()
     return {"id": exp.id}
+
+
+@router.post("/subsidies/{subsidy_id}/steps", response_model=SubsidyRecordOut)
+def add_subsidy_step(
+    subsidy_id: int,
+    status_value: SubsidyStatus = Form(..., alias="status"),
+    event_date: Optional[date] = Form(None),
+    reference_no: Optional[str] = Form(None),
+    notes: Optional[str] = Form(None),
+    document: Optional[UploadFile] = File(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.ADMIN, UserRole.SALES)),
+):
+    """Advances the per-order subsidy tracker one step, with date, reference number and optional document."""
+    subsidy = db.query(SubsidyRecord).filter(SubsidyRecord.id == subsidy_id).first()
+    if not subsidy:
+        raise HTTPException(status_code=404, detail="Subsidy record not found")
+    doc_url = save_upload(document, "subsidy", f"subsidy_{subsidy.id}", DOC_EXT) if document and document.filename else None
+    finance_service.add_subsidy_step(db, subsidy, status_value, event_date or date.today(), reference_no, notes, doc_url, current_user.id)
+    db.commit()
+    db.refresh(subsidy)
+    return subsidy
+
+
+@router.get("/invoices/{invoice_id}/pdf")
+def download_invoice_pdf(
+    invoice_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    inv = get_invoice(invoice_id, db, current_user)  # same access rules as viewing the invoice
+    return Response(pdf_service.generate_invoice_pdf(inv), media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="{inv.invoice_number}.pdf"'})

@@ -2,6 +2,7 @@ import pytest
 from datetime import datetime, timedelta
 from fastapi.testclient import TestClient
 from app.main import app
+from tests.helpers import SALES, call_checklist, send_and_accept, confirm_with_advance, ship_to_delivered, scan_all_serials, advance
 
 client = TestClient(app)
 admin_headers = {"Authorization": "Bearer admin_uid"}
@@ -94,6 +95,7 @@ def test_quote_survey_approval_gate(setup_catalog):
     # Schedule survey (Status: SCHEDULED) -> Still Expect 400
     users_res = client.get("/api/users?role=technician", headers=admin_headers)
     tech_id = users_res.json()[0]["id"]
+    call_checklist(client, lead["id"], sales_headers)
     survey = client.post("/api/surveys", headers=sales_headers, json={
         "lead_id": lead["id"],
         "technician_id": tech_id,
@@ -141,7 +143,7 @@ def test_quote_survey_approval_gate(setup_catalog):
     assert len(pdf_res.content) > 1000
 
     # Test Quote Acceptance
-    accept_res = client.post(f"/api/quotes/{quote['id']}/accept", headers=sales_headers)
+    accept_res = send_and_accept(client, quote['id'], sales_headers)
     assert accept_res.status_code == 200
     data = accept_res.json()
     assert data["status"] == "DRAFT"

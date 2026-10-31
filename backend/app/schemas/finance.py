@@ -48,6 +48,18 @@ class SubsidyRecordUpdate(BaseModel):
     remarks: Optional[str] = None
 
 
+class SubsidyEventOut(BaseModel):
+    id: int
+    status: SubsidyStatus
+    event_date: date
+    reference_no: Optional[str] = None
+    document_url: Optional[str] = None
+    notes: Optional[str] = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class SubsidyRecordOut(BaseModel):
     id: int
     order_id: int
@@ -64,6 +76,7 @@ class SubsidyRecordOut(BaseModel):
     disbursed_date: Optional[date] = None
     rejection_notes: Optional[str] = None
     remarks: Optional[str] = None
+    events: List[SubsidyEventOut] = []
     created_at: datetime
     updated_at: datetime
 

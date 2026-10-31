@@ -1,5 +1,6 @@
 import os
 from typing import List, Optional
+from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
@@ -106,3 +107,42 @@ def accept_quote(
         "status": order.status.value,
     }
 
+
+
+class QuoteLineEdit(BaseModel):
+    product_id: int
+    quantity: int = Field(ge=1)
+    unit_price: Optional[float] = Field(default=None, ge=0)
+
+
+class QuoteLinesUpdate(BaseModel):
+    lines: List[QuoteLineEdit]
+
+
+def _load_quote(db: Session, quote_id: int, current_user: User) -> Quote:
+    quote = db.query(Quote).filter(Quote.id == quote_id).first()
+    if not quote:
+        raise HTTPException(status_code=404, detail="Quote not found")
+    _validate_quote_access(quote, current_user)
+    return quote
+
+
+@router.put("/{quote_id}/lines", response_model=QuoteOut)
+def edit_quote_lines(
+    quote_id: int,
+    payload: QuoteLinesUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.SALES, UserRole.ADMIN)),
+):
+    """Adjust the auto-filled BOM (draft quotes only); totals and PDF are recomputed."""
+    return quote_service.update_quote_lines(db, _load_quote(db, quote_id, current_user), payload.lines, current_user.id)
+
+
+@router.post("/{quote_id}/send", response_model=QuoteOut)
+def send_quote(
+    quote_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.SALES, UserRole.ADMIN)),
+):
+    """DRAFT → SENT: the PDF becomes visible to the customer, who is notified."""
+    return quote_service.send_quote(db, _load_quote(db, quote_id, current_user), current_user.id)

@@ -1,5 +1,6 @@
 import time
 from typing import Optional, List
+from app.core import events
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 from app.models.lead import Lead, LeadStatus, CallChecklist
@@ -91,15 +92,7 @@ def create_public_lead(db: Session, payload: LeadPublicCreate, client_ip: str) -
     )
     db.add(audit)
 
-    # Send notification to assigned sales user
-    if assigned_id:
-        notif = Notification(
-            user_id=assigned_id,
-            title="New Lead Assigned",
-            message=f"New lead from {lead.name} for {lead.required_capacity} kW {lead.system_type}.",
-            link=f"/crm/leads/{lead.id}",
-        )
-        db.add(notif)
+    notify_new_lead(db, lead)
 
     db.commit()
     db.refresh(lead)
@@ -111,6 +104,8 @@ def process_call_checklist(db: Session, lead_id: int, payload: CallChecklistCrea
     if not lead:
         raise HTTPException(status_code=404, detail="Lead not found")
 
+    if lead.status not in (LeadStatus.NEW, LeadStatus.CONTACTED, LeadStatus.QUALIFIED):
+        raise HTTPException(status_code=400, detail=f"Call checklist can only be recorded before the survey (lead is {lead.status.value})")
     old_status = lead.status.value
 
     # Create or update checklist
@@ -147,6 +142,8 @@ def process_call_checklist(db: Session, lead_id: int, payload: CallChecklistCrea
         user_id=current_user_id,
     )
     db.add(audit)
+    events.emit(db, "lead.updated", {"lead_id": lead.id, "status": lead.status.value},
+                user_ids=[lead.assigned_to_id, lead.customer.user_id if lead.customer else None], roles=[UserRole.ADMIN])
 
     db.commit()
     db.refresh(lead)
@@ -174,3 +171,14 @@ def soft_delete_lead(db: Session, lead_id: int, current_user_id: int) -> Lead:
     db.commit()
     db.refresh(lead)
     return lead
+
+
+def notify_new_lead(db: Session, lead: Lead) -> None:
+    """New lead hand-off to the assigned sales user (live + notification)."""
+    events.emit(
+        db, "lead.created", {"lead_id": lead.id, "name": lead.name},
+        user_ids=[lead.assigned_to_id], roles=[UserRole.ADMIN],
+        title="New lead assigned",
+        message=f"New lead from {lead.name} for {lead.required_capacity} kW {lead.system_type}.",
+        link=f"/web/crm/{lead.id}",
+    )

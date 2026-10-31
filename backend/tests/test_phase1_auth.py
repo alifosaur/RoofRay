@@ -29,7 +29,7 @@ def test_role_enforcement_admin_endpoint():
     admin_res = client.get("/api/users", headers={"Authorization": "Bearer admin_uid"})
     assert admin_res.status_code == 200
     users = admin_res.json()
-    assert len(users) >= 6
+    assert len(users) >= 5  # the five test accounts created in conftest
 
     # Technician access to admin-only endpoint fails with 403
     tech_res = client.get("/api/users", headers={"Authorization": "Bearer tech_uid"})

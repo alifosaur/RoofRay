@@ -41,9 +41,10 @@ class TimesheetOut(BaseModel):
 
 class JobCompleteRequest(BaseModel):
     confirmed_capacity_kw: float
-    power_generating: bool = True
-    customer_name: str = "Customer"
-    signature_data: str = ""  # Base64 canvas data or signature URL
+    power_generating: bool          # power-generation test result
+    customer_name: str              # name of the person signing on site
+    signature_data: str             # Base64 canvas data of the customer's signature
+    start_time: Optional[datetime] = None   # defaults to when the job was started
     finish_time: Optional[datetime] = None
     generation_reading_kw: Optional[float] = None
     inverter_serial: Optional[str] = None
@@ -82,6 +83,9 @@ class InstallationJobOut(BaseModel):
     customer_phone: Optional[str] = None
     site_address: Optional[str] = None
     capacity_kw: Optional[float] = None
+    bom: List[dict] = []
+    delivered_serials: List[dict] = []
+    is_released: bool = False
     started_at: Optional[datetime] = None
     finished_at: Optional[datetime] = None
     confirmed_capacity_kw: Optional[float] = None

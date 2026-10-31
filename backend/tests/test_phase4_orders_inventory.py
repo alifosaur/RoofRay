@@ -2,6 +2,7 @@ import pytest
 from datetime import datetime, timedelta
 from fastapi.testclient import TestClient
 from app.main import app
+from tests.helpers import SALES, call_checklist, send_and_accept, confirm_with_advance, ship_to_delivered, scan_all_serials, advance
 
 client = TestClient(app)
 admin_headers = {"Authorization": "Bearer admin_uid"}
@@ -56,6 +57,7 @@ def test_order_confirmation_automation_and_payment():
     }).json()
 
     tech_id = client.get("/api/users?role=technician", headers=admin_headers).json()[0]["id"]
+    call_checklist(client, lead["id"], sales_headers)
     survey = client.post("/api/surveys", headers=sales_headers, json={
         "lead_id": lead["id"],
         "technician_id": tech_id,
@@ -77,11 +79,12 @@ def test_order_confirmation_automation_and_payment():
         "template_id": template_id,
     }).json()
 
-    accept_res = client.post(f"/api/quotes/{quote['id']}/accept", headers=sales_headers)
+    accept_res = send_and_accept(client, quote['id'], sales_headers)
     order_id = accept_res.json()["order_id"]
 
     # 1. Confirm Order
-    confirm_res = client.post(f"/api/orders/{order_id}/confirm", headers=sales_headers)
+    confirm_res = confirm_with_advance(client, order_id, sales_headers)
+    advance_paid = client.get(f"/api/orders/{order_id}", headers=sales_headers).json()["paid_amount"]
     assert confirm_res.status_code == 200
     order_data = confirm_res.json()
     assert order_data["status"] == "CONFIRMED"
@@ -105,9 +108,14 @@ def test_order_confirmation_automation_and_payment():
 
     # Verify order paid_amount updated
     order_after_pay = client.get(f"/api/orders/{order_id}", headers=sales_headers).json()
-    assert order_after_pay["paid_amount"] == 50000.0
+    assert order_after_pay["paid_amount"] == round(advance_paid + 50000.0, 2)
 
-    # 3. Warehouse Packs Pick List
+    # 3. Packing is blocked until every serialised item is scanned (scan gate)
+    blocked = client.put(f"/api/inventory/pick-lists/{matching_pick['id']}/pack", headers=warehouse_headers)
+    assert blocked.status_code == 400 and "serialised" in blocked.json()["detail"]
+    scan_all_serials(client, order_id, warehouse_headers)
+
+    # Warehouse packs the pick list
     pack_res = client.put(f"/api/inventory/pick-lists/{matching_pick['id']}/pack", headers=warehouse_headers)
     assert pack_res.status_code == 200
     assert pack_res.json()["status"] == "PACKED"

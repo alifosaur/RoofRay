@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.models.user import UserRole
 from app.models.order import OrderStatus
+from tests.helpers import confirmed_order, SALES, call_checklist, send_and_accept, confirm_with_advance, ship_to_delivered, scan_all_serials, advance
 
 client = TestClient(app)
 
@@ -130,10 +131,11 @@ def test_technician_object_level_isolation():
     })
     lead_id = lead_res.json()["id"]
 
-    techs = client.get("/api/users?role=technician", headers=admin_headers).json()
+    techs = [t for t in client.get("/api/users?role=technician", headers=admin_headers).json() if t["is_active"]]
     tech1 = techs[0]
     tech2 = techs[1]
 
+    call_checklist(client, lead_id, sales_headers)
     survey_res = client.post("/api/surveys", headers=sales_headers, json={
         "lead_id": lead_id,
         "technician_id": tech1["id"],
@@ -182,10 +184,9 @@ def test_customer_object_level_isolation():
     })
     token_b = {"Authorization": f"Bearer {res_b.json()['access_token']}"}
 
-    # Fetch quotes as Admin to get an existing quote belonging to someone else
-    admin_quotes = client.get("/api/quotes", headers=admin_headers).json()
-    assert len(admin_quotes) > 0
-    foreign_quote_id = admin_quotes[0]["id"]
+    # A quote and order that belong to a different customer
+    foreign = confirmed_order(client, "Foreign Customer")
+    foreign_quote_id = foreign["quote"]["id"]
 
     # Customer A attempting to view foreign quote MUST fail with 403 Forbidden!
     cust_view_quote = client.get(f"/api/quotes/{foreign_quote_id}", headers=token_a)
@@ -196,9 +197,7 @@ def test_customer_object_level_isolation():
     assert cust_b_view.status_code == 403
 
     # Customer attempting to view foreign order
-    admin_orders = client.get("/api/orders", headers=admin_headers).json()
-    assert len(admin_orders) > 0
-    foreign_order_id = admin_orders[0]["id"]
+    foreign_order_id = foreign["order_id"]
 
     cust_view_order = client.get(f"/api/orders/{foreign_order_id}", headers=token_a)
     assert cust_view_order.status_code == 403

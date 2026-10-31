@@ -31,7 +31,9 @@ from app.schemas.customer import (
     GovernmentSchemeOut,
     CustomerSubsidyOut,
 )
-from app.services import lead_service, quote_service, ticket_service, subsidy_service
+from app.services import lead_service, quote_service, ticket_service, subsidy_service, audit_service
+from app.core import events
+from pydantic import BaseModel
 
 router = APIRouter(prefix="/customer", tags=["Customer Portal"])
 
@@ -52,6 +54,12 @@ def _get_customer_profile(db: Session, current_user: User) -> Optional[Customer]
             db.commit()
             db.refresh(cust)
     return cust
+
+
+FULFILMENT_ORDER = [
+    OrderStatus.CONFIRMED, OrderStatus.PACKING, OrderStatus.PACKED, OrderStatus.DISPATCHED,
+    OrderStatus.OUT_FOR_DELIVERY, OrderStatus.DELIVERED, OrderStatus.INSTALLED, OrderStatus.CLOSED,
+]
 
 
 @router.post("/enquiry", response_model=CustomerEnquiryResponse, status_code=status.HTTP_201_CREATED)
@@ -105,7 +113,7 @@ def submit_customer_enquiry(
         roof_area_sqft=roof_area,
         shadow_free_area_sqft=payload.shadow_free_area_sqft,
         floor_number=payload.floor_number or 1,
-        roof_direction=payload.roof_direction or "South",
+        roof_direction=payload.roof_direction,
         monthly_bill_amount=payload.monthly_bill_amount,
         required_capacity=payload.preferred_capacity_kw,
         system_type=payload.preferred_system_type,
@@ -118,17 +126,6 @@ def submit_customer_enquiry(
     db.add(lead)
     db.flush()
 
-    # 5. Pre-create CallChecklist if roof measurements were entered
-    if payload.shadow_free_area_sqft or payload.monthly_bill_amount:
-        chk = CallChecklist(
-            lead_id=lead.id,
-            shadow_free_area_sqft=payload.shadow_free_area_sqft or (roof_area * 0.7 if roof_area else 250.0),
-            monthly_bill_amount=payload.monthly_bill_amount or 3500.0,
-            is_grid_suitable=True if payload.preferred_system_type == "On-Grid" else False,
-            remarks=f"Portal measurements: Property={payload.property_type}, Roof={payload.roof_type}, Direction={payload.roof_direction}",
-        )
-        db.add(chk)
-
     # 6. Audit & Notification
     audit = AuditLog(
         record_type="lead",
@@ -140,14 +137,7 @@ def submit_customer_enquiry(
     )
     db.add(audit)
 
-    if assigned_id:
-        notif = Notification(
-            user_id=assigned_id,
-            title="New Customer Portal Lead",
-            message=f"{payload.name} submitted an enquiry for {payload.preferred_capacity_kw} kW {payload.preferred_system_type} in {payload.city or 'local'}.",
-            link=f"/crm/leads/{lead.id}",
-        )
-        db.add(notif)
+    lead_service.notify_new_lead(db, lead)
 
     db.commit()
     db.refresh(lead)
@@ -249,7 +239,7 @@ def get_customer_tracker(
     }
 
     # Stage 4: Survey done
-    survey_approved = survey is not None and survey.status == SurveyStatus.APPROVED
+    survey_approved = survey is not None and survey.status in (SurveyStatus.COMPLETED, SurveyStatus.APPROVED)
     evaluations["survey_done"] = {
         "completed": survey_approved,
         "date": survey.approved_at.strftime("%Y-%m-%d") if (survey and survey.approved_at) else (survey.updated_at.strftime("%Y-%m-%d") if survey else None),
@@ -257,8 +247,7 @@ def get_customer_tracker(
     }
 
     # Stage 5: Quotation ready
-    # Quotes are created as DRAFT and nothing moves them to SENT, so any non-rejected quote is visible to the customer
-    quote_ready = quote is not None and quote.status != QuoteStatus.REJECTED
+    quote_ready = quote is not None and quote.status in (QuoteStatus.SENT, QuoteStatus.ACCEPTED)
     evaluations["quotation_ready"] = {
         "completed": quote_ready or order is not None,
         "date": quote.created_at.strftime("%Y-%m-%d") if quote else None,
@@ -269,14 +258,13 @@ def get_customer_tracker(
     order_confirmed = order is not None and order.status != OrderStatus.DRAFT
     evaluations["order_confirmed"] = {
         "completed": order_confirmed,
-        "date": order.created_at.strftime("%Y-%m-%d") if order else None,
+        "date": order.confirmed_at.strftime("%Y-%m-%d") if (order and order.confirmed_at) else None,
         "desc": f"Sales Order {order.order_number} confirmed with advance payment" if order_confirmed else "Customer quotation approval & advance booking",
     }
 
     # Stage 7: Packing
-    packing_ok = order is not None and order.status in [
-        OrderStatus.PACKED, OrderStatus.DISPATCHED, OrderStatus.DELIVERED, OrderStatus.INSTALLED, OrderStatus.CLOSED
-    ]
+    stage_idx = FULFILMENT_ORDER.index(order.status) if (order and order.status in FULFILMENT_ORDER) else -1
+    packing_ok = stage_idx >= FULFILMENT_ORDER.index(OrderStatus.PACKED)
     evaluations["packing"] = {
         "completed": packing_ok,
         "date": order.updated_at.strftime("%Y-%m-%d") if packing_ok else None,
@@ -284,9 +272,7 @@ def get_customer_tracker(
     }
 
     # Stage 8: Dispatched
-    dispatched_ok = order is not None and order.status in [
-        OrderStatus.DISPATCHED, OrderStatus.DELIVERED, OrderStatus.INSTALLED, OrderStatus.CLOSED
-    ]
+    dispatched_ok = stage_idx >= FULFILMENT_ORDER.index(OrderStatus.DISPATCHED)
     evaluations["dispatched"] = {
         "completed": dispatched_ok,
         "date": order.updated_at.strftime("%Y-%m-%d") if dispatched_ok else None,
@@ -294,9 +280,7 @@ def get_customer_tracker(
     }
 
     # Stage 9: Out for delivery
-    out_ok = order is not None and order.status in [
-        OrderStatus.DISPATCHED, OrderStatus.DELIVERED, OrderStatus.INSTALLED, OrderStatus.CLOSED
-    ]
+    out_ok = stage_idx >= FULFILMENT_ORDER.index(OrderStatus.OUT_FOR_DELIVERY)
     evaluations["out_for_delivery"] = {
         "completed": out_ok,
         "date": order.updated_at.strftime("%Y-%m-%d") if out_ok else None,
@@ -312,7 +296,8 @@ def get_customer_tracker(
     }
 
     # Stage 11: Installation scheduled
-    job_scheduled = job is not None and job.scheduled_date is not None
+    # The install job is released to the technician on delivery
+    job_scheduled = job is not None and delivered_ok
     evaluations["installation_scheduled"] = {
         "completed": job_scheduled,
         "date": job.scheduled_date.strftime("%Y-%m-%d") if (job and job.scheduled_date) else None,
@@ -586,6 +571,7 @@ def raise_customer_ticket(
         user_id=current_user.id,
     )
     db.add(audit)
+    ticket_service.ticket_event(db, ticket, "raised by customer")
     db.commit()
     db.refresh(ticket)
 
@@ -636,6 +622,61 @@ def list_solar_packages(db: Session = Depends(get_db)):
 def list_government_schemes(db: Session = Depends(get_db)):
     """List active government solar subsidy schemes (PM Surya Ghar, state subsidies)."""
     return db.query(GovernmentScheme).filter(GovernmentScheme.is_active == True).order_by(GovernmentScheme.id.asc()).all()
+
+
+class SchemeIn(BaseModel):
+    name: str
+    description: str
+    eligibility: str
+    benefit_amounts: str
+    how_to_apply: str
+    official_link: str = "https://pmsuryaghar.gov.in"
+    state: str = "National / All India"
+    is_active: bool = True
+    is_announcement: bool = False
+    announcement_text: Optional[str] = None
+    cfa_per_kw_first_2kw: float = 0.0
+    cfa_per_kw_3rd_kw: float = 0.0
+    cfa_max: float = 0.0
+    state_topup_per_kw: float = 0.0
+    grid_connected_only: bool = True
+
+
+@router.get("/schemes/all", response_model=List[GovernmentSchemeOut])
+def list_all_schemes(db: Session = Depends(get_db), current_user: User = Depends(require_role(UserRole.ADMIN))):
+    return db.query(GovernmentScheme).order_by(GovernmentScheme.id.asc()).all()
+
+
+@router.post("/schemes", response_model=GovernmentSchemeOut, status_code=status.HTTP_201_CREATED)
+def create_scheme(payload: SchemeIn, db: Session = Depends(get_db), current_user: User = Depends(require_role(UserRole.ADMIN))):
+    scheme = GovernmentScheme(**payload.model_dump())
+    db.add(scheme)
+    db.flush()
+    db.add(AuditLog(record_type="scheme", record_id=scheme.id, action="SCHEME_CREATED", notes=scheme.name, user_id=current_user.id))
+    _announce_scheme(db, scheme)
+    db.commit()
+    db.refresh(scheme)
+    return scheme
+
+
+@router.put("/schemes/{scheme_id}", response_model=GovernmentSchemeOut)
+def update_scheme(scheme_id: int, payload: SchemeIn, db: Session = Depends(get_db),
+                  current_user: User = Depends(require_role(UserRole.ADMIN))):
+    scheme = db.query(GovernmentScheme).filter(GovernmentScheme.id == scheme_id).first()
+    if not scheme:
+        raise HTTPException(status_code=404, detail="Scheme not found")
+    audit_service.apply_changes(db, "scheme", scheme, payload.model_dump(), current_user.id)
+    _announce_scheme(db, scheme)
+    db.commit()
+    db.refresh(scheme)
+    return scheme
+
+
+def _announce_scheme(db: Session, scheme: GovernmentScheme) -> None:
+    """Scheme updates are pushed to customers' portals (government scheme updates)."""
+    events.emit(db, "scheme.updated", {"scheme_id": scheme.id}, roles=[UserRole.CUSTOMER, UserRole.ADMIN, UserRole.SALES],
+                title=f"Scheme update: {scheme.name}" if scheme.is_announcement else None,
+                message=scheme.announcement_text or scheme.description[:200])
 
 
 @router.post("/schemes/estimate", response_model=SubsidyEstimatorResponse)

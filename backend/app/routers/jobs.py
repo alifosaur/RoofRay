@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, s
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.models.order import Order, OrderStatus
 from app.core.security import get_current_user, require_role
 from app.models.user import User, UserRole
 from app.models.job import InstallationJob, JobStatus
@@ -48,7 +49,8 @@ def get_my_schedule(
     """Returns today and upcoming jobs for the logged in technician (or all for managers)."""
     query = db.query(InstallationJob)
     if current_user.role == UserRole.TECHNICIAN:
-        query = query.filter(InstallationJob.technician_id == current_user.id)
+        # Hidden until the warehouse marks the order DELIVERED
+        query = query.filter(InstallationJob.technician_id == current_user.id, InstallationJob.order.has(Order.status.in_([OrderStatus.DELIVERED, OrderStatus.INSTALLED, OrderStatus.CLOSED])))
     return query.order_by(InstallationJob.scheduled_date.asc()).all()
 
 
@@ -61,7 +63,7 @@ def list_jobs(
 ):
     query = db.query(InstallationJob)
     if current_user.role == UserRole.TECHNICIAN:
-        query = query.filter(InstallationJob.technician_id == current_user.id)
+        query = query.filter(InstallationJob.technician_id == current_user.id, InstallationJob.order.has(Order.status.in_([OrderStatus.DELIVERED, OrderStatus.INSTALLED, OrderStatus.CLOSED])))
     elif technician_id and current_user.role == UserRole.ADMIN:
         query = query.filter(InstallationJob.technician_id == technician_id)
 
@@ -80,10 +82,10 @@ def get_job(
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
-    if current_user.role == UserRole.TECHNICIAN and job.technician_id != current_user.id:
+    if current_user.role == UserRole.TECHNICIAN and (job.technician_id != current_user.id or not job.is_released):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Forbidden: You cannot view another technician's job",
+            detail="Forbidden: this job is not assigned to you or not released yet",
         )
     return job
 

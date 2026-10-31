@@ -9,6 +9,7 @@ from app.models.serial import SerialItem
 from app.models.finance import Invoice, InvoiceType, InvoiceStatus, InvoiceLine
 from app.models.audit import AuditLog
 from app.models.user import User, UserRole
+from app.core import events
 from app.schemas.ticket import TicketCreate, TicketResolveRequest, WarrantyLookupResult
 
 
@@ -88,6 +89,16 @@ def lookup_customer_support(db: Session, query_str: str) -> List[WarrantyLookupR
     return results
 
 
+def ticket_event(db: Session, ticket: Ticket, title: str) -> None:
+    events.emit(
+        db, "ticket.updated", {"ticket_id": ticket.id, "status": ticket.status.value},
+        user_ids=[ticket.assigned_to_id, ticket.customer.user_id if ticket.customer else None],
+        roles=[UserRole.ADMIN, UserRole.SALES],
+        title=f"Ticket {ticket.ticket_number}: {title}",
+        message=f"{ticket.subject} — {ticket.status.value.replace('_', ' ').lower()}",
+    )
+
+
 def assign_first_technician(db: Session, ticket: Ticket) -> None:
     # Same assignment rule as installation jobs: first active technician
     tech = db.query(User).filter(User.role == UserRole.TECHNICIAN, User.is_active == True).first()
@@ -141,6 +152,7 @@ def create_ticket(db: Session, payload: TicketCreate, current_user_id: int) -> T
     )
     db.add(audit)
 
+    ticket_event(db, ticket, "created")
     db.commit()
     db.refresh(ticket)
     return ticket
@@ -151,6 +163,9 @@ def resolve_ticket(db: Session, ticket_id: int, payload: TicketResolveRequest, c
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
 
+    if ticket.status not in (TicketStatus.OPEN, TicketStatus.ASSIGNED, TicketStatus.IN_PROGRESS):
+        raise HTTPException(status_code=400, detail=f"Ticket is already {ticket.status.value}")
+    old_status = ticket.status.value
     ticket.status = TicketStatus.RESOLVED
     ticket.resolved_at = datetime.utcnow()
     ticket.resolution_notes = payload.resolution_notes
@@ -203,13 +218,14 @@ def resolve_ticket(db: Session, ticket_id: int, payload: TicketResolveRequest, c
         record_type="ticket",
         record_id=ticket.id,
         action="TICKET_RESOLVED",
-        from_status=TicketStatus.IN_PROGRESS.value,
+        from_status=old_status,
         to_status=TicketStatus.RESOLVED.value,
         notes=f"Ticket resolved. Cost: ₹{total_cost:,.2f}. Billable: {ticket.is_billable}.",
         user_id=current_user_id,
     )
     db.add(audit)
 
+    ticket_event(db, ticket, "resolved")
     db.commit()
     db.refresh(ticket)
     return ticket
@@ -241,6 +257,7 @@ def customer_confirm_ticket(db: Session, ticket_id: int, current_user_id: int) -
     )
     db.add(audit)
 
+    ticket_event(db, ticket, "confirmed by customer")
     db.commit()
     db.refresh(ticket)
     return ticket
@@ -272,6 +289,7 @@ def close_ticket(db: Session, ticket_id: int, current_user_id: int) -> Ticket:
     )
     db.add(audit)
 
+    ticket_event(db, ticket, "closed")
     db.commit()
     db.refresh(ticket)
     return ticket

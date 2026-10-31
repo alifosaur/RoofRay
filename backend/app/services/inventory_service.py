@@ -6,6 +6,8 @@ from app.models.product import Product, ProductCategory
 from app.models.order import Order, OrderStatus
 from app.models.audit import AuditLog
 from app.schemas.inventory import StockMovementCreate
+from app.core import events
+from app.models.user import UserRole
 
 
 def record_purchase_movement(db: Session, payload: StockMovementCreate, current_user_id: int) -> StockMovement:
@@ -35,6 +37,7 @@ def record_purchase_movement(db: Session, payload: StockMovementCreate, current_
         user_id=current_user_id,
     )
     db.add(audit)
+    events.emit(db, "stock.purchased", {"product_id": product.id, "quantity": payload.quantity}, roles=[UserRole.WAREHOUSE, UserRole.ADMIN])
 
     db.commit()
     db.refresh(movement)
@@ -48,7 +51,13 @@ def pack_pick_list(db: Session, pick_list_id: int, current_user_id: int) -> Pick
 
     if pick_list.status == "PACKED":
         raise HTTPException(status_code=400, detail="Pick list is already packed")
+    if pick_list.order.status not in (OrderStatus.CONFIRMED, OrderStatus.PACKING):
+        raise HTTPException(status_code=400, detail=f"Order is {pick_list.order.status.value}; only confirmed/packing orders can be packed")
 
+    from app.services.dispatch_service import missing_serialised
+    missing = missing_serialised(db, pick_list.order)
+    if missing:
+        raise HTTPException(status_code=400, detail=f"Scan every serialised item before packing. Missing: {', '.join(missing)}")
     short = [
         f"{l.product.name} (need {l.required_qty}, have {l.product.stock_quantity})"
         for l in pick_list.lines
@@ -92,6 +101,8 @@ def pack_pick_list(db: Session, pick_list_id: int, current_user_id: int) -> Pick
             user_id=current_user_id,
         )
         db.add(audit)
+        from app.services.dispatch_service import _stage_event
+        _stage_event(db, order, OrderStatus.PACKED)
 
     db.commit()
     db.refresh(pick_list)

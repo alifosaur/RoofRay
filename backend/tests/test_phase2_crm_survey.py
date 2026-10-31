@@ -2,6 +2,7 @@ import pytest
 from datetime import datetime, timedelta
 from fastapi.testclient import TestClient
 from app.main import app
+from tests.helpers import SALES, call_checklist, send_and_accept, confirm_with_advance, ship_to_delivered, scan_all_serials, advance
 
 client = TestClient(app)
 
@@ -115,6 +116,7 @@ def test_survey_workflow():
 
     # 2. Schedule survey
     survey_date = (datetime.utcnow() + timedelta(days=2)).isoformat()
+    call_checklist(client, lead_id, sales_headers)
     sched_res = client.post("/api/surveys", headers=sales_headers, json={
         "lead_id": lead_id,
         "technician_id": tech_id,

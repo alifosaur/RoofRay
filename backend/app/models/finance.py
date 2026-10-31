@@ -18,15 +18,20 @@ class InvoiceStatus(str, enum.Enum):
 
 
 class SubsidyStatus(str, enum.Enum):
+    # Ordered: each step may only move to the next one (or to REJECTED)
     NOT_APPLIED = "NOT_APPLIED"
-    APPLIED = "APPLIED"
-    APPLICATION_SUBMITTED = "APPLICATION_SUBMITTED"
-    DISCOM_FEASIBILITY_APPROVED = "DISCOM_FEASIBILITY_APPROVED"
-    INSTALLATION_INSPECTION_DONE = "INSTALLATION_INSPECTION_DONE"
-    SUBSIDY_CLAIMED = "SUBSIDY_CLAIMED"
+    ELIGIBILITY_CHECKED = "ELIGIBILITY_CHECKED"
+    REGISTERED = "REGISTERED"
+    FEASIBILITY_APPROVED = "FEASIBILITY_APPROVED"
+    INSTALLATION_DONE = "INSTALLATION_DONE"
+    INSPECTION_COMMISSIONING = "INSPECTION_COMMISSIONING"
+    CLAIM_SUBMITTED = "CLAIM_SUBMITTED"
     APPROVED = "APPROVED"
     DISBURSED = "DISBURSED"
     REJECTED = "REJECTED"
+
+
+SUBSIDY_STEPS = [s for s in SubsidyStatus if s != SubsidyStatus.REJECTED]
 
 
 class Invoice(Base):
@@ -90,6 +95,24 @@ class SubsidyRecord(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     order = relationship("Order", back_populates="subsidy_record")
+    events = relationship("SubsidyEvent", back_populates="subsidy", cascade="all, delete-orphan", order_by="SubsidyEvent.id")
+
+
+class SubsidyEvent(Base):
+    """One row per subsidy tracker step: date, reference number and optional document."""
+    __tablename__ = "subsidy_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    subsidy_id = Column(Integer, ForeignKey("subsidy_records.id"), nullable=False, index=True)
+    status = Column(Enum(SubsidyStatus), nullable=False)
+    event_date = Column(Date, nullable=False)
+    reference_no = Column(String(128), nullable=True)
+    document_url = Column(String(512), nullable=True)
+    notes = Column(Text, nullable=True)
+    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    subsidy = relationship("SubsidyRecord", back_populates="events")
 
 
 class TechnicianPayout(Base):

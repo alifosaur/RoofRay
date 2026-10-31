@@ -66,8 +66,9 @@ def test_customer_enquiry_submission_and_round_robin():
     assert lead.source == "customer_portal"
     assert lead.roof_area_sqft == 500.0  # 25 * 20
     assert lead.assigned_to_id is not None
-    assert lead.call_checklist is not None
-    assert lead.call_checklist.monthly_bill_amount == 4200.0
+    # Measurements live on the lead; the call checklist is recorded by sales after calling
+    assert lead.monthly_bill_amount == 4200.0
+    assert lead.call_checklist is None
     db.close()
 
 

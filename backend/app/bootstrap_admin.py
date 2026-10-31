@@ -16,10 +16,12 @@ from app.core import security
 from app.models.user import User, UserRole
 
 
-def bootstrap_admin(email: str, name: str, password: str = None) -> User:
-    Base.metadata.create_all(bind=engine)
+def bootstrap_admin(email: str, name: str, password: str = None, db=None) -> User:
+    own_session = db is None
+    if own_session:
+        Base.metadata.create_all(bind=engine)
+        db = SessionLocal()
     email = email.lower().strip()
-    db = SessionLocal()
     try:
         if db.query(User).filter(User.email == email).first():
             raise SystemExit(f"A user with email {email} already exists.")
@@ -39,7 +41,8 @@ def bootstrap_admin(email: str, name: str, password: str = None) -> User:
         db.refresh(user)
         return user
     finally:
-        db.close()
+        if own_session:
+            db.close()
 
 
 if __name__ == "__main__":

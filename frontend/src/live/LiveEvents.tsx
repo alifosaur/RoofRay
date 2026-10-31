@@ -17,7 +17,7 @@ const EVENT_TYPES = [
   'quote.created', 'quote.sent', 'quote.accepted', 'order.payment', 'order.confirmed', 'order.stage_changed',
   'order.delivered', 'order.closed', 'serial.scanned', 'job.released', 'job.started', 'job.completed',
   'invoice.issued', 'ticket.created', 'ticket.updated', 'subsidy.updated', 'finance.expense_recorded',
-  'stock.purchased', 'payout.paid',
+  'stock.purchased', 'payout.paid', 'scheme.updated', 'order.closed',
 ];
 
 /** One EventSource per signed-in session, shared by every screen. */

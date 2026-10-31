@@ -1,3 +1,4 @@
+from datetime import date, datetime, timedelta
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -6,6 +7,8 @@ from app.core import security
 from app.core.security import require_role
 from app.models.audit import AuditLog
 from app.models.user import User, UserRole
+from app.models.survey import Survey, SurveyStatus
+from app.models.job import InstallationJob, JobStatus
 from app.schemas.user import StaffCreateRequest, StaffCreateResponse, UserUpdate, UserOut
 from app.services import audit_service
 
@@ -64,6 +67,33 @@ def create_user(
     if security.AUTH_MODE == "local":
         setup_url = f"/set-password?token={security.issue_password_setup_token(user.firebase_uid)}"
     return StaffCreateResponse(user=user, auth_mode=security.AUTH_MODE, password_setup_url=setup_url)
+
+
+@router.get("/technicians/availability")
+def technician_availability(
+    start: Optional[date] = None,
+    days: int = 7,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.ADMIN, UserRole.SALES)),
+):
+    """Calendar view for assigning surveys: each technician's surveys and install jobs per day."""
+    start = start or date.today()
+    end = start + timedelta(days=min(max(days, 1), 31))
+    lo, hi = datetime.combine(start, datetime.min.time()), datetime.combine(end, datetime.min.time())
+    out = []
+    for tech in db.query(User).filter(User.role == UserRole.TECHNICIAN, User.is_active == True).order_by(User.full_name).all():
+        bookings = [
+            {"type": "survey", "id": s.id, "at": s.scheduled_date, "label": s.lead.name if s.lead else "", "status": s.status.value}
+            for s in db.query(Survey).filter(Survey.technician_id == tech.id, Survey.scheduled_date >= lo, Survey.scheduled_date < hi,
+                                             Survey.status == SurveyStatus.SCHEDULED)
+        ] + [
+            {"type": "install", "id": j.id, "at": j.scheduled_date, "label": j.customer_name or "", "status": j.status.value}
+            for j in db.query(InstallationJob).filter(InstallationJob.technician_id == tech.id, InstallationJob.scheduled_date >= lo,
+                                                      InstallationJob.scheduled_date < hi,
+                                                      InstallationJob.status.in_([JobStatus.SCHEDULED, JobStatus.IN_PROGRESS]))
+        ]
+        out.append({"technician_id": tech.id, "name": tech.full_name, "bookings": sorted(bookings, key=lambda b: b["at"])})
+    return {"start": start, "end": end, "technicians": out}
 
 
 @router.get("/{user_id}", response_model=UserOut)

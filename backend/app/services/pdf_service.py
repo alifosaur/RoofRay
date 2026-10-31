@@ -155,3 +155,45 @@ def generate_quote_pdf(quote, customer, lead, template_name: str) -> str:
     doc.build(story)
     return pdf_path
 
+
+
+def generate_invoice_pdf(invoice) -> bytes:
+    """Invoice PDF built from the stored invoice and its lines."""
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
+    styles = getSampleStyleSheet()
+    cust = invoice.customer
+    story = [
+        Paragraph(f"{settings.PROJECT_NAME} — Tax Invoice", styles["Title"]),
+        Paragraph(settings.COMPANY_CONTACT_LINE, styles["Normal"]),
+        Spacer(1, 10),
+        Paragraph(
+            f"<b>Invoice:</b> {invoice.invoice_number}<br/><b>Date:</b> {invoice.created_at:%d-%b-%Y}"
+            f"<br/><b>Due:</b> {invoice.due_date:%d-%b-%Y}" if invoice.due_date else
+            f"<b>Invoice:</b> {invoice.invoice_number}<br/><b>Date:</b> {invoice.created_at:%d-%b-%Y}",
+            styles["Normal"],
+        ),
+        Paragraph(f"<b>Bill to:</b> {cust.name}<br/>{cust.address or ''}<br/>{cust.phone}", styles["Normal"]),
+        Spacer(1, 12),
+    ]
+    rows = [["Description", "Qty", "Unit price (Rs)", "Amount (Rs)"]]
+    for l in invoice.lines:
+        rows.append([Paragraph(l.description, styles["Normal"]), str(l.quantity), f"{l.unit_price:,.2f}", f"{l.amount:,.2f}"])
+    rows += [
+        ["", "", "Subtotal", f"{invoice.subtotal:,.2f}"],
+        ["", "", "Tax", f"{invoice.tax_amount:,.2f}"],
+        ["", "", "Total", f"{invoice.total_amount:,.2f}"],
+    ]
+    if invoice.order:
+        rows.append(["", "", "Paid", f"{invoice.order.paid_amount:,.2f}"])
+    t = Table(rows, colWidths=[300, 50, 100, 100], repeatRows=1)
+    t.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#714B67")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("GRID", (0, 0), (-1, len(invoice.lines)), 0.5, colors.lightgrey),
+        ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
+        ("FONTNAME", (2, -3), (-1, -1), "Helvetica-Bold"),
+    ]))
+    story += [t, Spacer(1, 12), Paragraph(f"Status: {invoice.status.value}", styles["Normal"])]
+    doc.build(story)
+    return buf.getvalue()

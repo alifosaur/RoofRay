@@ -7,6 +7,7 @@ from app.models.user import User, UserRole
 from app.models.audit import AuditLog
 from app.models.notification import Notification
 from app.schemas.survey import SurveyCreate, SurveyComplete
+from app.core import events
 
 
 def schedule_survey(db: Session, payload: SurveyCreate, current_user_id: int) -> Survey:
@@ -14,9 +15,13 @@ def schedule_survey(db: Session, payload: SurveyCreate, current_user_id: int) ->
     if not lead:
         raise HTTPException(status_code=404, detail="Lead not found")
 
-    tech = db.query(User).filter(User.id == payload.technician_id, User.role == UserRole.TECHNICIAN).first()
+    if lead.status not in (LeadStatus.NEW, LeadStatus.CONTACTED, LeadStatus.QUALIFIED):
+        raise HTTPException(status_code=400, detail=f"A survey cannot be scheduled for a lead in status {lead.status.value}")
+    if lead.survey:
+        raise HTTPException(status_code=400, detail="This lead already has a site survey")
+    tech = db.query(User).filter(User.id == payload.technician_id, User.role == UserRole.TECHNICIAN, User.is_active == True).first()
     if not tech:
-        raise HTTPException(status_code=404, detail="Technician not found or not a technician")
+        raise HTTPException(status_code=404, detail="Technician not found or inactive")
 
     survey = Survey(
         lead_id=lead.id,
@@ -43,13 +48,14 @@ def schedule_survey(db: Session, payload: SurveyCreate, current_user_id: int) ->
     )
     db.add(audit_lead)
 
-    notif = Notification(
-        user_id=tech.id,
-        title="Site Survey Assigned",
-        message=f"You have been assigned to survey {lead.name} at {lead.address}.",
-        link=f"/surveys/{survey.id}",
+    events.emit(
+        db, "survey.assigned", {"survey_id": survey.id, "lead_id": lead.id},
+        user_ids=[tech.id, lead.customer.user_id if lead.customer else None],
+        roles=[UserRole.ADMIN],
+        title="Site survey assigned",
+        message=f"Survey for {lead.name} at {lead.address} on {payload.scheduled_date:%d %b %Y %H:%M}.",
+        link="/technician",
     )
-    db.add(notif)
 
     db.commit()
     db.refresh(survey)
@@ -60,7 +66,12 @@ def complete_survey(db: Session, survey_id: int, payload: SurveyComplete, curren
     survey = db.query(Survey).filter(Survey.id == survey_id).first()
     if not survey:
         raise HTTPException(status_code=404, detail="Survey not found")
+    if survey.status != SurveyStatus.SCHEDULED:
+        raise HTTPException(status_code=400, detail=f"Only scheduled surveys can be submitted (current: {survey.status.value})")
 
+    for field in ("address_confirmed", "roof_length_ft", "roof_width_ft", "shadow_free_area_sqft", "out_of_shade_zone", "shade_notes"):
+        setattr(survey, field, getattr(payload, field))
+    survey.submitted_at = datetime.utcnow()
     survey.roof_direction = payload.roof_direction
     survey.roof_tilt_deg = payload.roof_tilt_deg
     survey.cable_distance_meters = payload.cable_distance_meters
@@ -77,6 +88,15 @@ def complete_survey(db: Session, survey_id: int, payload: SurveyComplete, curren
         user_id=current_user_id,
     )
     db.add(audit)
+    lead = survey.lead
+    events.emit(
+        db, "survey.submitted", {"survey_id": survey.id, "lead_id": survey.lead_id},
+        user_ids=[lead.assigned_to_id, lead.customer.user_id if lead.customer else None],
+        roles=[UserRole.ADMIN],
+        title="Site survey submitted for review",
+        message=f"Survey for {lead.name} is ready for your approval.",
+        link=f"/web/crm/{lead.id}",
+    )
 
     db.commit()
     db.refresh(survey)
@@ -88,10 +108,10 @@ def approve_survey(db: Session, survey_id: int, approved_by_id: int) -> Survey:
     if not survey:
         raise HTTPException(status_code=404, detail="Survey not found")
 
-    if survey.status not in [SurveyStatus.COMPLETED, SurveyStatus.SCHEDULED]:
+    if survey.status != SurveyStatus.COMPLETED:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Only scheduled or completed surveys can be approved. Current status: {survey.status.value}",
+            detail=f"The technician must submit the survey before it can be approved. Current status: {survey.status.value}",
         )
 
     survey.status = SurveyStatus.APPROVED
@@ -124,6 +144,13 @@ def approve_survey(db: Session, survey_id: int, approved_by_id: int) -> Survey:
         user_id=approved_by_id,
     )
     db.add(audit)
+    events.emit(
+        db, "survey.approved", {"survey_id": survey.id, "lead_id": survey.lead_id},
+        user_ids=[survey.technician_id, lead.customer.user_id if (lead and lead.customer) else None],
+        roles=[UserRole.ADMIN],
+        title="Site survey approved",
+        message="Your site survey has been approved. A quotation will follow.",
+    )
 
     db.commit()
     db.refresh(survey)
@@ -135,6 +162,9 @@ def reject_survey(db: Session, survey_id: int, reason: str, user_id: int) -> Sur
     if not survey:
         raise HTTPException(status_code=404, detail="Survey not found")
 
+    if survey.status not in (SurveyStatus.SCHEDULED, SurveyStatus.COMPLETED):
+        raise HTTPException(status_code=400, detail=f"Survey is already {survey.status.value}")
+    old_survey_status = survey.status.value
     survey.status = SurveyStatus.REJECTED
     lead = db.query(Lead).filter(Lead.id == survey.lead_id).first()
     if lead:
@@ -156,12 +186,14 @@ def reject_survey(db: Session, survey_id: int, reason: str, user_id: int) -> Sur
         record_type="survey",
         record_id=survey.id,
         action="SURVEY_REJECTED",
-        from_status=survey.status.value,
+        from_status=old_survey_status,
         to_status=SurveyStatus.REJECTED.value,
         notes=f"Survey rejected by manager: {reason}",
         user_id=user_id,
     )
     db.add(audit)
+    events.emit(db, "survey.rejected", {"survey_id": survey.id, "lead_id": survey.lead_id},
+                user_ids=[survey.technician_id], roles=[UserRole.ADMIN])
 
     db.commit()
     db.refresh(survey)

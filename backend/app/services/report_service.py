@@ -15,6 +15,7 @@ from app.models.lead import Lead, LeadStatus
 from app.models.survey import Survey, SurveyStatus
 from app.models.ticket import Ticket, TicketStatus
 from app.models.product import Product
+from app.models.quote import Quote
 from app.models.finance import SubsidyRecord, SubsidyStatus
 
 

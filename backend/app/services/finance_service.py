@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.models.finance import Invoice, InvoiceType, InvoiceStatus, InvoiceLine, SubsidyRecord, SubsidyStatus, TechnicianPayout
 from app.models.order import Order
-from app.models.job import InstallationJob, JobStatus
+from app.models.job import InstallationJob, JobStatus, Timesheet
 from app.models.audit import AuditLog
 from app.schemas.finance import SubsidyRecordUpdate
 

@@ -51,3 +51,24 @@ def test_director_dashboard_and_profit_metrics():
     invalid_res = client.get("/api/reports/shared/bogus-invalid-token")
     assert invalid_res.status_code == 401
 
+
+def test_sales_metrics_and_commissions():
+    sales_headers = {"Authorization": "Bearer sales_uid"}
+
+    # 1. Test sales metrics as sales user (triggers sales_user_id filtering and Quote join)
+    sales_res = client.get("/api/reports/sales-metrics", headers=sales_headers)
+    assert sales_res.status_code == 200
+    s_data = sales_res.json()
+    assert "conversion_rate_pct" in s_data
+    assert "commission_earned" in s_data
+    assert "pipeline_value" in s_data
+    assert "deals" in s_data
+
+    # 2. Test sales metrics as admin (all sales team)
+    admin_res = client.get("/api/reports/sales-metrics", headers=admin_headers)
+    assert admin_res.status_code == 200
+    a_data = admin_res.json()
+    assert "conversion_rate_pct" in a_data
+    assert "deals" in a_data
+
+

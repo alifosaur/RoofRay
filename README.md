@@ -232,7 +232,7 @@ source venv/bin/activate
 pytest
 ```
 
-**Test Coverage Highlights (29 Automated Tests Passed)**:
+**Test Coverage Highlights (30 Automated Tests Passed)**:
 - `tests/test_milestone_all_roles_e2e.py`: Complete end-to-end milestone lifecycle across all 5 roles verifying customer self-registration, enquiry submission, sales checklist, technician survey in PWA, admin survey approval gate, quotation & order confirmation, warehouse queue, serial barcode scanning & dispatch gate, auto-warranty activation on delivery, technician installation job with generation test (> 0 kW) and signature, timesheet & payout sync, admin user management, sales commissions, and subsidy stage advancement.
 - `tests/test_phase1_roles_auth_guards.py`: Strict role route guards, customer privilege escalation blocking (403 on staff endpoints), and technician object-level isolation.
 - `tests/test_phase2_customer_portal.py`: Customer portal endpoints, 13-stage timeline tracker, PM Surya Ghar subsidy estimator, equipment warranty lookup, and service ticket creation.
@@ -243,7 +243,7 @@ pytest
 - `tests/test_phase5_dispatch_warranty.py`: Dispatch serialization gate (asserts 400 on missing serial), duplicate serial rejection, automated warranty date computation on delivery.
 - `tests/test_phase6_jobs.py`: Technician mobile workflow, photo upload, signature storage, power test verification, timesheet derivation.
 - `tests/test_phase7_tickets_warranty.py`: Support lookup, in-warranty free ticket, out-of-warranty auto-repair invoicing, customer confirmation gate.
-- `tests/test_phase8_reports_finance.py`: Subsidies, technician hourly payouts, profit-per-job calculation, Excel export, expiring shareable dashboard link.
+- `tests/test_phase8_reports_finance.py`: Subsidies, technician hourly payouts, profit-per-job calculation, sales team commissions with Quote join verification, Excel export, expiring shareable dashboard link.
 - `tests/test_phase10_e2e_all_gates.py`: End-to-end integration test verifying all 8 business invariants in a single cohesive flow.
 
 To build the frontend bundle:

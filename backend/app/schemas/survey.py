@@ -1,6 +1,6 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Optional, Any
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 from app.models.survey import SurveyStatus
 
 
@@ -9,6 +9,16 @@ class SurveyCreate(BaseModel):
     technician_id: int
     scheduled_date: datetime
     notes: Optional[str] = None
+
+    @field_validator("scheduled_date")
+    @classmethod
+    def validate_not_past(cls, v: datetime) -> datetime:
+        now_naive = datetime.utcnow()
+        v_naive = v.replace(tzinfo=None) if v.tzinfo else v
+        # Allow 5 minutes tolerance for form submission latency
+        if v_naive < (now_naive - timedelta(minutes=5)):
+            raise ValueError("Scheduled date cannot be in the past")
+        return v
 
 
 class SurveyComplete(BaseModel):

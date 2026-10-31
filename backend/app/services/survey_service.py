@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 from app.models.survey import Survey, SurveyStatus
@@ -11,6 +11,11 @@ from app.core import events
 
 
 def schedule_survey(db: Session, payload: SurveyCreate, current_user_id: int) -> Survey:
+    now_utc = datetime.utcnow()
+    sched = payload.scheduled_date.replace(tzinfo=None) if payload.scheduled_date.tzinfo else payload.scheduled_date
+    if sched < (now_utc - timedelta(minutes=5)):
+        raise HTTPException(status_code=400, detail="Scheduled survey date cannot be in the past")
+
     lead = db.query(Lead).filter(Lead.id == payload.lead_id, Lead.is_deleted == False).first()
     if not lead:
         raise HTTPException(status_code=404, detail="Lead not found")

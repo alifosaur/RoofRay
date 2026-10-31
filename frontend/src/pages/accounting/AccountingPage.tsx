@@ -375,7 +375,7 @@ export const AccountingPage: React.FC = () => {
             <form onSubmit={handleAddExpense} className="bg-white border border-gray-200 rounded p-3 grid grid-cols-2 md:grid-cols-6 gap-2 text-xs items-end">
               <input required placeholder="Category (e.g. transport)" value={newExpense.category} onChange={(e) => setNewExpense({ ...newExpense, category: e.target.value })} className="border border-gray-300 rounded px-2 py-1.5" />
               <input required type="number" min="0.01" step="0.01" placeholder="Amount ₹" value={newExpense.amount} onChange={(e) => setNewExpense({ ...newExpense, amount: e.target.value })} className="border border-gray-300 rounded px-2 py-1.5" />
-              <input type="date" value={newExpense.expense_date} onChange={(e) => setNewExpense({ ...newExpense, expense_date: e.target.value })} className="border border-gray-300 rounded px-2 py-1.5" aria-label="Expense date" />
+              <input type="date" min={new Date().toISOString().split('T')[0]} value={newExpense.expense_date} onChange={(e) => setNewExpense({ ...newExpense, expense_date: e.target.value })} className="border border-gray-300 rounded px-2 py-1.5" aria-label="Expense date" />
               <input type="number" placeholder="Order ID (optional)" value={newExpense.order_id} onChange={(e) => setNewExpense({ ...newExpense, order_id: e.target.value })} className="border border-gray-300 rounded px-2 py-1.5" />
               <input placeholder="Description" value={newExpense.description} onChange={(e) => setNewExpense({ ...newExpense, description: e.target.value })} className="border border-gray-300 rounded px-2 py-1.5" />
               <button className="bg-odoo-primary text-white rounded px-3 py-1.5 font-semibold">Record cost</button>
@@ -442,7 +442,7 @@ export const AccountingPage: React.FC = () => {
               {subsidyStatus && (
                 <div className="grid grid-cols-2 gap-3">
                   <label className="block text-gray-700 font-medium">Date
-                    <input type="date" value={stepDate} onChange={(e) => setStepDate(e.target.value)} className="w-full px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:border-odoo-primary mt-1" />
+                    <input type="date" min={new Date().toISOString().split('T')[0]} value={stepDate} onChange={(e) => setStepDate(e.target.value)} className="w-full px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:border-odoo-primary mt-1" />
                   </label>
                   <label className="block text-gray-700 font-medium">Reference number
                     <input type="text" value={applicationRef} onChange={(e) => setApplicationRef(e.target.value)} className="w-full px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:border-odoo-primary mt-1 font-mono" />

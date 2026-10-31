@@ -143,6 +143,11 @@ export const LeadFormPage: React.FC = () => {
 
   const handleScheduleSurvey = async (e: React.FormEvent) => {
     e.preventDefault();
+    const scheduled = new Date(surveySchedule.scheduled_date);
+    if (scheduled.getTime() < Date.now() - 60000) {
+      alert('Scheduled survey visit date and time cannot be in the past.');
+      return;
+    }
     try {
       await api.post('/surveys', {
         lead_id: lead.id,
@@ -823,6 +828,11 @@ export const LeadFormPage: React.FC = () => {
                 <input
                   type="datetime-local"
                   required
+                  min={(() => {
+                    const now = new Date();
+                    const pad = (n: number) => String(n).padStart(2, '0');
+                    return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+                  })()}
                   value={surveySchedule.scheduled_date}
                   onChange={(e) => setSurveySchedule({ ...surveySchedule, scheduled_date: e.target.value })}
                   className="w-full border border-gray-300 rounded px-2.5 py-1.5 focus:border-odoo-accent focus:outline-none"

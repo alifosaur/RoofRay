@@ -91,3 +91,13 @@ def confirmed_order(client, name="Test Customer"):
     res = confirm_with_advance(client, order_id, sales)
     assert res.status_code == 200, res.text
     return {"lead": lead, "quote": quote, "order_id": order_id, "sales": sales}
+
+
+def register(client, payload: dict):
+    """Customer sign-up the way the UI does it: request the emailed code, then register with it."""
+    from app.core import mailer
+    sent = client.post("/api/auth/register/request-otp", json={"email": payload["email"]})
+    if sent.status_code != 200:
+        return sent
+    code = next(m["subject"].rsplit(" ", 1)[-1] for m in reversed(mailer.outbox) if m["to"] == payload["email"].lower())
+    return client.post("/api/auth/register", json={**payload, "otp": code})

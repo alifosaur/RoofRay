@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.models.user import UserRole
 from app.models.order import OrderStatus
-from tests.helpers import confirmed_order, SALES, call_checklist, send_and_accept, confirm_with_advance, ship_to_delivered, scan_all_serials, advance
+from tests.helpers import register, confirmed_order, SALES, call_checklist, send_and_accept, confirm_with_advance, ship_to_delivered, scan_all_serials, advance
 
 client = TestClient(app)
 
@@ -35,7 +35,7 @@ def test_public_self_registration_creates_only_customer_and_links_customer_row()
         "role": "admin",
     }
 
-    res = client.post("/api/auth/register", json=reg_payload)
+    res = register(client, reg_payload)
     assert res.status_code == 201
     data = res.json()
     assert "access_token" in data
@@ -56,7 +56,7 @@ def test_public_self_registration_creates_only_customer_and_links_customer_row()
 def test_login_requires_correct_password():
     """Login checks the password; the returned token works on /auth/me; staff self-registration is gone."""
     email = f"login_{uuid.uuid4().hex[:6]}@example.com"
-    reg = client.post("/api/auth/register", json={
+    reg = register(client, {
         "email": email, "password": "correct-horse", "full_name": "Login Test", "phone": f"955{uuid.uuid4().hex[:7]}",
     })
     assert reg.status_code == 201
@@ -72,10 +72,15 @@ def test_login_requires_correct_password():
     assert client.get("/api/auth/me", headers={"Authorization": "Bearer not.a.jwt"}).status_code == 401
     # Public staff self-registration no longer exists
     assert client.post("/api/auth/staff-register", json={"email": "x@example.com", "role": "admin"}).status_code in (404, 405)
-    # Short passwords are refused
-    assert client.post("/api/auth/register", json={
-        "email": f"short_{uuid.uuid4().hex[:6]}@example.com", "password": "123", "full_name": "Short", "phone": "9000000001",
-    }).status_code == 400
+    # Short passwords and wrong codes are refused
+    short_email = f"short_{uuid.uuid4().hex[:6]}@example.com"
+    assert register(client, {"email": short_email, "password": "123", "full_name": "Short", "phone": "9000000001"}).status_code == 422
+    wrong = client.post("/api/auth/register", json={"email": short_email, "password": "long-enough-1", "full_name": "Short",
+                                                    "phone": "9000000001", "otp": "000000"})
+    assert wrong.status_code == 400
+    # A code is required at all
+    assert client.post("/api/auth/register", json={"email": "nocode@example.com", "password": "long-enough-1",
+                                                   "full_name": "No Code", "phone": "9000000002"}).status_code == 422
 
 
 def test_admin_creates_staff_with_password_setup_link():
@@ -166,7 +171,7 @@ def test_customer_object_level_isolation():
     """Verify that a customer cannot view another customer's quotes, orders, or invoices."""
     # Register customer A
     u1 = f"c1_{uuid.uuid4().hex[:6]}"
-    res_a = client.post("/api/auth/register", json={
+    res_a = register(client, {
         "password": "testpass123",
         "email": f"{u1}@example.com",
         "full_name": "Customer A",
@@ -176,7 +181,7 @@ def test_customer_object_level_isolation():
 
     # Register customer B
     u2 = f"c2_{uuid.uuid4().hex[:6]}"
-    res_b = client.post("/api/auth/register", json={
+    res_b = register(client, {
         "password": "testpass123",
         "email": f"{u2}@example.com",
         "full_name": "Customer B",

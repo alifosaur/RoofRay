@@ -7,8 +7,6 @@ from datetime import datetime, timedelta
 from typing import Optional, List
 
 import jwt
-import firebase_admin
-from firebase_admin import auth as fb_auth, credentials
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
@@ -17,25 +15,8 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.models.user import User, UserRole
 
-# Initialize Firebase Admin
-_firebase_initialized = False
-
-if os.path.exists(settings.FIREBASE_CREDENTIALS_PATH):
-    try:
-        cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS_PATH)
-        firebase_admin.initialize_app(cred)
-        _firebase_initialized = True
-    except Exception as e:
-        print(f"[WARN] Failed to initialize Firebase Admin with credentials: {e}")
-else:
-    print("[INFO] Firebase credentials file not found. Running with dev fallback.")
-
 security_scheme = HTTPBearer(auto_error=False)
 
-
-AUTH_MODE = "firebase" if _firebase_initialized else "local"
-if AUTH_MODE == "local":
-    print("[INFO] Auth mode: local password + signed session tokens (configure Firebase credentials for production).")
 
 _SESSION_HOURS = 12
 _RESET_HOURS = 48
@@ -83,35 +64,17 @@ def decode_local_token(token: str, purpose: str) -> str:
     return payload["sub"]
 
 
-def verify_firebase_token(token: str) -> dict:
-    """Verifies a Firebase ID token, or a local session token when Firebase is not configured."""
-    if AUTH_MODE == "firebase":
-        try:
-            return fb_auth.verify_id_token(token)
-        except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=f"Invalid Firebase ID token: {str(e)}",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+def verify_token(token: str) -> dict:
+    """Verifies a signed session token issued by this app."""
     return {"uid": decode_local_token(token, "session")}
 
 
 def set_account_password(user, password: str) -> None:
-    """Admin-set password: Firebase account password, or the local password hash."""
-    if AUTH_MODE == "firebase":
-        fb_auth.update_user(user.firebase_uid, password=password)
-    else:
-        user.password_hash = hash_password(password)
+    user.password_hash = hash_password(password)
 
 
 def create_auth_account(email: str, full_name: str) -> str:
-    """Creates (or reuses) the identity-provider account for a staff member and returns its UID."""
-    if AUTH_MODE == "firebase":
-        try:
-            return fb_auth.get_user_by_email(email).uid
-        except fb_auth.UserNotFoundError:
-            return fb_auth.create_user(email=email, display_name=full_name).uid
+    """Opaque login identifier stored in users.firebase_uid (column name kept from the earlier Firebase setup)."""
     return f"local_{uuid.uuid4().hex}"
 
 
@@ -127,7 +90,7 @@ def get_current_user(
         )
 
     token = auth_header.credentials
-    decoded = verify_firebase_token(token)
+    decoded = verify_token(token)
     uid = decoded.get("uid")
 
     if not uid:
@@ -138,17 +101,6 @@ def get_current_user(
 
     # Check database for user
     user = db.query(User).filter(User.firebase_uid == uid).first()
-    if not user and AUTH_MODE == "firebase":
-        # Check by email if available in decoded token
-        email = decoded.get("email")
-        if email:
-            user = db.query(User).filter(User.email == email).first()
-            if user:
-                # Update firebase_uid
-                user.firebase_uid = uid
-                db.commit()
-                db.refresh(user)
-
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

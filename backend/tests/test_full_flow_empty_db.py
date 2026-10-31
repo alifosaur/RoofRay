@@ -17,6 +17,7 @@ from app.bootstrap_admin import bootstrap_admin
 from app.core.database import Base, get_db
 from app.load_catalog import load_catalog
 from app.main import app
+from tests.helpers import register
 from app.services.dispatch_service import add_years_to_date
 
 
@@ -82,7 +83,7 @@ def test_complete_chain_from_empty_database(client):
     assert client.get("/api/auth/me", headers=tech).json()["role"] == "technician"
 
     # ---- Customer self-registers (role forced to customer) and submits the enquiry
-    reg = client.post("/api/auth/register", json={
+    reg = register(client, {
         "email": "asha@example.com", "password": "customer-password", "full_name": "Asha Rao", "phone": "9876500011",
         "address": "12 MG Road", "city": "Pune", "pincode": "411001", "role": "admin",
     })

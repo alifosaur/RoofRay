@@ -49,8 +49,9 @@ class UserRegisterRequest(BaseModel):
     """Public self-registration. Always creates a CUSTOMER; any role field is ignored."""
     full_name: str = Field(min_length=2)
     phone: str = Field(min_length=6)
-    email: Optional[str] = None      # local mode (Firebase mode takes it from the ID token)
-    password: Optional[str] = None   # local mode only
+    email: str
+    password: str = Field(min_length=8)
+    otp: str = Field(min_length=6, max_length=6)  # code emailed by /auth/register/request-otp
     address: Optional[str] = None
     city: Optional[str] = None
     pincode: Optional[str] = None
@@ -73,6 +74,10 @@ class StaffCreateRequest(BaseModel):
 
 class AdminSetPasswordRequest(BaseModel):
     password: str = Field(min_length=8)
+
+
+class OtpRequest(BaseModel):
+    email: str
 
 
 class UserLoginRequest(BaseModel):

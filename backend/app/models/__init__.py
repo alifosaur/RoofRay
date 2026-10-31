@@ -18,6 +18,7 @@ from app.models.notification import Notification
 from app.models.scheme import GovernmentScheme
 from app.models.outbox import OutboxEvent
 from app.models.expense import Expense
+from app.models.email_otp import EmailOtp
 
 __all__ = [
     "Base",
@@ -65,5 +66,6 @@ __all__ = [
     "GovernmentScheme",
     "OutboxEvent",
     "Expense",
+    "EmailOtp",
 ]
 

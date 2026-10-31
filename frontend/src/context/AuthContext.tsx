@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { api, setTokenProvider, TOKEN_KEY } from '../api/client';
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { api, TOKEN_KEY } from '../api/client';
 
 export type UserRole = 'customer' | 'sales' | 'technician' | 'warehouse' | 'admin';
 
@@ -16,6 +16,7 @@ export interface UserProfile {
 export interface RegisterPayload {
   email: string;
   password: string;
+  otp: string;
   full_name: string;
   phone: string;
   address?: string;
@@ -23,17 +24,15 @@ export interface RegisterPayload {
   pincode?: string;
 }
 
-type AuthMode = 'firebase' | 'local';
 
 interface AuthContextType {
   user: UserProfile | null;
   role: UserRole | null;
-  authMode: AuthMode | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<UserProfile>;
   register: (payload: RegisterPayload) => Promise<UserProfile>;
   requestPasswordReset: (email: string) => Promise<void>;
-  sendStaffPasswordEmail: (email: string) => Promise<void>;
+  requestSignupOtp: (email: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -58,10 +57,7 @@ export function getRoleHomePath(role: UserRole): string {
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
-  const [authMode, setAuthMode] = useState<AuthMode | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  // Firebase Auth instance + SDK module, loaded only in Firebase mode
-  const fb = useRef<{ auth: any; sdk: typeof import('firebase/auth') } | null>(null);
 
   const loadProfile = async (): Promise<UserProfile | null> => {
     try {
@@ -76,27 +72,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     (async () => {
-      try {
-        const cfg = await api.get<{ mode: AuthMode; firebase: Record<string, string> | null }>('/auth/config');
-        setAuthMode(cfg.mode);
-        if (cfg.mode === 'firebase' && cfg.firebase) {
-          const [{ initializeApp }, sdk] = await Promise.all([import('firebase/app'), import('firebase/auth')]);
-          const auth = sdk.getAuth(initializeApp(cfg.firebase));
-          fb.current = { auth, sdk };
-          setTokenProvider(async () => (auth.currentUser ? auth.currentUser.getIdToken() : null));
-          sdk.onAuthStateChanged(auth, async (fbUser) => {
-            if (fbUser) await loadProfile();
-            else setUser(null);
-            setIsLoading(false);
-          });
-          return;
-        }
-        if (localStorage.getItem(TOKEN_KEY)) {
-          if (!(await loadProfile())) localStorage.removeItem(TOKEN_KEY);
-        }
-      } catch (err) {
-        console.error('Auth initialisation failed', err);
-      }
+      if (localStorage.getItem(TOKEN_KEY) && !(await loadProfile())) localStorage.removeItem(TOKEN_KEY);
       setIsLoading(false);
     })();
   }, []);
@@ -108,10 +84,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const login = async (email: string, password: string) => {
-    if (fb.current) {
-      await fb.current.sdk.signInWithEmailAndPassword(fb.current.auth, email, password);
-      return requireProfile();
-    }
     const res = await api.post<{ access_token: string; user: UserProfile }>('/auth/login', { email, password });
     localStorage.setItem(TOKEN_KEY, res.access_token);
     setUser(res.user);
@@ -119,13 +91,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const register = async (payload: RegisterPayload) => {
-    if (fb.current) {
-      await fb.current.sdk.createUserWithEmailAndPassword(fb.current.auth, payload.email, payload.password);
-      const { password, ...profile } = payload;
-      const res = await api.post<{ user: UserProfile }>('/auth/register', profile);
-      setUser(res.user);
-      return res.user;
-    }
     const res = await api.post<{ access_token: string; user: UserProfile }>('/auth/register', payload);
     localStorage.setItem(TOKEN_KEY, res.access_token);
     setUser(res.user);
@@ -133,20 +98,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const requestPasswordReset = async (email: string) => {
-    if (fb.current) {
-      await fb.current.sdk.sendPasswordResetEmail(fb.current.auth, email);
-      return;
-    }
     await api.post('/auth/forgot-password', { email });
   };
 
-  // Firebase mode: newly created staff get Firebase's password-reset email to set their password
-  const sendStaffPasswordEmail = async (email: string) => {
-    if (fb.current) await fb.current.sdk.sendPasswordResetEmail(fb.current.auth, email);
+  const requestSignupOtp = async (email: string) => {
+    await api.post('/auth/register/request-otp', { email });
   };
 
   const logout = async () => {
-    if (fb.current) await fb.current.sdk.signOut(fb.current.auth);
     localStorage.removeItem(TOKEN_KEY);
     setUser(null);
   };
@@ -156,12 +115,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       value={{
         user,
         role: user?.role ?? null,
-        authMode,
         isLoading,
         login,
         register,
         requestPasswordReset,
-        sendStaffPasswordEmail,
+        requestSignupOtp,
         logout,
       }}
     >

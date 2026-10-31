@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../api/client';
-import { useAuth } from '../../context/AuthContext';
 import { ControlPanel } from '../../components/odoo/ControlPanel';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -51,7 +50,6 @@ export const UsersPage: React.FC = () => {
     hourly_rate: 0,
     password: '',
   });
-  const { sendStaffPasswordEmail } = useAuth();
   const openCreate = (role: string) => {
     setNewUser({ email: '', full_name: '', role, phone: '', hourly_rate: 0, password: '' });
     setShowCreateModal(true);
@@ -87,10 +85,8 @@ export const UsersPage: React.FC = () => {
       });
       if (newUser.password) {
         alert(`${newUser.full_name} created. They can sign in now with ${newUser.email} and the password you set.`);
-      } else if (res.auth_mode === 'firebase') {
-        await sendStaffPasswordEmail(newUser.email);
-        alert(`${newUser.full_name} created. A password setup email has been sent to ${newUser.email}.`);
       } else {
+        // The setup link is also emailed to the staff member (SMTP)
         setSetupLink(`${window.location.origin}${res.password_setup_url}`);
       }
       setShowCreateModal(false);
@@ -209,7 +205,7 @@ export const UsersPage: React.FC = () => {
       {setupLink && (
         <div className="mx-6 mt-3 p-3 bg-emerald-50 border border-emerald-200 rounded text-xs text-emerald-900">
           <div className="font-bold mb-1">
-            Staff account created. This is a LINK, not a password: the staff member must open it in their browser and choose a password there (valid 48 hours).
+            Staff account created and the link was emailed to them. This is a LINK, not a password: the staff member must open it in their browser and choose a password there (valid 48 hours).
           </div>
           <div className="flex items-center gap-2">
             <code className="flex-1 break-all bg-white border border-emerald-200 rounded px-2 py-1">{setupLink}</code>

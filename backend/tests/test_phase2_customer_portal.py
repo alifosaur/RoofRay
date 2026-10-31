@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime, date, timedelta
 from fastapi.testclient import TestClient
 from app.main import app
+from tests.helpers import register
 from app.core.database import SessionLocal
 from app.models.user import User, UserRole
 from app.models.customer import Customer
@@ -192,7 +193,7 @@ def test_customer_subsidy_tracker():
 def test_enquiry_is_locked_after_submission():
     phone = f"97{uuid.uuid4().int % 10**8:08d}"
     email = f"lock_{uuid.uuid4().hex[:6]}@example.com"
-    reg = client.post("/api/auth/register", json={"email": email, "password": "lockpass1", "full_name": "Lock Test", "phone": phone})
+    reg = register(client, {"email": email, "password": "lockpass1", "full_name": "Lock Test", "phone": phone})
     hdr = {"Authorization": f"Bearer {reg.json()['access_token']}"}
     assert client.get("/api/customer/enquiry", headers=hdr).json() is None
     body = {"name": "Lock Test", "phone": phone, "email": email, "address": "5 Lock Street", "preferred_capacity_kw": 2}

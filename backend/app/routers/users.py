@@ -5,7 +5,8 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from app.core.database import Base
 from app.core.database import get_db
-from app.core import security
+from app.core import mailer, security
+from app.core.config import settings
 from app.core.security import require_role
 from app.models.audit import AuditLog
 from app.models.user import User, UserRole
@@ -70,9 +71,12 @@ def create_user(
     db.commit()
     db.refresh(user)
     setup_url = None
-    if security.AUTH_MODE == "local" and not payload.password:
+    if not payload.password:
         setup_url = f"/set-password?token={security.issue_password_setup_token(user.firebase_uid)}"
-    return StaffCreateResponse(user=user, auth_mode=security.AUTH_MODE, password_setup_url=setup_url)
+        mailer.send_email(email, f"Your {settings.PROJECT_NAME} {user.role.value} account",
+                          f"An account was created for you. Set your password here (valid 48 hours):\n"
+                          f"{settings.PUBLIC_APP_URL}{setup_url}")
+    return StaffCreateResponse(user=user, auth_mode="local", password_setup_url=setup_url)
 
 
 @router.post("/{user_id}/password")
@@ -211,12 +215,6 @@ def remove_user(
                 db.execute(table.delete().where(col == user.id))
     db.add(AuditLog(record_type="user", record_id=user.id, action="USER_DELETED",
                     notes=f"{user.email} ({user.role.value}) deleted.", user_id=current_user.id))
-    if security.AUTH_MODE == "firebase":
-        try:
-            from firebase_admin import auth as fb_auth
-            fb_auth.delete_user(user.firebase_uid)
-        except Exception as e:
-            print(f"[WARN] Could not delete Firebase user {user.email}: {e}")
     db.delete(user)
     db.commit()
     return {"removed": True, "deactivated": False, "message": "User removed."}

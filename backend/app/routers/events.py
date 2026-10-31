@@ -21,7 +21,7 @@ HEARTBEAT_SECONDS = 15
 def _authenticate(token: str) -> User:
     db = SessionLocal()
     try:
-        uid = security.verify_firebase_token(token)["uid"]
+        uid = security.verify_token(token)["uid"]
         user = db.query(User).filter(User.firebase_uid == uid, User.is_active == True).first()
         if not user:
             raise HTTPException(status_code=401, detail="Unknown or inactive user")

@@ -51,7 +51,9 @@ const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, 
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const { user, isLoading, login, logout, register, requestPasswordReset } = useAuth();
+  const { user, isLoading, login, logout, register, requestSignupOtp, requestPasswordReset } = useAuth();
+  const [otp, setOtp] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
   const signingIn = useRef(false);
   const [selectedRole, setSelectedRole] = useState<UserRole>('customer');
 
@@ -113,7 +115,13 @@ export const LoginPage: React.FC = () => {
         return;
       }
       run(async () => {
-        const u = await register({ email: email.trim(), password, full_name: fullName, phone });
+        if (!otpSent) {
+          await requestSignupOtp(email.trim());
+          setOtpSent(true);
+          setNotice(`We emailed a 6-digit code to ${email.trim()}. Enter it below to create your account.`);
+          return;
+        }
+        const u = await register({ email: email.trim(), password, full_name: fullName, phone, otp: otp.trim() });
         navigate(getRoleHomePath(u.role));
       });
     } else {
@@ -201,6 +209,27 @@ export const LoginPage: React.FC = () => {
                 <input className={inputClass} value={email} onChange={(e) => setEmail(e.target.value)} required type="email" autoComplete="email" />
               </Field>
 
+              {mode === 'register' && otpSent && (
+                <Field label="Verification code (from your email)">
+                  <input
+                    className={inputClass}
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    required
+                    placeholder="6-digit code"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => run(async () => { await requestSignupOtp(email.trim()); setNotice('A new code has been sent.'); })}
+                    className="mt-1 text-xs text-[#6B4B63] hover:underline"
+                  >
+                    Resend code
+                  </button>
+                </Field>
+              )}
+
               {mode !== 'forgot' && (
                 <Field label="Password">
                   <input
@@ -221,7 +250,7 @@ export const LoginPage: React.FC = () => {
                 disabled={loading}
                 className="w-full py-2.5 bg-[#6B4B63] hover:bg-[#583D51] disabled:opacity-60 text-white font-semibold text-sm rounded transition-colors"
               >
-                {loading ? 'Please wait…' : mode === 'login' ? 'Sign in' : mode === 'register' ? 'Create account' : 'Send reset link'}
+                {loading ? 'Please wait…' : mode === 'login' ? 'Sign in' : mode === 'register' ? (otpSent ? 'Verify & create account' : 'Send verification code') : 'Send reset link'}
               </button>
             </form>
             )}

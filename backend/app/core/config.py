@@ -14,12 +14,14 @@ class Settings(BaseSettings):
     FRONTEND_PORT: int = 5173
 
     DATABASE_URL: str = "sqlite:///./sunpower.db"
-    FIREBASE_CREDENTIALS_PATH: str = "firebase-service-account.json"
-    # Firebase web config served to the frontend by /auth/config (public values)
-    FIREBASE_WEB_API_KEY: str = ""
-    FIREBASE_WEB_AUTH_DOMAIN: str = ""
-    FIREBASE_WEB_PROJECT_ID: str = ""
-    FIREBASE_WEB_APP_ID: str = ""
+    # SMTP for sign-up codes and password links; with no SMTP_HOST emails are printed to the server log
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM: str = ""
+    SMTP_USE_TLS: bool = True
+    PUBLIC_APP_URL: str = "http://localhost:5173"
 
     UPLOAD_DIR: str = "./uploads"
     REDIS_URL: str = ""  # empty = no cache/locks (DB only)

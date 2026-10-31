@@ -136,3 +136,4 @@ def get_lead_chatter(
         }
         for log in logs
     ]
+

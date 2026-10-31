@@ -36,3 +36,4 @@ class Product(Base):
     bom_lines = relationship("BOMLine", back_populates="product")
     quote_lines = relationship("QuoteLine", back_populates="product")
     serial_items = relationship("SerialItem", back_populates="product")
+

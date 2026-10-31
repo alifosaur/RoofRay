@@ -61,3 +61,4 @@ def get_bom_template(
     if not template:
         raise HTTPException(status_code=404, detail="BOM Template not found")
     return template
+

@@ -70,3 +70,4 @@ def approve_survey(
 ):
     """Manager/Admin approves the survey (required gate for quote generation)."""
     return survey_service.approve_survey(db, survey_id, current_user.id)
+

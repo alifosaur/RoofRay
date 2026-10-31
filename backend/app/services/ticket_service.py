@@ -251,3 +251,4 @@ def close_ticket(db: Session, ticket_id: int, current_user_id: int) -> Ticket:
     db.commit()
     db.refresh(ticket)
     return ticket
+

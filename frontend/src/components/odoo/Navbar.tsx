@@ -139,3 +139,4 @@ export const Navbar: React.FC<NavbarProps> = ({ appName, onToggleHomeMenu, isHom
     </nav>
   );
 };
+

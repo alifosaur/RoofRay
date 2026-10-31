@@ -70,3 +70,4 @@ def pack_pick_list(
 ):
     """Warehouse confirms picking & packing for an order."""
     return inventory_service.pack_pick_list(db, pick_list_id, current_user.id)
+

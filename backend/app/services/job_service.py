@@ -163,3 +163,4 @@ def complete_job(db: Session, job_id: int, payload: JobCompleteRequest, current_
     db.commit()
     db.refresh(job)
     return job
+

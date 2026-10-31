@@ -130,11 +130,39 @@ Every business rule is enforced strictly in the **backend service and data layer
 
 ## 🚀 Quickstart Guide
 
-### 1. Prerequisites
+### Option A: One-Command Docker Setup (Recommended)
+
+Run the entire stack (PostgreSQL, Redis, FastAPI Backend with auto-seeding, and Nginx React Frontend) in isolated Docker containers with a single command:
+
+```bash
+docker compose up --build
+```
+
+- **Frontend App & Odoo Staff Portal**: [http://localhost:5173](http://localhost:5173) or [http://localhost:80](http://localhost:80)
+- **FastAPI Backend & Interactive Swagger Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
+- **Database**: PostgreSQL 16 on `localhost:5432` (`sunpower_db`)
+- **Cache/Queue**: Redis 7 on `localhost:6379`
+- **Auto-Seeding**: The backend container automatically detects PostgreSQL and populates the complete 21-user, 40-product, 10-customer lifecycle dataset on first boot (`AUTO_SEED=true`).
+
+To stop all containers:
+```bash
+docker compose down
+```
+
+To stop and remove persistent database volumes:
+```bash
+docker compose down -v
+```
+
+---
+
+### Option B: Local Development Setup (Without Docker)
+
+#### 1. Prerequisites
 - Python 3.9 or higher
 - Node.js 18 or higher (tested with Node 20 / 22 / 26)
 
-### 2. Backend Setup & Run
+#### 2. Backend Setup & Run
 
 Open a terminal in the project root:
 
@@ -159,7 +187,7 @@ The backend will be live at `http://localhost:8000`.
 - Interactive Swagger UI: `http://localhost:8000/docs`
 - ReDoc Documentation: `http://localhost:8000/redoc`
 
-### 3. Frontend Setup & Run
+#### 3. Frontend Setup & Run
 
 Open a second terminal in the project root:
 

@@ -64,3 +64,4 @@ def record_payment(
 ):
     """Records advance or full payment (cash, UPI, bank, cheque)."""
     return order_service.record_payment(db, order_id, payload, current_user.id)
+

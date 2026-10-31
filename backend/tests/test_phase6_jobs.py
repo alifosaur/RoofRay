@@ -97,3 +97,4 @@ def test_installation_job_flow_and_timesheet():
     updated_order = client.get(f"/api/orders/{order_id}", headers=sales_headers).json()
     assert updated_order["status"] == "INSTALLED"
     assert updated_order["installed_at"] is not None
+

@@ -87,3 +87,4 @@ def pack_pick_list(db: Session, pick_list_id: int, current_user_id: int) -> Pick
     db.commit()
     db.refresh(pick_list)
     return pick_list
+

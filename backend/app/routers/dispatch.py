@@ -71,3 +71,4 @@ def deliver_order(
     AUTO-WARRANTY: Sets delivered_on = today and warranty_end = delivered_on + warranty_years.
     """
     return dispatch_service.deliver_order(db, order_id, current_user.id)
+

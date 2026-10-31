@@ -47,3 +47,4 @@ class QuoteOut(BaseModel):
     lines: List[QuoteLineOut] = []
 
     model_config = ConfigDict(from_attributes=True)
+

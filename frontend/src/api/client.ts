@@ -49,3 +49,4 @@ export const api = {
     }),
   delete: <T>(url: string) => apiRequest<T>(url, { method: 'DELETE' }),
 };
+

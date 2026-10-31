@@ -48,3 +48,4 @@ class PickListLine(Base):
 
     pick_list = relationship("PickList", back_populates="lines")
     product = relationship("Product")
+

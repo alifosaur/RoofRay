@@ -88,3 +88,4 @@ def accept_quote(
         "order_number": order.order_number,
         "status": order.status.value,
     }
+

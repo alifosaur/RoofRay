@@ -35,3 +35,4 @@ def test_role_enforcement_admin_endpoint():
     tech_res = client.get("/api/users", headers={"Authorization": "Bearer tech_uid"})
     assert tech_res.status_code == 403
     assert "Forbidden" in tech_res.json()["detail"]
+

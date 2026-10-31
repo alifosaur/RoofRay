@@ -127,3 +127,4 @@ def approve_survey(db: Session, survey_id: int, approved_by_id: int) -> Survey:
     db.commit()
     db.refresh(survey)
     return survey
+

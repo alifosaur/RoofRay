@@ -154,3 +154,4 @@ def generate_quote_pdf(quote, customer, lead, template_name: str) -> str:
 
     doc.build(story)
     return pdf_path
+

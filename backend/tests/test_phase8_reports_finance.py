@@ -50,3 +50,4 @@ def test_director_dashboard_and_profit_metrics():
     # Invalid token check
     invalid_res = client.get("/api/reports/shared/bogus-invalid-token")
     assert invalid_res.status_code == 401
+

@@ -88,3 +88,4 @@ def complete_job(
     - marks job COMPLETED and Order INSTALLED.
     """
     return job_service.complete_job(db, job_id, payload, current_user)
+

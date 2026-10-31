@@ -66,3 +66,4 @@ class InstallationJobOut(BaseModel):
     timesheet: Optional[TimesheetOut] = None
 
     model_config = ConfigDict(from_attributes=True)
+

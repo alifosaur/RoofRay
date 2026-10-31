@@ -81,3 +81,4 @@ def update_user(
     db.commit()
     db.refresh(user)
     return user
+

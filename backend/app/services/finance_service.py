@@ -99,3 +99,4 @@ def mark_payout_paid(db: Session, payout_id: int, current_user_id: int) -> Techn
     db.commit()
     db.refresh(payout)
     return payout
+

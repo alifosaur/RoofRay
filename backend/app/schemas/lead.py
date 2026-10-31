@@ -65,3 +65,4 @@ class LeadOut(BaseModel):
     call_checklist: Optional[CallChecklistOut] = None
 
     model_config = ConfigDict(from_attributes=True)
+

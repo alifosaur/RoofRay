@@ -113,3 +113,4 @@ export const Chatter: React.FC<ChatterProps> = ({ logs, onAddNote }) => {
     </div>
   );
 };
+

@@ -35,3 +35,4 @@ class Survey(Base):
     lead = relationship("Lead", back_populates="survey")
     technician = relationship("User", foreign_keys=[technician_id])
     approved_by = relationship("User", foreign_keys=[approved_by_id])
+

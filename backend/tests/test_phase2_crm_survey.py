@@ -147,3 +147,4 @@ def test_survey_workflow():
     # Verify lead status updated to SURVEY_APPROVED
     lead_after_appr = client.get(f"/api/leads/{lead_id}", headers=sales_headers).json()
     assert lead_after_appr["status"] == "SURVEY_APPROVED"
+

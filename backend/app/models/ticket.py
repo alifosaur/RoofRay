@@ -42,3 +42,4 @@ class Ticket(Base):
     serial_item = relationship("SerialItem", back_populates="tickets")
     assigned_to = relationship("User")
     repair_invoice = relationship("Invoice", back_populates="ticket", uselist=False)
+

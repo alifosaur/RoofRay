@@ -25,3 +25,4 @@ class Payment(Base):
 
     order = relationship("Order", back_populates="payments")
     recorded_by = relationship("User")
+

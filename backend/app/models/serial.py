@@ -33,3 +33,4 @@ class SerialItem(Base):
     order = relationship("Order", back_populates="serial_items")
     customer = relationship("Customer", back_populates="serial_items")
     tickets = relationship("Ticket", back_populates="serial_item")
+

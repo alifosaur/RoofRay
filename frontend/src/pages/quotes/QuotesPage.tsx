@@ -169,3 +169,4 @@ export const QuotesPage: React.FC = () => {
     </div>
   );
 };
+

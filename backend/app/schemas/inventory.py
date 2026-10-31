@@ -44,3 +44,4 @@ class PickListOut(BaseModel):
     lines: List[PickListLineOut] = []
 
     model_config = ConfigDict(from_attributes=True)
+

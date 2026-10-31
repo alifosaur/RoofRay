@@ -43,3 +43,4 @@ class Order(Base):
     installation_job = relationship("InstallationJob", back_populates="order", uselist=False)
     invoice = relationship("Invoice", back_populates="order", uselist=False)
     subsidy_record = relationship("SubsidyRecord", back_populates="order", uselist=False)
+

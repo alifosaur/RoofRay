@@ -28,3 +28,4 @@ class SerialItemOut(BaseModel):
     product: ProductOut
 
     model_config = ConfigDict(from_attributes=True)
+

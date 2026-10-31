@@ -19,3 +19,4 @@ class Customer(Base):
     orders = relationship("Order", back_populates="customer")
     serial_items = relationship("SerialItem", back_populates="customer")
     tickets = relationship("Ticket", back_populates="customer")
+

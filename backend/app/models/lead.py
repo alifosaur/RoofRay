@@ -56,3 +56,4 @@ class CallChecklist(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     lead = relationship("Lead", back_populates="call_checklist")
+

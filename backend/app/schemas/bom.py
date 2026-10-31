@@ -37,3 +37,4 @@ class BOMTemplateOut(BOMTemplateBase):
     lines: List[BOMLineOut] = []
 
     model_config = ConfigDict(from_attributes=True)
+

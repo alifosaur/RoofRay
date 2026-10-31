@@ -232,3 +232,4 @@ def verify_share_token(token: str) -> bool:
         return decoded.get("scope") == "dashboard_readonly"
     except Exception:
         return False
+

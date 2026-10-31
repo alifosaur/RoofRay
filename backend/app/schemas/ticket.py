@@ -53,3 +53,4 @@ class WarrantyLookupResult(BaseModel):
     in_warranty: bool
     days_left: int
     service_history: List[TicketOut] = []
+

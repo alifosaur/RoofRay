@@ -104,3 +104,4 @@ def close_ticket(
     GATE: Blocks closure (HTTP 400) if ticket is not CUSTOMER_CONFIRMED.
     """
     return ticket_service.close_ticket(db, ticket_id, current_user.id)
+

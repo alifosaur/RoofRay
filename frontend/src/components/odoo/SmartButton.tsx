@@ -24,3 +24,4 @@ export const SmartButton: React.FC<SmartButtonProps> = ({ icon, count, label, on
     </button>
   );
 };
+

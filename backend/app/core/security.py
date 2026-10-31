@@ -122,3 +122,4 @@ def require_role(*roles: UserRole):
         return current_user
 
     return role_checker
+

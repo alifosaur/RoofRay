@@ -27,3 +27,4 @@ class BOMLine(Base):
 
     template = relationship("BOMTemplate", back_populates="lines")
     product = relationship("Product", back_populates="bom_lines")
+

@@ -51,3 +51,4 @@ class QuoteLine(Base):
 
     quote = relationship("Quote", back_populates="lines")
     product = relationship("Product", back_populates="quote_lines")
+

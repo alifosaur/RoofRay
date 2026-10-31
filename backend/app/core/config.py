@@ -19,6 +19,7 @@ class Settings(BaseSettings):
 
     UPLOAD_DIR: str = "./uploads"
     SECRET_KEY: str = "sunpower-secret-key-change-in-production"
+    COMPANY_CONTACT_LINE: str = "Rooftop Solar Engineering & EPC"
 
     model_config = SettingsConfigDict(
         env_file=".env",

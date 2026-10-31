@@ -102,6 +102,11 @@ class GovernmentSchemeOut(BaseModel):
     is_active: bool
     is_announcement: bool
     announcement_text: Optional[str] = None
+    cfa_per_kw_first_2kw: float = 0.0
+    cfa_per_kw_3rd_kw: float = 0.0
+    cfa_max: float = 0.0
+    state_topup_per_kw: float = 0.0
+    grid_connected_only: bool = True
 
 
 class CustomerSubsidyOut(BaseModel):

@@ -99,6 +99,15 @@ def test_dispatch_gate_and_auto_warranty():
             print("DEBUG SCAN FAILED:", scan_res.status_code, scan_res.json())
         assert scan_res.status_code == 200
 
+    # Scan any other serialised BOM items (e.g. net meter)
+    other_serialised = [l for l in quote["lines"] if l["product"]["is_serialised"] and l["product_id"] not in (inv_prod_id, panel_prod_id)]
+    for l in other_serialised:
+        sns = [f"OTH-{test_run_id}-{l['product_id']}-{i}" for i in range(l["quantity"])]
+        client.post("/api/dispatch/serials/register", headers=warehouse_headers, json={"product_id": l["product_id"], "serial_numbers": sns})
+        for sn in sns:
+            assert client.post("/api/dispatch/scan", headers=warehouse_headers, json={"order_id": order_id, "serial_no": sn}).status_code == 200
+    other_qty = sum(l["quantity"] for l in other_serialised)
+
     # 6. Verify duplicate scan of assigned serial to another order fails
     # Create a second lead and order
     lead2 = client.post("/api/leads/public", json={
@@ -137,7 +146,7 @@ def test_dispatch_gate_and_auto_warranty():
     today = date.today()
     serials_res = client.get(f"/api/dispatch/serials?order_id={order_id}", headers=warehouse_headers)
     serials = serials_res.json()
-    assert len(serials) == 1 + panel_qty
+    assert len(serials) == 1 + panel_qty + other_qty
 
     inv_item = next(s for s in serials if s["serial_no"] == inv_serial)
     assert inv_item["status"] == "DELIVERED"

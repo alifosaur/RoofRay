@@ -73,16 +73,9 @@ def create_quote_from_bom(db: Session, payload: QuoteCreate, current_user_id: in
     if payload.subsidy_amount is not None:
         subsidy = payload.subsidy_amount
     else:
-        # Benchmark: 3 kW = 78,000, 2 kW = 60,000, 1 kW = 30,000
-        if "on-grid" in template.system_type.lower():
-            if template.capacity_kw >= 3.0:
-                subsidy = 78000.0
-            elif template.capacity_kw >= 2.0:
-                subsidy = 60000.0
-            else:
-                subsidy = 30000.0
-        else:
-            subsidy = 0.0  # Off-Grid typically ineligible for central solar rooftop subsidy
+        from app.services import subsidy_service
+        sub = subsidy_service.central_subsidy(db, template.capacity_kw, template.system_type, lead.state)
+        subsidy = sub["central"] + sub["state"]
 
     # Taxes (13.8% composite solar GST)
     taxable_base = subtotal

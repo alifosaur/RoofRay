@@ -306,7 +306,7 @@ export const UsersPage: React.FC = () => {
                     type="tel"
                     value={newUser.phone}
                     onChange={(e) => setNewUser({ ...newUser, phone: e.target.value })}
-                    placeholder="+91 98110 00004"
+                    placeholder="Phone number"
                     className="w-full border border-gray-300 rounded px-3 py-2"
                   />
                 </div>
@@ -319,7 +319,7 @@ export const UsersPage: React.FC = () => {
                   required
                   value={newUser.email}
                   onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-                  placeholder="user@roofray.com"
+                  placeholder="name@company.com"
                   className="w-full border border-gray-300 rounded px-3 py-2"
                 />
               </div>

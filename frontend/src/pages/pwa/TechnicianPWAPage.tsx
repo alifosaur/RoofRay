@@ -299,7 +299,7 @@ export const TechnicianPWAPage: React.FC = () => {
               <div className="text-xs text-gray-300 space-y-1.5 pt-2 border-t border-slate-700">
                 <div className="flex items-center gap-2">
                   <FontAwesomeIcon icon={faMapMarkerAlt} className="text-red-400 w-3.5" />
-                  <span>{activeJob.site_address || 'Rooftop Site Location'}</span>
+                  <span>{activeJob.site_address || 'Address not provided'}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <FontAwesomeIcon icon={faBolt} className="text-amber-400 w-3.5" />
@@ -554,7 +554,7 @@ export const TechnicianPWAPage: React.FC = () => {
                     )}
                     <p className="text-[11px] text-gray-300 mt-1 flex items-center gap-1">
                       <FontAwesomeIcon icon={faMapMarkerAlt} className="text-red-400 w-3" />
-                      <span>{activeSurvey.site_address || 'Rooftop Site Location'}</span>
+                      <span>{activeSurvey.site_address || 'Address not provided'}</span>
                     </p>
                     <p className="text-[11px] text-gray-400 mt-0.5">
                       Target: <strong className="text-white">{activeSurvey.required_capacity || 3.0} kW {activeSurvey.system_type || 'On-Grid'}</strong> • Scheduled: {new Date(activeSurvey.scheduled_date).toLocaleString()}

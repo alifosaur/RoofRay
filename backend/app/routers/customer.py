@@ -18,6 +18,7 @@ from app.models.finance import Invoice, SubsidyRecord, SubsidyStatus
 from app.models.audit import AuditLog
 from app.models.notification import Notification
 from app.models.scheme import GovernmentScheme
+from app.models.bom import BOMTemplate
 from app.schemas.customer import (
     CustomerEnquiryCreate,
     CustomerEnquiryResponse,
@@ -30,7 +31,7 @@ from app.schemas.customer import (
     GovernmentSchemeOut,
     CustomerSubsidyOut,
 )
-from app.services import lead_service, quote_service, ticket_service
+from app.services import lead_service, quote_service, ticket_service, subsidy_service
 
 router = APIRouter(prefix="/customer", tags=["Customer Portal"])
 
@@ -597,6 +598,40 @@ def raise_customer_ticket(
     }
 
 
+@router.get("/packages")
+def list_solar_packages(db: Session = Depends(get_db)):
+    """Public package catalogue built from the BOM templates, product prices and the schemes table."""
+    out = []
+    for t in db.query(BOMTemplate).order_by(BOMTemplate.system_type.desc(), BOMTemplate.capacity_kw).all():
+        gross = round(sum(l.quantity * l.product.sale_price for l in t.lines), 2)
+        sub = subsidy_service.central_subsidy(db, t.capacity_kw, t.system_type)
+        subsidy = sub["central"] + sub["state"]
+        out.append({
+            "id": t.id,
+            "name": t.name,
+            "system_type": t.system_type,
+            "capacity_kw": t.capacity_kw,
+            "description": t.description,
+            "gross_price": gross,
+            "subsidy_amount": subsidy,
+            "net_price": round(max(0.0, gross - subsidy), 2),
+            "subsidy_eligible": subsidy_service.is_grid_connected(t.system_type),
+            # Same generation assumption as the estimator (~1,380 units per kW per year)
+            "monthly_generation_units": round(t.capacity_kw * 115),
+            "components": [
+                {
+                    "name": l.product.name,
+                    "category": l.product.category.value,
+                    "quantity": l.quantity,
+                    "warranty_years": l.product.warranty_years,
+                    "is_serialised": l.product.is_serialised,
+                }
+                for l in t.lines
+            ],
+        })
+    return out
+
+
 @router.get("/schemes", response_model=List[GovernmentSchemeOut])
 def list_government_schemes(db: Session = Depends(get_db)):
     """List active government solar subsidy schemes (PM Surya Ghar, state subsidies)."""
@@ -604,60 +639,31 @@ def list_government_schemes(db: Session = Depends(get_db)):
 
 
 @router.post("/schemes/estimate", response_model=SubsidyEstimatorResponse)
-def estimate_solar_subsidy(payload: SubsidyEstimatorRequest):
-    """
-    Interactive PM Surya Ghar: Muft Bijli Yojana subsidy calculator.
-    Formula:
-    - On-Grid: ₹30,000/kW for first 2 kW + ₹18,000 for 3rd kW (capped at ₹78,000 maximum CFA).
-    - Off-Grid: ₹0 central subsidy (ineligible).
-    - Turnkey benchmark system cost: ₹65,000 / kW.
-    - Average monthly power generation: ~115 units / kW / month (1,380 units/yr).
-    """
+def estimate_solar_subsidy(payload: SubsidyEstimatorRequest, db: Session = Depends(get_db)):
+    """Subsidy estimate from the admin-managed schemes table and the catalogue package price."""
     kw = payload.capacity_kw
     sys_type = payload.system_type.strip()
-    gross_cost = round(kw * 65000.0, 2)
-
-    if sys_type.lower() == "off-grid":
-        central_subsidy = 0.0
-        state_subsidy = 0.0
-        net_cost = gross_cost
-        is_eligible = False
-        breakdown = (
-            "Off-Grid solar systems are NOT eligible for central financial assistance under PM Surya Ghar. "
-            "Central subsidies apply exclusively to grid-connected residential rooftop systems with net-metering."
-        )
+    gross_cost = subsidy_service.package_price(db, kw, sys_type) or 0.0
+    sub = subsidy_service.central_subsidy(db, kw, sys_type, payload.state)
+    if not subsidy_service.is_grid_connected(sys_type):
+        breakdown = "NOT eligible: central subsidy applies to grid-connected (On-Grid) systems only."
     else:
-        # On-Grid PM Surya Ghar Rules
-        is_eligible = True
-        if kw <= 2.0:
-            central_subsidy = round(kw * 30000.0, 2)
-            breakdown = f"₹30,000 per kW × {kw:.1f} kW = ₹{central_subsidy:,.0f}"
-        elif kw <= 3.0:
-            central_subsidy = round(60000.0 + (kw - 2.0) * 18000.0, 2)
-            breakdown = f"₹60,000 (first 2 kW) + ₹{(kw - 2.0) * 18000.0:,.0f} (next {(kw - 2.0):.1f} kW) = ₹{central_subsidy:,.0f}"
-        else:
-            central_subsidy = 78000.0
-            breakdown = "Capped at maximum central subsidy limit of ₹78,000 for 3 kW and higher systems."
+        breakdown = sub["breakdown"]
 
-        # Optional State subsidy (e.g. Delhi GBI or Gujarat top-up)
-        state_subsidy = 3000.0 if payload.state and "delhi" in payload.state.lower() else 0.0
-        net_cost = round(gross_cost - central_subsidy - state_subsidy, 2)
-
+    # Generation assumption: ~1,380 units per kW per year at ₹7.50/unit
     annual_units = round(kw * 1380.0, 0)
-    annual_savings = round(annual_units * 7.50, 0)
-
     return SubsidyEstimatorResponse(
         capacity_kw=kw,
         system_type=sys_type,
         estimated_gross_cost=gross_cost,
-        central_subsidy=central_subsidy,
-        state_subsidy=state_subsidy,
-        estimated_net_cost=net_cost,
+        central_subsidy=sub["central"],
+        state_subsidy=sub["state"],
+        estimated_net_cost=round(max(0.0, gross_cost - sub["central"] - sub["state"]), 2),
         annual_savings_units=annual_units,
-        annual_bill_savings=annual_savings,
-        is_eligible=is_eligible,
+        annual_bill_savings=round(annual_units * 7.50, 0),
+        is_eligible=sub["eligible"],
         subsidy_breakdown=breakdown,
-        disclaimer="Estimates based on MNRE PM Surya Ghar guidelines. Actual subsidy requires DISCOM technical feasibility and net-meter commissioning.",
+        disclaimer="Estimate only. Confirm current amounts on the official portal; actual subsidy requires DISCOM feasibility and commissioning.",
         portal_url="https://pmsuryaghar.gov.in",
     )
 

@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { api } from '../../api/client';
 import { useNavigate } from 'react-router-dom';
 import { SiteNavbar } from '../../components/layout/SiteNavbar';
 import { SiteFooter } from '../../components/layout/SiteFooter';
@@ -15,7 +16,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 
 interface PackageItem {
-  id: string;
+  id: number;
   name: string;
   type: 'On-Grid' | 'Off-Grid';
   capacityKw: number;
@@ -26,101 +27,45 @@ interface PackageItem {
   panelCount: string;
   inverterSpec: string;
   batterySpec?: string;
-  recommendedFor: string;
   popular?: boolean;
+}
+
+// Maps an API package (BOM template + catalogue prices) to the card shape below
+export function toPackageItem(p: any): PackageItem {
+  const part = (cat: string) => p.components.find((c: any) => c.category === cat);
+  const label = (c: any) => (c ? `${c.quantity} × ${c.name} (${c.warranty_years}-yr warranty)` : '—');
+  return {
+    id: p.id,
+    name: p.name,
+    type: p.system_type,
+    capacityKw: p.capacity_kw,
+    tagline: p.description || '',
+    grossPrice: p.gross_price,
+    subsidyAmount: p.subsidy_amount,
+    monthlyGeneration: `~${p.monthly_generation_units} units / month`,
+    panelCount: label(part('panel')),
+    inverterSpec: label(part('inverter')),
+    batterySpec: part('battery') ? label(part('battery')) : undefined,
+  };
 }
 
 export const PackagesPage: React.FC = () => {
   const navigate = useNavigate();
   const [filterType, setFilterType] = useState<'ALL' | 'On-Grid' | 'Off-Grid'>('ALL');
-  const [selectedPackage, setSelectedPackage] = useState<PackageItem | null>(null);
-  const [enquirySuccess, setEnquirySuccess] = useState(false);
+  const [packages, setPackages] = useState<PackageItem[] | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const PACKAGES: PackageItem[] = [
-    {
-      id: 'on-grid-1kw',
-      name: '1 kW Compact On-Grid',
-      type: 'On-Grid',
-      capacityKw: 1.0,
-      tagline: 'Ideal for 1-2 BHK apartments or basic lighting load',
-      grossPrice: 58000,
-      subsidyAmount: 30000,
-      monthlyGeneration: '120 - 140 Units',
-      panelCount: '2 × 550W Mono PERC Panels',
-      inverterSpec: '1.5 kW Single-phase Smart String Inverter (IP65)',
-      recommendedFor: 'Basic residential apartments with small rooftops (100 sq.ft.)',
-    },
-    {
-      id: 'on-grid-2kw',
-      name: '2 kW Smart On-Grid',
-      type: 'On-Grid',
-      capacityKw: 2.0,
-      tagline: 'Best for standard 2-3 BHK homes with refrigerator & 1 AC',
-      grossPrice: 115000,
-      subsidyAmount: 60000,
-      monthlyGeneration: '240 - 280 Units',
-      panelCount: '4 × 550W Mono PERC Panels',
-      inverterSpec: '2.5 kW Smart On-Grid Inverter with Wi-Fi Logger',
-      recommendedFor: 'Homes with monthly bills between ₹2,000 - ₹3,500',
-    },
-    {
-      id: 'on-grid-3kw',
-      name: '3 kW Popular Residential',
-      type: 'On-Grid',
-      capacityKw: 3.0,
-      tagline: 'Maximum central subsidy benefit under PM Surya Ghar Yojana',
-      grossPrice: 165000,
-      subsidyAmount: 78000,
-      monthlyGeneration: '360 - 420 Units',
-      panelCount: '6 × 550W Bi-facial Half-Cut Panels',
-      inverterSpec: '3.3 kW High-efficiency String Inverter (98.2% efficiency)',
-      recommendedFor: '3-4 BHK homes with multiple ACs targeting ₹0 bills',
-      popular: true,
-    },
-    {
-      id: 'on-grid-5kw',
-      name: '5 kW Commercial & Villa',
-      type: 'On-Grid',
-      capacityKw: 5.0,
-      tagline: 'High yield for large residences, clinics, and offices',
-      grossPrice: 265000,
-      subsidyAmount: 78000,
-      monthlyGeneration: '600 - 700 Units',
-      panelCount: '10 × 550W TopCon High Efficiency Panels',
-      inverterSpec: '5 kW Dual-MPPT Three-phase/Single-phase Inverter',
-      recommendedFor: 'Independent villas, small factories, and high-power consumers',
-    },
-    {
-      id: 'off-grid-3kw',
-      name: '3 kW Off-Grid with Battery Bank',
-      type: 'Off-Grid',
-      capacityKw: 3.0,
-      tagline: 'Complete grid independence with lithium-ion / lead-acid backup',
-      grossPrice: 245000,
-      subsidyAmount: 0,
-      monthlyGeneration: '360 - 400 Units + Night Backup',
-      panelCount: '6 × 550W Mono PERC Panels',
-      inverterSpec: '3.5 kW Hybrid Solar Inverter with MPPT Solar Charger',
-      batterySpec: '5.12 kWh LiFePO4 Battery Bank (10-year design life)',
-      recommendedFor: 'Areas with frequent power cuts or farmhouses with unstable grid',
-    },
-    {
-      id: 'off-grid-5kw',
-      name: '5 kW Heavy-Duty Off-Grid',
-      type: 'Off-Grid',
-      capacityKw: 5.0,
-      tagline: 'Autonomous continuous power for remote properties and factories',
-      grossPrice: 385000,
-      subsidyAmount: 0,
-      monthlyGeneration: '600 - 680 Units + Full Day Backup',
-      panelCount: '10 × 550W Mono PERC Panels',
-      inverterSpec: '6 kW Hybrid Inverter with Smart Generator Interface',
-      batterySpec: '10.24 kWh Expandable Lithium Energy Storage System',
-      recommendedFor: 'Rural schools, commercial establishments, and luxury estates',
-    },
-  ];
+  const loadPackages = () => {
+    setLoadError(null);
+    api
+      .get<any[]>('/customer/packages')
+      .then((data) => setPackages(data.map(toPackageItem)))
+      .catch((err) => setLoadError(err.message || 'Could not load packages'));
+  };
 
-  const visiblePackages = PACKAGES.filter(
+  useEffect(loadPackages, []);
+
+  const visiblePackages = (packages || []).filter(
     (p) => filterType === 'ALL' || p.type === filterType
   );
 
@@ -159,7 +104,7 @@ export const PackagesPage: React.FC = () => {
                     : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-100'
                 }`}
               >
-                All Packages ({PACKAGES.length})
+                All Packages ({packages?.length ?? 0})
               </button>
               <button
                 onClick={() => setFilterType('On-Grid')}
@@ -187,6 +132,24 @@ export const PackagesPage: React.FC = () => {
 
         {/* Packages Grid */}
         <section className="py-16 max-w-[1320px] mx-auto px-6">
+          {loadError && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 text-sm rounded flex items-center justify-between">
+              <span>{loadError}</span>
+              <button onClick={loadPackages} className="font-semibold underline">Retry</button>
+            </div>
+          )}
+          {!packages && !loadError && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="h-96 rounded-xl bg-gray-100 animate-pulse" />
+              ))}
+            </div>
+          )}
+          {packages && visiblePackages.length === 0 && (
+            <div className="p-10 text-center text-gray-500 text-sm border border-dashed border-gray-300 rounded-xl">
+              No packages published yet.
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {visiblePackages.map((pkg) => {
               const netPrice = pkg.grossPrice - pkg.subsidyAmount;

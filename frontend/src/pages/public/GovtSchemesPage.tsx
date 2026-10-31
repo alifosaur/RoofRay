@@ -17,7 +17,7 @@ import {
 export const GovtSchemesPage: React.FC = () => {
   const [capacityKw, setCapacityKw] = useState<number>(3.0);
   const [systemType, setSystemType] = useState<string>('On-Grid');
-  const [stateName, setStateName] = useState<string>('Delhi');
+  const [stateName, setStateName] = useState<string>('National');
 
   const [estimate, setEstimate] = useState<any | null>(null);
   const [calculating, setCalculating] = useState<boolean>(false);
@@ -128,7 +128,7 @@ export const GovtSchemesPage: React.FC = () => {
                   <div className="flex justify-between text-[11px] text-gray-400 mt-1">
                     <span>1 kW</span>
                     <span>2 kW</span>
-                    <span>3 kW (Cap ₹78K)</span>
+                    <span>3 kW</span>
                     <span>4 kW</span>
                     <span>5 kW</span>
                   </div>
@@ -143,12 +143,12 @@ export const GovtSchemesPage: React.FC = () => {
                     onChange={(e) => setStateName(e.target.value)}
                     className="w-full px-3.5 py-2.5 border border-gray-300 rounded text-sm text-[#212529] focus:outline-none focus:border-[#6B4B63] focus:ring-2 focus:ring-[#6B4B63]/20"
                   >
-                    <option value="Delhi">Delhi NCR (Includes State GBI incentive)</option>
-                    <option value="Maharashtra">Maharashtra (MSEDCL)</option>
-                    <option value="Gujarat">Gujarat (GUVNL)</option>
-                    <option value="Karnataka">Karnataka (BESCOM)</option>
-                    <option value="Uttar Pradesh">Uttar Pradesh (UPPCL)</option>
-                    <option value="Haryana">Haryana (DHBVN)</option>
+                    <option value="National">National (central subsidy only)</option>
+                    {schemes
+                      .filter((sc) => !String(sc.state).toLowerCase().includes('national'))
+                      .map((sc) => (
+                        <option key={sc.id} value={sc.state}>{sc.state}</option>
+                      ))}
                   </select>
                 </div>
               </div>
@@ -170,7 +170,7 @@ export const GovtSchemesPage: React.FC = () => {
                       <div className="flex justify-between text-sm">
                         <span className="text-gray-600">Estimated Gross System Cost:</span>
                         <span className="font-semibold text-gray-900">
-                          ₹{estimate.gross_cost?.toLocaleString()}
+                          ₹{estimate.estimated_gross_cost?.toLocaleString()}
                         </span>
                       </div>
 
@@ -193,7 +193,7 @@ export const GovtSchemesPage: React.FC = () => {
                       <div className="pt-3 border-t border-dashed border-gray-200 flex justify-between items-baseline">
                         <span className="text-base font-bold text-[#212529]">Net Consumer Investment:</span>
                         <span className="text-3xl font-extrabold text-[#6B4B63]">
-                          ₹{estimate.net_cost?.toLocaleString()}
+                          ₹{estimate.estimated_net_cost?.toLocaleString()}
                         </span>
                       </div>
                     </div>

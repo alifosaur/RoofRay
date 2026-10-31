@@ -14,7 +14,7 @@ from app.models.job import InstallationJob, JobStatus
 from app.models.lead import Lead, LeadStatus
 from app.models.survey import Survey, SurveyStatus
 from app.models.ticket import Ticket, TicketStatus
-from app.models.product import Product
+from app.models.product import Product, ProductCategory
 from app.models.quote import Quote
 from app.models.finance import SubsidyRecord, SubsidyStatus
 
@@ -209,7 +209,7 @@ def get_director_dashboard_metrics(db: Session, date_range: str = "this_month") 
     }
 
     # 7. Low Stock Alerts
-    low_stock_count = db.query(Product).filter(Product.stock_quantity <= Product.min_stock_alert).count()
+    low_stock_count = db.query(Product).filter(Product.category != ProductCategory.SERVICE, Product.stock_quantity <= Product.min_stock_alert).count()
 
     return {
         "date_range": date_range,
@@ -352,14 +352,8 @@ def get_sales_metrics(db: Session, sales_user_id: Optional[int] = None) -> Dict[
     closed_count = won_count + lost_count
     conversion_rate = round((won_count / max(1, closed_count)) * 100, 1)
 
-    # Calculate pipeline value (active leads * standard kW rate or active quotes)
-    pipeline_value = 0.0
-    for l in active_leads:
-        quote = l.quotes[0] if l.quotes else None
-        if quote and quote.total_amount:
-            pipeline_value += quote.total_amount
-        else:
-            pipeline_value += (l.required_capacity or 3.0) * 65000.0
+    # Pipeline value = value of quotes on active leads (unquoted leads have no value yet)
+    pipeline_value = sum(l.quotes[-1].total_amount for l in active_leads if l.quotes)
 
     # Calculate won revenue and average deal size
     won_orders_query = db.query(Order).filter(Order.status != OrderStatus.DRAFT)

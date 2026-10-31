@@ -2,7 +2,7 @@ from datetime import datetime
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from app.models.inventory import StockMovement, MovementType, PickList, PickListLine
-from app.models.product import Product
+from app.models.product import Product, ProductCategory
 from app.models.order import Order, OrderStatus
 from app.models.audit import AuditLog
 from app.schemas.inventory import StockMovementCreate
@@ -52,7 +52,7 @@ def pack_pick_list(db: Session, pick_list_id: int, current_user_id: int) -> Pick
     short = [
         f"{l.product.name} (need {l.required_qty}, have {l.product.stock_quantity})"
         for l in pick_list.lines
-        if l.product and l.product.stock_quantity < l.required_qty
+        if l.product and l.product.category != ProductCategory.SERVICE and l.product.stock_quantity < l.required_qty
     ]
     if short:
         raise HTTPException(status_code=400, detail=f"Insufficient stock to pack: {', '.join(short)}")
@@ -62,7 +62,7 @@ def pack_pick_list(db: Session, pick_list_id: int, current_user_id: int) -> Pick
         line.picked_qty = line.required_qty
         # Deduct from product stock
         prod = line.product
-        if prod:
+        if prod and prod.category != ProductCategory.SERVICE:
             prod.stock_quantity -= line.required_qty
             # Create issue movement
             movement = StockMovement(

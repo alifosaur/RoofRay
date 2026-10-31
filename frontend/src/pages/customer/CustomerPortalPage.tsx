@@ -112,6 +112,11 @@ interface SchemeData {
   is_active: boolean;
   is_announcement: boolean;
   announcement_text?: string | null;
+  cfa_per_kw_first_2kw: number;
+  cfa_per_kw_3rd_kw: number;
+  cfa_max: number;
+  state_topup_per_kw: number;
+  grid_connected_only: boolean;
 }
 
 export const CustomerPortalPage: React.FC = () => {
@@ -126,6 +131,7 @@ export const CustomerPortalPage: React.FC = () => {
   const [orders, setOrders] = useState<OrderData[]>([]);
   const [equipment, setEquipment] = useState<EquipmentItem[]>([]);
   const [schemes, setSchemes] = useState<SchemeData[]>([]);
+  const nationalScheme = schemes.find((sc) => sc.state.toLowerCase().includes('national'));
   const [subsidy, setSubsidy] = useState<SubsidyRecord | null>(null);
   const [loading, setLoading] = useState(false);
   const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
@@ -290,115 +296,41 @@ export const CustomerPortalPage: React.FC = () => {
   };
 
   // Catalogue product definitions
-  const packages = [
-    {
-      id: 'on-grid-3kw',
-      title: '3 kW On-Grid Rooftop System',
-      badge: 'Most Popular',
-      badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-      systemType: 'On-Grid',
-      capacityKw: 3.0,
-      generation: '~4,140 units / yr',
-      roofArea: '300 sq.ft',
-      grossPrice: '₹1,95,000',
-      subsidy: '₹78,000 (PM Surya Ghar)',
-      netPrice: '₹1,17,000',
-      warranty: '20 yrs panels, 2 yrs inverter',
-      components: [
-        'Mono-PERC Solar Panels (540W × 6)',
-        '3 kW String Inverter (Grid-tied)',
-        'Galvanized GI Roof Mounting Structure',
-        'Dual Surge Protection DCDB & ACDB Boxes',
-        'Chemical Earthing Kit + Lightning Arrester',
-        'Net Metering Ready & DISCOM Approved',
-      ],
-    },
-    {
-      id: 'on-grid-5kw',
-      title: '5 kW On-Grid Premium System',
-      badge: 'High Savings',
-      badgeColor: 'bg-purple-100 text-purple-800 border-purple-200',
-      systemType: 'On-Grid',
-      capacityKw: 5.0,
-      generation: '~6,900 units / yr',
-      roofArea: '500 sq.ft',
-      grossPrice: '₹3,25,000',
-      subsidy: '₹78,000 (PM Surya Ghar Max Cap)',
-      netPrice: '₹2,47,000',
-      warranty: '20 yrs panels, 2 yrs inverter',
-      components: [
-        'Mono-PERC Solar Panels (540W × 10)',
-        '5 kW Dual-MPPT String Inverter',
-        'Heavy-Duty Anodized Aluminum Staging',
-        'Industrial Grade DC/AC Junction Boxes',
-        'Triple Chemical Earthing System',
-        'WiFi Remote Mobile Generation Monitoring',
-      ],
-    },
-    {
-      id: 'off-grid-3kw',
-      title: '3 kW Off-Grid Independent Power',
-      badge: 'Battery Backup',
-      badgeColor: 'bg-blue-100 text-blue-800 border-blue-200',
-      systemType: 'Off-Grid',
-      capacityKw: 3.0,
-      generation: '~3,900 units / yr',
-      roofArea: '300 sq.ft',
-      grossPrice: '₹2,65,000',
-      subsidy: 'Not Eligible for Central Subsidy',
-      netPrice: '₹2,65,000',
-      warranty: '20 yrs panels, 2 yrs battery & inverter',
-      components: [
-        'Mono-PERC Solar Panels (540W × 6)',
-        '3 kW Pure Sine Wave Hybrid Inverter',
-        '100 Ah 48V Lithium-ion Battery Bank',
-        'MPPT Battery Charge Controller',
-        'Galvanized Metal Mounting Brackets',
-        'Zero Grid Dependency / 24x7 Power',
-      ],
-    },
-    {
-      id: 'on-grid-2kw',
-      title: '2 kW Compact Rooftop System',
-      badge: 'Entry Level',
-      badgeColor: 'bg-amber-100 text-amber-800 border-amber-200',
-      systemType: 'On-Grid',
-      capacityKw: 2.0,
-      generation: '~2,760 units / yr',
-      roofArea: '200 sq.ft',
-      grossPrice: '₹1,30,000',
-      subsidy: '₹60,000 (₹30k / kW)',
-      netPrice: '₹70,000',
-      warranty: '20 yrs panels, 2 yrs inverter',
-      components: [
-        'Mono-PERC Solar Panels (540W × 4)',
-        '2 kW Smart Grid Inverter',
-        'Elevated GI Rooftop Structure',
-        'Integrated DC/AC Distribution Board',
-        'Copper Earthing & Cable Harness',
-      ],
-    },
-    {
-      id: 'hardware-panels',
-      title: 'Mono-PERC Solar Panel Set',
-      badge: 'Hardware Only',
-      badgeColor: 'bg-gray-100 text-gray-800 border-gray-200',
-      systemType: 'Hardware',
-      capacityKw: 3.2,
-      generation: '540W High Efficiency',
-      roofArea: 'Modular',
-      grossPrice: '₹84,000',
-      subsidy: 'Component Sale (No CFA)',
-      netPrice: '₹84,000',
-      warranty: '20 Years Performance Warranty',
-      components: [
-        'A-Grade Bifacial Mono-PERC Cells',
-        'Anti-Reflective Coated Tempered Glass',
-        'IP68 Sealed Junction Box with MC4',
-        'PID Resistant & Extreme Wind Certified',
-      ],
-    },
-  ];
+  const [packages, setPackages] = useState<any[] | null>(null);
+  const [packagesError, setPackagesError] = useState<string | null>(null);
+  const loadPackages = () => {
+    setPackagesError(null);
+    api
+      .get<any[]>('/customer/packages')
+      .then((data) =>
+        setPackages(
+          data.map((p) => {
+            const inr = (n: number) => `₹${Math.round(n).toLocaleString('en-IN')}`;
+            const warranties = Array.from(
+              new Set(p.components.filter((c: any) => c.warranty_years > 1).map((c: any) => `${c.warranty_years} yrs ${c.category}`))
+            );
+            return {
+              id: p.id,
+              title: p.name,
+              badge: p.subsidy_eligible ? 'Subsidy eligible' : 'Not subsidy eligible',
+              badgeColor: p.subsidy_eligible
+                ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                : 'bg-gray-100 text-gray-700 border-gray-200',
+              systemType: p.system_type,
+              capacityKw: p.capacity_kw,
+              generation: `~${(p.monthly_generation_units * 12).toLocaleString('en-IN')} units / yr`,
+              grossPrice: inr(p.gross_price),
+              subsidy: p.subsidy_eligible ? inr(p.subsidy_amount) : 'Not eligible (Off-Grid)',
+              netPrice: inr(p.net_price),
+              warranty: warranties.join(', ') || '—',
+              components: p.components.map((c: any) => `${c.name} × ${c.quantity}`),
+            };
+          })
+        )
+      )
+      .catch((err) => setPackagesError(err.message || 'Could not load packages'));
+  };
+  useEffect(loadPackages, []);
 
   return (
     <div className="min-h-screen bg-[#FDFCFD] flex flex-col font-sans select-text">
@@ -505,7 +437,7 @@ export const CustomerPortalPage: React.FC = () => {
                     Turnkey Rooftop Solar Systems (1 - 5 kW)
                   </h1>
                   <p className="text-xs text-purple-100 max-w-2xl leading-relaxed">
-                    Designed for residential rooftops with Tier-1 Mono-PERC panels, smart inverters, full BOM electrical kits, and direct PM Surya Ghar DBT subsidies up to ₹78,000.
+                    Designed for residential rooftops with Tier-1 Mono-PERC panels, smart inverters, full BOM electrical kits, and support with PM Surya Ghar subsidy applications.
                   </p>
                 </div>
                 <button
@@ -518,8 +450,22 @@ export const CustomerPortalPage: React.FC = () => {
               </div>
             </div>
 
+            {packagesError && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded flex justify-between">
+                <span>{packagesError}</span>
+                <button onClick={loadPackages} className="font-semibold underline">Retry</button>
+              </div>
+            )}
+            {!packages && !packagesError && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[0, 1, 2].map((i) => <div key={i} className="h-80 rounded-xl bg-gray-100 animate-pulse" />)}
+              </div>
+            )}
+            {packages && packages.length === 0 && (
+              <div className="p-8 text-center text-gray-500 text-sm border border-dashed rounded-xl">No packages published yet.</div>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {packages.map((pkg) => (
+              {(packages || []).map((pkg) => (
                 <div
                   key={pkg.id}
                   className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col justify-between"
@@ -554,8 +500,8 @@ export const CustomerPortalPage: React.FC = () => {
                         <strong className="text-gray-800">{pkg.generation}</strong>
                       </div>
                       <div>
-                        <span className="text-gray-400 block">Roof Area Needed:</span>
-                        <strong className="text-gray-800">{pkg.roofArea}</strong>
+                        <span className="text-gray-400 block">Capacity:</span>
+                        <strong className="text-gray-800">{pkg.capacityKw} kW</strong>
                       </div>
                     </div>
 
@@ -564,7 +510,7 @@ export const CustomerPortalPage: React.FC = () => {
                         BOM Hardware Included:
                       </span>
                       <ul className="space-y-1 text-xs text-gray-600">
-                        {pkg.components.map((comp, idx) => (
+                        {pkg.components.map((comp: string, idx: number) => (
                           <li key={idx} className="flex items-start gap-1.5">
                             <i className="fa-solid fa-check text-emerald-500 text-[10px] mt-0.5"></i>
                             <span className="text-[11px]">{comp}</span>
@@ -638,7 +584,7 @@ export const CustomerPortalPage: React.FC = () => {
                         value={enquiryForm.phone}
                         onChange={(e) => setEnquiryForm({ ...enquiryForm, phone: e.target.value })}
                         className="w-full px-3 py-2 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-odoo-purple focus:border-odoo-purple"
-                        placeholder="+91 98110 00007"
+                        placeholder="Phone number"
                       />
                     </div>
                     <div>
@@ -648,7 +594,7 @@ export const CustomerPortalPage: React.FC = () => {
                         value={enquiryForm.email}
                         onChange={(e) => setEnquiryForm({ ...enquiryForm, email: e.target.value })}
                         className="w-full px-3 py-2 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-odoo-purple focus:border-odoo-purple"
-                        placeholder="customer@roofray.com"
+                        placeholder="you@example.com"
                       />
                     </div>
                     <div className="sm:col-span-2">
@@ -1279,7 +1225,9 @@ export const CustomerPortalPage: React.FC = () => {
                     PM Surya Ghar: Muft Bijli Yojana
                   </h1>
                   <p className="text-xs text-orange-100 max-w-2xl leading-relaxed">
-                    Get up to ₹78,000 direct bank transfer (DBT) subsidy for residential rooftop solar installations. Enjoy up to 300 units of free clean solar electricity each month.
+                    {nationalScheme
+                      ? `Central subsidy of up to ₹${nationalScheme.cfa_max.toLocaleString('en-IN')} for grid-connected residential rooftop solar. Confirm current amounts on the official portal.`
+                      : 'Scheme details are not published yet.'}
                   </p>
                 </div>
                 <a
@@ -1294,23 +1242,26 @@ export const CustomerPortalPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Subsidy Slab Rules */}
+            {/* Subsidy Slab Rules (from the admin-managed schemes table) */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-                <span className="text-xs font-bold text-gray-400 block mb-1">1 kW System</span>
-                <div className="text-2xl font-bold text-orange-600 mb-1">₹30,000</div>
-                <p className="text-xs text-gray-500">Fixed Central Financial Assistance (CFA) directly credited to your bank account.</p>
-              </div>
-              <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-                <span className="text-xs font-bold text-gray-400 block mb-1">2 kW System</span>
-                <div className="text-2xl font-bold text-orange-600 mb-1">₹60,000</div>
-                <p className="text-xs text-gray-500">₹30,000 per kW for the first 2 kW of residential capacity.</p>
-              </div>
-              <div className="bg-white border-2 border-orange-500 rounded-xl p-5 shadow-sm bg-orange-50/20">
-                <span className="text-xs font-bold text-orange-600 block mb-1">3 kW & Above (Max Cap)</span>
-                <div className="text-2xl font-bold text-orange-600 mb-1">₹78,000</div>
-                <p className="text-xs text-gray-600 font-medium">₹60,000 + ₹18,000 for 3rd kW. Maximum central subsidy cap.</p>
-              </div>
+              {nationalScheme ? (
+                [1, 2, 3].map((kw) => {
+                  const amt = Math.min(
+                    Math.min(kw, 2) * nationalScheme.cfa_per_kw_first_2kw +
+                      Math.max(0, Math.min(kw, 3) - 2) * nationalScheme.cfa_per_kw_3rd_kw,
+                    nationalScheme.cfa_max || Infinity
+                  );
+                  return (
+                    <div key={kw} className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+                      <span className="text-xs font-bold text-gray-400 block mb-1">{kw === 3 ? '3 kW & Above (Max)' : `${kw} kW System`}</span>
+                      <div className="text-2xl font-bold text-orange-600 mb-1">₹{amt.toLocaleString('en-IN')}</div>
+                      <p className="text-xs text-gray-500">Central financial assistance for grid-connected systems.</p>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="md:col-span-3 p-5 text-xs text-gray-500 border border-dashed rounded-xl">No subsidy scheme published yet.</div>
+              )}
               <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
                 <span className="text-xs font-bold text-gray-400 block mb-1">Off-Grid Systems</span>
                 <div className="text-2xl font-bold text-gray-400 mb-1">₹0</div>
@@ -1385,7 +1336,11 @@ export const CustomerPortalPage: React.FC = () => {
                         className="w-full px-3 py-2 text-xs border border-gray-300 rounded"
                       >
                         <option value="National">National / General State</option>
-                        <option value="Delhi">Delhi NCT (+₹3,000 GBI)</option>
+                        {schemes
+                          .filter((sc) => !sc.state.toLowerCase().includes('national'))
+                          .map((sc) => (
+                            <option key={sc.id} value={sc.state}>{sc.state}</option>
+                          ))}
                       </select>
                     </div>
                   </div>

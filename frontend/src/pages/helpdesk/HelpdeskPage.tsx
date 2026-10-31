@@ -241,7 +241,7 @@ export const HelpdeskPage: React.FC = () => {
               />
               <input
                 type="text"
-                placeholder="e.g. +91 98765 43210, Sharma, or INV-482019"
+                placeholder="Serial number, customer name or phone"
                 value={lookupQuery}
                 onChange={(e) => setLookupQuery(e.target.value)}
                 className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded text-xs focus:outline-none focus:border-odoo-primary"

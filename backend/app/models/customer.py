@@ -13,7 +13,7 @@ class Customer(Base):
     phone = Column(String(32), unique=True, index=True, nullable=False)
     email = Column(String(255), nullable=True, index=True)
     address = Column(Text, nullable=False)
-    city = Column(String(100), default="Delhi NCR")
+    city = Column(String(100), nullable=True)
     pincode = Column(String(20), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 

@@ -46,7 +46,6 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-sunpower}:${POSTGRES_PASSWORD:-sunpower_secure_password}@postgres:5432/${POSTGRES_DB:-sunpower_db}
       REDIS_URL: redis://redis:6379/0
       DEV_AUTH_BYPASS: "True"
-      AUTO_SEED: "${AUTO_SEED:-true}"
       UPLOAD_DIR: "/app/uploads"
       SECRET_KEY: "${SECRET_KEY:-sunpower-super-secret-key-production-ready}"
       PORT: "${BACKEND_PORT:-8000}"

@@ -152,8 +152,14 @@ def test_government_schemes_and_subsidy_calculator():
     assert calc_on_grid.status_code == 200
     res_on = calc_on_grid.json()
     assert res_on["central_subsidy"] == 78000.0
-    assert res_on["estimated_gross_cost"] == 195000.0  # 3 * 65000
-    assert res_on["estimated_net_cost"] == 117000.0  # 195000 - 78000
+    # Gross cost is the catalogue price of the 3 kW On-Grid BOM template
+    db = SessionLocal()
+    from app.services.subsidy_service import package_price
+    expected_gross = package_price(db, 3.0, "On-Grid")
+    db.close()
+    assert expected_gross > 0
+    assert res_on["estimated_gross_cost"] == expected_gross
+    assert res_on["estimated_net_cost"] == round(expected_gross - 78000.0, 2)
     assert res_on["is_eligible"] is True
 
     # 3. Off-Grid calculator (Ineligible for central subsidy)

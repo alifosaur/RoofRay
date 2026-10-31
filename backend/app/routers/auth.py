@@ -78,9 +78,9 @@ def register(payload: UserRegisterRequest, db: Session = Depends(get_db)):
             name=payload.full_name.strip(),
             phone=payload.phone.strip(),
             email=email_clean,
-            address=payload.address or "Delhi NCR",
-            city=payload.city or "Delhi NCR",
-            pincode=payload.pincode or "110001",
+            address=payload.address or "",
+            city=payload.city,
+            pincode=payload.pincode,
         )
         db.add(customer)
 

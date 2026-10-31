@@ -69,7 +69,7 @@ def generate_quote_pdf(quote, customer, lead, template_name: str) -> str:
 
     # Header
     story.append(Paragraph("RoofRay Solutions", title_style))
-    story.append(Paragraph("Complete Rooftop Solar Engineering & EPC | Phone: +91 98765 43210 | www.roofray.com", subtitle_style))
+    story.append(Paragraph(settings.COMPANY_CONTACT_LINE, subtitle_style))
     story.append(Spacer(1, 10))
 
     # Meta Table (Customer & Quote details)

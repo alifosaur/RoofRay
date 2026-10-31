@@ -59,7 +59,7 @@ def test_login_unified_endpoint():
     assert cust_login.json()["user"]["role"] == "customer"
 
     # Test admin login
-    admin_login = client.post("/api/auth/login", json={"email": "admin@roofray.com"})
+    admin_login = client.post("/api/auth/login", json={"email": "admin@test.local"})
     assert admin_login.status_code == 200
     assert admin_login.json()["user"]["role"] == "admin"
 

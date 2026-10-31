@@ -6,7 +6,6 @@ import { ScriptHeading } from '../../components/common/ScriptHeading';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faQuestionCircle,
-  faPhoneAlt,
   faEnvelope,
   faHeadset,
   faChevronDown,
@@ -39,7 +38,7 @@ export const HelpPage: React.FC = () => {
     {
       question: 'How much government subsidy can I receive under PM Surya Ghar?',
       answer:
-        'Under the central PM Surya Ghar: Muft Bijli Yojana, residential consumers receive ₹30,000 per kW for the first 2 kW (₹60,000 total) and ₹18,000 for the 3rd kW, capping at ₹78,000 for 3 kW and higher systems. Subsidies are disbursed directly via DBT into your Aadhaar-linked bank account.',
+        'Under the central PM Surya Ghar: Muft Bijli Yojana, grid-connected residential systems receive central financial assistance per kW up to a cap. Current amounts are listed on our Government Schemes page and on pmsuryaghar.gov.in. Subsidies are credited directly to your bank account.',
     },
     {
       question: 'What happens during cloudy days or rainy monsoons?',
@@ -121,12 +120,6 @@ export const HelpPage: React.FC = () => {
               </p>
 
               <div className="space-y-4 text-sm text-[#495057] mb-8">
-                <div className="flex items-center space-x-3">
-                  <FontAwesomeIcon icon={faPhoneAlt} className="text-plum w-4" />
-                  <a href="tel:+919811000000" className="hover:underline font-semibold text-[#212529]">
-                    +91 (011) 4567-8900
-                  </a>
-                </div>
                 <div className="flex items-center space-x-3">
                   <FontAwesomeIcon icon={faEnvelope} className="text-plum w-4" />
                   <a href="mailto:support@roofray.com" className="hover:underline">

@@ -54,9 +54,9 @@ class UserRegisterRequest(BaseModel):
     full_name: str
     phone: str
     password: Optional[str] = None
-    address: Optional[str] = "Delhi NCR"
-    city: Optional[str] = "Delhi NCR"
-    pincode: Optional[str] = "110001"
+    address: Optional[str] = None
+    city: Optional[str] = None
+    pincode: Optional[str] = None
     firebase_uid: Optional[str] = None
     # Any role field provided is ignored/discarded for security
 

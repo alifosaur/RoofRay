@@ -32,12 +32,6 @@ sys.exit(1)
 EOF
 fi
 
-# Run database seeder if AUTO_SEED is enabled
-if [ "${AUTO_SEED:-false}" = "true" ] || [ "${AUTO_SEED:-0}" = "1" ]; then
-  echo "Running database seeder (AUTO_SEED=true)..."
-  python seed.py || echo "Warning: Seeder exited with non-zero status (data might already exist)."
-fi
-
 echo "Starting Uvicorn Server..."
 exec "$@"
 

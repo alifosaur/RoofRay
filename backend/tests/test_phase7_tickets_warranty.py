@@ -13,11 +13,17 @@ sales_headers = {"Authorization": "Bearer sales_uid"}
 
 
 def test_warranty_lookup_and_ticket_billing_gate():
+    import uuid
+    run_id = uuid.uuid4().hex[:6].upper()
+    phone_test = f"981{uuid.uuid4().int % 10000000:07d}"
+    in_serial_no = f"INV-IN-{run_id}"
+    out_serial_no = f"INV-OUT-{run_id}"
+
     # Setup test customer with two serials: one in-warranty, one out-of-warranty
     db = SessionLocal()
     cust = Customer(
         name="Deepa Sharma",
-        phone="9818818818",
+        phone=phone_test,
         address="A-45 Preet Vihar, Delhi",
     )
     db.add(cust)
@@ -28,7 +34,7 @@ def test_warranty_lookup_and_ticket_billing_gate():
     today = date.today()
     # In-warranty serial (expires in 1 year)
     s_in = SerialItem(
-        serial_no="INV-IN-WARRANTY-1234",
+        serial_no=in_serial_no,
         product_id=prod.id,
         customer_id=cust.id,
         status=SerialStatus.INSTALLED,
@@ -37,7 +43,7 @@ def test_warranty_lookup_and_ticket_billing_gate():
     )
     # Out-of-warranty serial (expired 6 months ago)
     s_out = SerialItem(
-        serial_no="INV-OUT-WARRANTY-5678",
+        serial_no=out_serial_no,
         product_id=prod.id,
         customer_id=cust.id,
         status=SerialStatus.INSTALLED,
@@ -53,14 +59,14 @@ def test_warranty_lookup_and_ticket_billing_gate():
     db.close()
 
     # 1. TEST SUPPORT LOOKUP
-    lookup_by_serial = client.get("/api/tickets/lookup?query=INV-IN-WARRANTY-1234", headers=support_headers)
+    lookup_by_serial = client.get(f"/api/tickets/lookup?query={in_serial_no}", headers=support_headers)
     assert lookup_by_serial.status_code == 200
     res1 = lookup_by_serial.json()[0]
     assert res1["customer_name"] == "Deepa Sharma"
     assert res1["in_warranty"] is True
     assert res1["days_left"] > 0
 
-    lookup_by_phone = client.get("/api/tickets/lookup?query=9818818818", headers=support_headers)
+    lookup_by_phone = client.get(f"/api/tickets/lookup?query={phone_test}", headers=support_headers)
     assert lookup_by_phone.status_code == 200
     assert len(lookup_by_phone.json()) == 2
 

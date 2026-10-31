@@ -11,9 +11,11 @@ tech_headers = {"Authorization": "Bearer tech_uid"}
 
 @pytest.fixture(scope="module")
 def setup_catalog():
+    import uuid
+    run_id = uuid.uuid4().hex[:6].upper()
     # 1. Create products
     p_panel = client.post("/api/products", headers=admin_headers, json={
-        "sku": "PANEL-540W-MONO",
+        "sku": f"PANEL-{run_id}",
         "name": "SunPower 540W Mono PERC Solar Panel",
         "category": "panel",
         "warranty_years": 20,
@@ -24,7 +26,7 @@ def setup_catalog():
     }).json()
 
     p_inverter = client.post("/api/products", headers=admin_headers, json={
-        "sku": "INV-3KW-GROWATT",
+        "sku": f"INV-{run_id}",
         "name": "Growatt 3kW Single Phase On-Grid Inverter",
         "category": "inverter",
         "warranty_years": 2,
@@ -35,7 +37,7 @@ def setup_catalog():
     }).json()
 
     p_bos = client.post("/api/products", headers=admin_headers, json={
-        "sku": "BOS-3KW-KIT",
+        "sku": f"BOS-{run_id}",
         "name": "Complete 3kW ACDB/DCDB, Earthing & Structure Kit",
         "category": "balance_of_system",
         "warranty_years": 5,
@@ -47,7 +49,7 @@ def setup_catalog():
 
     # 2. Create 3 kW On-Grid BOM Template
     template = client.post("/api/bom-templates", headers=admin_headers, json={
-        "name": "3 kW On-Grid System Standard",
+        "name": f"3 kW On-Grid System {run_id}",
         "capacity_kw": 3.0,
         "system_type": "On-Grid",
         "description": "Standard 3kW rooftop system with 6 panels and 3kW inverter",

@@ -12,9 +12,11 @@ tech_headers = {"Authorization": "Bearer tech_uid"}
 
 
 def test_inventory_purchase_and_stock():
+    import uuid
+    run_id = uuid.uuid4().hex[:6].upper()
     # 1. Create a product with 0 stock
     prod = client.post("/api/products", headers=admin_headers, json={
-        "sku": "CABLE-4SQMM-DC",
+        "sku": f"CABLE-{run_id}",
         "name": "Solar DC Cable 4 sq mm (Red/Black)",
         "category": "balance_of_system",
         "warranty_years": 5,

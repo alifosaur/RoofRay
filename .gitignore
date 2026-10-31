@@ -33,3 +33,6 @@ frontend/.env
 
 # Local DB backups
 backups/
+
+# Firebase service account key (private)
+backend/secrets/*.json

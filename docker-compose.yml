@@ -51,10 +51,17 @@ services:
       HOST: "0.0.0.0"
       BACKEND_PORT: "${BACKEND_PORT:-8000}"
       FRONTEND_PORT: "${FRONTEND_PORT:-5173}"
+      # Firebase: auth switches on when the service-account file exists in backend/secrets/
+      FIREBASE_CREDENTIALS_PATH: /app/secrets/firebase-service-account.json
+      FIREBASE_WEB_API_KEY: "${FIREBASE_WEB_API_KEY:-}"
+      FIREBASE_WEB_AUTH_DOMAIN: "${FIREBASE_WEB_AUTH_DOMAIN:-}"
+      FIREBASE_WEB_PROJECT_ID: "${FIREBASE_WEB_PROJECT_ID:-}"
+      FIREBASE_WEB_APP_ID: "${FIREBASE_WEB_APP_ID:-}"
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     volumes:
       - backend_uploads:/app/uploads
+      - ./backend/secrets:/app/secrets:ro
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 10s

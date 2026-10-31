@@ -21,10 +21,26 @@ export const LeadFormPage: React.FC = () => {
   });
 
   const [surveySchedule, setSurveySchedule] = useState({
-    technician_id: 3,
+    technician_id: 6,
     scheduled_date: new Date(Date.now() + 86400000 * 2).toISOString().slice(0, 16),
-    notes: 'Check inverter cable run to main distribution box.',
+    notes: 'Check inverter cable run to main distribution box and measure roof tilt.',
   });
+  const [technicians, setTechnicians] = useState<any[]>([]);
+
+  const fetchTechnicians = async () => {
+    try {
+      const data = await api.get<any[]>('/users?role=technician');
+      if (data && data.length > 0) {
+        setTechnicians(data);
+        setSurveySchedule((prev) => ({
+          ...prev,
+          technician_id: data[0].id,
+        }));
+      }
+    } catch (e) {
+      console.warn('Failed to load technician list', e);
+    }
+  };
 
   const fetchLeadData = async () => {
     try {
@@ -39,6 +55,7 @@ export const LeadFormPage: React.FC = () => {
 
   useEffect(() => {
     fetchLeadData();
+    fetchTechnicians();
   }, [id]);
 
   if (!lead) {
@@ -402,7 +419,15 @@ export const LeadFormPage: React.FC = () => {
                   onChange={(e) => setSurveySchedule({ ...surveySchedule, technician_id: Number(e.target.value) })}
                   className="w-full border border-gray-300 rounded px-2 py-1.5 focus:border-odoo-accent focus:outline-none"
                 >
-                  <option value={3}>Amit Verma (Lead Technician)</option>
+                  {technicians.length > 0 ? (
+                    technicians.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.full_name} ({t.email})
+                      </option>
+                    ))
+                  ) : (
+                    <option value={6}>Amit Verma (Lead Tech #1)</option>
+                  )}
                 </select>
               </div>
 

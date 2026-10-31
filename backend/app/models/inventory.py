@@ -36,6 +36,14 @@ class PickList(Base):
     order = relationship("Order", back_populates="pick_list")
     lines = relationship("PickListLine", back_populates="pick_list", cascade="all, delete-orphan")
 
+    @property
+    def order_number(self) -> str:
+        return self.order.order_number if self.order else ""
+
+    @property
+    def customer_name(self) -> str:
+        return self.order.customer.name if (self.order and self.order.customer) else ""
+
 
 class PickListLine(Base):
     __tablename__ = "pick_list_lines"

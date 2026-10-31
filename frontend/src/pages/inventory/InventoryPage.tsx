@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { api } from '../../api/client';
 import { ControlPanel } from '../../components/odoo/ControlPanel';
 import { ListView } from '../../components/odoo/ListView';
@@ -9,7 +9,16 @@ import {
   faDolly,
   faCheck,
   faListCheck,
+  faBarcode,
+  faCamera,
+  faCheckCircle,
+  faPlus,
+  faMinus,
+  faRotateLeft,
+  faCheckDouble,
+  faTimes,
 } from '@fortawesome/free-solid-svg-icons';
+import { Html5QrcodeScanner } from 'html5-qrcode';
 
 export const InventoryPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'stock' | 'picklists'>('stock');
@@ -18,6 +27,13 @@ export const InventoryPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [lowStockOnly, setLowStockOnly] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Interactive Checklist & Barcode Scanning Modal for Pick Lists
+  const [selectedPickList, setSelectedPickList] = useState<any | null>(null);
+  const [barcodeInput, setBarcodeInput] = useState('');
+  const [scanMessage, setScanMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [scanningCamera, setScanningCamera] = useState(false);
+  const scannerRef = useRef<Html5QrcodeScanner | null>(null);
 
   // Purchase modal
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
@@ -34,9 +50,9 @@ export const InventoryPage: React.FC = () => {
         api.get<any[]>(`/inventory/stock?low_stock_only=${lowStockOnly}`),
         api.get<any[]>('/inventory/pick-lists'),
       ]);
-      setProducts(prodsData);
-      setPickLists(picksData);
-      if (prodsData.length > 0 && selectedProductId === 0) {
+      setProducts(prodsData || []);
+      setPickLists(picksData || []);
+      if (prodsData && prodsData.length > 0 && selectedProductId === 0) {
         setSelectedProductId(prodsData[0].id);
         setPurchaseCost(prodsData[0].cost_price || 0);
       }
@@ -50,6 +66,36 @@ export const InventoryPage: React.FC = () => {
   useEffect(() => {
     fetchData();
   }, [lowStockOnly]);
+
+  // Camera scanner effect for PickList modal
+  useEffect(() => {
+    if (scanningCamera && selectedPickList) {
+      const scanner = new Html5QrcodeScanner(
+        'picklist-barcode-reader',
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        false
+      );
+      scanner.render(
+        (decodedText) => {
+          handleScanCode(decodedText);
+          setScanningCamera(false);
+          scanner.clear().catch(() => {});
+        },
+        () => {}
+      );
+      scannerRef.current = scanner;
+    } else {
+      if (scannerRef.current) {
+        scannerRef.current.clear().catch(() => {});
+        scannerRef.current = null;
+      }
+    }
+    return () => {
+      if (scannerRef.current) {
+        scannerRef.current.clear().catch(() => {});
+      }
+    };
+  }, [scanningCamera, selectedPickList]);
 
   const handleInwardPurchase = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,10 +118,82 @@ export const InventoryPage: React.FC = () => {
     }
   };
 
-  const handlePackPickList = async (pickListId: number) => {
+  const handleToggleLinePick = async (lineId: number, currentPicked: number, required: number) => {
+    if (!selectedPickList) return;
     try {
-      await api.put(`/inventory/pick-lists/${pickListId}/pack`);
+      const newQty = currentPicked >= required ? 0 : required;
+      const updated = await api.put<any>(
+        `/inventory/pick-lists/${selectedPickList.id}/lines/${lineId}/pick?qty=${newQty}`
+      );
+      setSelectedPickList(updated);
+      setPickLists((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+    } catch (err: any) {
+      setScanMessage({ type: 'error', text: err.message || 'Failed to update item check' });
+    }
+  };
+
+  const handleAdjustQty = async (lineId: number, delta: number) => {
+    if (!selectedPickList) return;
+    const line = selectedPickList.lines?.find((l: any) => l.id === lineId);
+    if (!line) return;
+    const newQty = Math.max(0, Math.min(line.required_qty, (line.picked_qty || 0) + delta));
+    try {
+      const updated = await api.put<any>(
+        `/inventory/pick-lists/${selectedPickList.id}/lines/${lineId}/pick?qty=${newQty}`
+      );
+      setSelectedPickList(updated);
+      setPickLists((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+    } catch (err: any) {
+      setScanMessage({ type: 'error', text: err.message || 'Failed to adjust qty' });
+    }
+  };
+
+  const handleScanCode = async (rawCode?: string) => {
+    if (!selectedPickList) return;
+    const code = (rawCode || barcodeInput).trim();
+    if (!code) return;
+    try {
+      const updated = await api.post<any>(`/inventory/pick-lists/${selectedPickList.id}/scan`, { code });
+      setSelectedPickList(updated);
+      setPickLists((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+      setScanMessage({
+        type: 'success',
+        text: `✓ Successfully scanned and verified item [${code}]! Checklist updated.`,
+      });
+      setBarcodeInput('');
+    } catch (err: any) {
+      setScanMessage({
+        type: 'error',
+        text: err.message || `No item matching barcode/SKU '${code}' in this installation checklist.`,
+      });
+    }
+  };
+
+  const handleTickAllItems = async () => {
+    if (!selectedPickList || !selectedPickList.lines) return;
+    try {
+      let current = selectedPickList;
+      for (const line of selectedPickList.lines) {
+        if (line.picked_qty < line.required_qty) {
+          current = await api.put<any>(
+            `/inventory/pick-lists/${selectedPickList.id}/lines/${line.id}/pick?qty=${line.required_qty}`
+          );
+        }
+      }
+      setSelectedPickList(current);
+      setPickLists((prev) => prev.map((p) => (p.id === current.id ? current : p)));
+      setScanMessage({ type: 'success', text: 'All installation items marked as verified & picked!' });
+    } catch (err: any) {
+      alert(err.message || 'Failed to tick all items');
+    }
+  };
+
+  const handlePackAndPlaceOrder = async (pickListId: number) => {
+    try {
+      const updated = await api.put<any>(`/inventory/pick-lists/${pickListId}/pack`);
+      setSelectedPickList(null);
       fetchData();
+      alert(`✓ Installation checklist completed! Order has been placed into PACKED status and warehouse stock deducted.`);
     } catch (err: any) {
       alert(err.message || 'Failed to pack pick list');
     }
@@ -125,7 +243,7 @@ export const InventoryPage: React.FC = () => {
         return (
           <div className="flex items-center space-x-1.5">
             <span className={`font-bold ${isLow ? 'text-red-600' : 'text-gray-800'}`}>
-              {row.stock_quantity} {row.uom}
+              {row.stock_quantity} {row.uom || 'units'}
             </span>
             {isLow && (
               <FontAwesomeIcon
@@ -141,7 +259,7 @@ export const InventoryPage: React.FC = () => {
     {
       key: 'min_stock_alert',
       header: 'Min Alert',
-      accessor: (row: any) => `${row.min_stock_alert} ${row.uom}`,
+      accessor: (row: any) => `${row.min_stock_alert} ${row.uom || 'units'}`,
     },
     {
       key: 'cost_price',
@@ -165,13 +283,22 @@ export const InventoryPage: React.FC = () => {
       key: 'pick_list_number',
       header: 'Pick List #',
       accessor: (row: any) => (
-        <span className="font-mono font-bold text-odoo-primary">{row.pick_list_number}</span>
+        <span className="font-mono font-bold text-odoo-primary">
+          PL-{String(row.id).padStart(4, '0')}
+        </span>
       ),
     },
     {
       key: 'order_id',
-      header: 'Order #',
-      accessor: (row: any) => `Order #${row.order_id}`,
+      header: 'Order Reference',
+      accessor: (row: any) => (
+        <div>
+          <span className="font-bold text-gray-900">{row.order_number || `Order #${row.order_id}`}</span>
+          {row.customer_name && (
+            <span className="block text-[11px] text-gray-500">{row.customer_name}</span>
+          )}
+        </div>
+      ),
     },
     {
       key: 'status',
@@ -190,37 +317,61 @@ export const InventoryPage: React.FC = () => {
     },
     {
       key: 'items',
-      header: 'Items to Pick',
-      accessor: (row: any) => (
-        <div className="space-y-1">
-          {row.items?.map((item: any, idx: number) => (
-            <div key={idx} className="text-[11px] text-gray-700">
-              <span className="font-medium">{item.product_name}</span>: {item.quantity_required} req.
+      header: 'Installation Checklist Progress',
+      accessor: (row: any) => {
+        const lines = row.lines || row.items || [];
+        const completedLines = lines.filter((l: any) => (l.picked_qty || 0) >= (l.required_qty || 1)).length;
+        const totalLines = lines.length;
+        const pct = totalLines > 0 ? Math.round((completedLines / totalLines) * 100) : 0;
+
+        return (
+          <div className="space-y-1.5 min-w-[200px]">
+            <div className="flex justify-between text-[11px]">
+              <span className="text-gray-600 font-medium">
+                {completedLines} of {totalLines} items verified
+              </span>
+              <span className="font-bold text-odoo-primary">{pct}%</span>
             </div>
-          ))}
-        </div>
-      ),
+            <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+              <div
+                className={`h-full transition-all ${pct === 100 ? 'bg-emerald-500' : 'bg-amber-500'}`}
+                style={{ width: `${pct}%` }}
+              ></div>
+            </div>
+            <div className="text-[10px] text-gray-400 truncate">
+              {lines.slice(0, 2).map((l: any) => l.product?.name || `Product #${l.product_id}`).join(', ')}
+              {lines.length > 2 && ` +${lines.length - 2} more`}
+            </div>
+          </div>
+        );
+      },
     },
     {
       key: 'action',
       header: 'Action',
-      accessor: (row: any) =>
-        row.status === 'PENDING' ? (
+      accessor: (row: any) => (
+        <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handlePackPickList(row.id);
+            type="button"
+            onClick={() => {
+              setSelectedPickList(row);
+              setScanMessage(null);
             }}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded text-[11px] font-medium shadow-xs flex items-center gap-1"
+            className="bg-[#6B4B63] hover:bg-[#583D51] text-white px-2.5 py-1 rounded text-[11px] font-bold shadow-xs flex items-center gap-1 transition-colors"
           >
-            <FontAwesomeIcon icon={faCheck} />
-            <span>Mark Packed</span>
+            <FontAwesomeIcon icon={faBarcode} />
+            <span>{row.status === 'PACKED' ? 'View Checklist' : 'Pick & Scan Checklist'}</span>
           </button>
-        ) : (
-          <span className="text-gray-400 text-xs italic">Packed & Ready</span>
-        ),
+        </div>
+      ),
     },
   ];
+
+  // Checklist completion calculation for modal
+  const modalLines = selectedPickList?.lines || [];
+  const modalCompletedCount = modalLines.filter((l: any) => (l.picked_qty || 0) >= (l.required_qty || 1)).length;
+  const modalAllCompleted = modalLines.length > 0 && modalCompletedCount === modalLines.length;
+  const modalPct = modalLines.length > 0 ? Math.round((modalCompletedCount / modalLines.length) * 100) : 0;
 
   return (
     <div className="flex-1 flex flex-col">
@@ -288,9 +439,320 @@ export const InventoryPage: React.FC = () => {
         ) : activeTab === 'stock' ? (
           <ListView columns={stockColumns} data={filteredProducts} />
         ) : (
-          <ListView columns={pickListColumns} data={pickLists} />
+          <ListView
+            columns={pickListColumns}
+            data={pickLists}
+            onRowClick={(row) => {
+              setSelectedPickList(row);
+              setScanMessage(null);
+            }}
+          />
         )}
       </div>
+
+      {/* Interactive Installation Pick List Checklist & Barcode Scanner Modal */}
+      {selectedPickList && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full border border-gray-200 overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in duration-150">
+            {/* Modal Header */}
+            <div className="px-5 py-3.5 bg-gradient-to-r from-purple-50 via-white to-gray-50 border-b border-gray-200 flex justify-between items-center">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono font-bold text-sm text-[#6B4B63]">
+                    Pick List #{selectedPickList.id}
+                  </span>
+                  <span className="text-gray-300">•</span>
+                  <span className="font-semibold text-xs text-gray-800">
+                    {selectedPickList.order_number || `Order #${selectedPickList.order_id}`}
+                  </span>
+                  <span
+                    className={`ml-2 px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                      selectedPickList.status === 'PACKED'
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : 'bg-amber-100 text-amber-800'
+                    }`}
+                  >
+                    {selectedPickList.status}
+                  </span>
+                </div>
+                <div className="text-[11px] text-gray-500 mt-0.5">
+                  Pre-generated installation BOM checklist. Verify each item by scanning or ticking before placing order.
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedPickList(null);
+                  setScanningCamera(false);
+                }}
+                className="text-gray-400 hover:text-gray-600 text-lg font-bold p-1 rounded hover:bg-gray-100"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Checklist Progress Strip */}
+            <div className="px-5 py-3 bg-gray-50 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+              <div className="flex-1">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="font-semibold text-gray-700">
+                    Checklist Verification Progress ({modalCompletedCount}/{modalLines.length} items ready)
+                  </span>
+                  <span className="font-bold text-[#6B4B63]">{modalPct}%</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                  <div
+                    className={`h-full transition-all duration-300 ${
+                      modalAllCompleted ? 'bg-emerald-600' : 'bg-[#6B4B63]'
+                    }`}
+                    style={{ width: `${modalPct}%` }}
+                  ></div>
+                </div>
+              </div>
+
+              {selectedPickList.status !== 'PACKED' && (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleTickAllItems}
+                    className="px-2.5 py-1 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded text-xs font-semibold flex items-center gap-1 shadow-2xs"
+                  >
+                    <FontAwesomeIcon icon={faCheckDouble} className="text-emerald-600" />
+                    <span>Tick All</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Barcode & SKU Scanner Area */}
+            {selectedPickList.status !== 'PACKED' && (
+              <div className="px-5 py-3 border-b border-gray-200 bg-white">
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleScanCode();
+                  }}
+                  className="flex flex-col sm:flex-row items-center gap-2"
+                >
+                  <div className="relative flex-1 w-full">
+                    <FontAwesomeIcon
+                      icon={faBarcode}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Scan or type product barcode / SKU (e.g. SP-PNL-540W or serial)..."
+                      value={barcodeInput}
+                      onChange={(e) => setBarcodeInput(e.target.value)}
+                      className="w-full pl-9 pr-3 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:border-[#6B4B63] font-mono"
+                    />
+                  </div>
+                  <div className="flex items-center gap-1.5 w-full sm:w-auto">
+                    <button
+                      type="submit"
+                      className="flex-1 sm:flex-none px-3 py-1.5 bg-[#6B4B63] hover:bg-[#583D51] text-white text-xs font-bold rounded-lg shadow-xs transition-colors"
+                    >
+                      Scan Item
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setScanningCamera(!scanningCamera)}
+                      className={`px-3 py-1.5 border rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+                        scanningCamera
+                          ? 'bg-rose-50 border-rose-300 text-rose-700'
+                          : 'bg-gray-100 hover:bg-gray-200 text-gray-700 border-gray-300'
+                      }`}
+                    >
+                      <FontAwesomeIcon icon={faCamera} />
+                      <span>{scanningCamera ? 'Close Camera' : 'Camera'}</span>
+                    </button>
+                  </div>
+                </form>
+
+                {/* Camera Scanner Viewport */}
+                {scanningCamera && (
+                  <div className="mt-3 p-3 bg-gray-900 rounded-lg text-center">
+                    <div id="picklist-barcode-reader" className="w-full max-w-sm mx-auto overflow-hidden rounded"></div>
+                    <div className="text-[11px] text-gray-300 mt-2">
+                      Point camera at 1D Barcode or QR code on item package / label.
+                    </div>
+                  </div>
+                )}
+
+                {/* Scan Feedback Message */}
+                {scanMessage && (
+                  <div
+                    className={`mt-2 p-2 rounded text-xs flex items-center justify-between ${
+                      scanMessage.type === 'success'
+                        ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                        : 'bg-red-50 text-red-800 border border-red-200'
+                    }`}
+                  >
+                    <span>{scanMessage.text}</span>
+                    <button
+                      type="button"
+                      onClick={() => setScanMessage(null)}
+                      className="text-gray-400 hover:text-gray-600 font-bold ml-2"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Checklist Items Table */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-2">
+              <table className="w-full text-left text-xs border border-gray-200 rounded-lg overflow-hidden">
+                <thead className="bg-gray-50 border-b border-gray-200 text-gray-600 font-semibold uppercase text-[11px]">
+                  <tr>
+                    <th className="py-2.5 px-3 text-center w-12">Tick</th>
+                    <th className="py-2.5 px-3">Item Specification & SKU</th>
+                    <th className="py-2.5 px-3">Category</th>
+                    <th className="py-2.5 px-3 text-center w-24">Required</th>
+                    <th className="py-2.5 px-3 text-center w-36">Picked / Scanned</th>
+                    <th className="py-2.5 px-3 text-center w-28">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {modalLines.map((line: any) => {
+                    const req = line.required_qty || 1;
+                    const picked = line.picked_qty || 0;
+                    const isCompleted = picked >= req;
+                    const pName = line.product?.name || `Product #${line.product_id}`;
+                    const pSku = line.product?.sku || 'SKU-N/A';
+                    const pCat = line.product?.category || 'BOS';
+
+                    return (
+                      <tr
+                        key={line.id}
+                        className={`transition-colors ${
+                          isCompleted ? 'bg-emerald-50/40 hover:bg-emerald-50/70' : 'hover:bg-purple-50/30'
+                        }`}
+                      >
+                        <td className="py-2 px-3 text-center">
+                          {selectedPickList.status === 'PACKED' ? (
+                            <FontAwesomeIcon icon={faCheckCircle} className="text-emerald-600 text-base" />
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleToggleLinePick(line.id, picked, req)}
+                              className={`w-6 h-6 rounded flex items-center justify-center transition-all ${
+                                isCompleted
+                                  ? 'bg-emerald-600 text-white shadow-2xs'
+                                  : 'border-2 border-gray-300 hover:border-[#6B4B63] text-transparent hover:text-gray-400'
+                              }`}
+                              title={isCompleted ? 'Click to untick' : 'Click to tick/pick item'}
+                            >
+                              <FontAwesomeIcon icon={faCheck} className="text-xs" />
+                            </button>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <div className="font-semibold text-gray-900 leading-tight">{pName}</div>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="font-mono text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.2 rounded">
+                              {pSku}
+                            </span>
+                            {line.product?.is_serialised && (
+                              <span className="text-[10px] bg-purple-100 text-purple-800 font-semibold px-1.5 py-0.2 rounded">
+                                Serialised
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-2.5 px-3 text-gray-600 capitalize">{pCat}</td>
+                        <td className="py-2.5 px-3 text-center font-bold text-gray-800">{req}</td>
+                        <td className="py-2.5 px-3 text-center">
+                          {selectedPickList.status === 'PACKED' ? (
+                            <span className="font-bold text-emerald-800">{picked}</span>
+                          ) : (
+                            <div className="inline-flex items-center border border-gray-300 rounded bg-white">
+                              <button
+                                type="button"
+                                onClick={() => handleAdjustQty(line.id, -1)}
+                                className="px-2 py-0.5 text-gray-600 hover:bg-gray-100 rounded-l"
+                              >
+                                <FontAwesomeIcon icon={faMinus} className="text-[10px]" />
+                              </button>
+                              <span className="px-2 py-0.5 font-bold text-xs min-w-[28px] text-center">
+                                {picked}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleAdjustQty(line.id, 1)}
+                                className="px-2 py-0.5 text-gray-600 hover:bg-gray-100 rounded-r"
+                              >
+                                <FontAwesomeIcon icon={faPlus} className="text-[10px]" />
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 text-center">
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                              isCompleted
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : 'bg-amber-100 text-amber-800'
+                            }`}
+                          >
+                            {isCompleted ? '✓ PICKED' : `${req - picked} NEEDED`}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Modal Footer Actions */}
+            <div className="px-5 py-3.5 bg-gray-50 border-t border-gray-200 flex flex-wrap items-center justify-between gap-3 text-xs">
+              <div className="text-gray-500 text-[11px]">
+                {modalAllCompleted ? (
+                  <span className="text-emerald-700 font-bold flex items-center gap-1.5">
+                    <FontAwesomeIcon icon={faCheckCircle} />
+                    <span>All items in installation checklist verified! Ready to place order.</span>
+                  </span>
+                ) : (
+                  <span>
+                    Tick or scan remaining items to unlock order placement and dispatch confirmation.
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedPickList(null);
+                    setScanningCamera(false);
+                  }}
+                  className="px-3.5 py-1.5 border border-gray-300 hover:bg-gray-100 text-gray-700 rounded-lg font-medium"
+                >
+                  Close
+                </button>
+
+                {selectedPickList.status !== 'PACKED' && (
+                  <button
+                    type="button"
+                    onClick={() => handlePackAndPlaceOrder(selectedPickList.id)}
+                    disabled={!modalAllCompleted}
+                    className={`px-4 py-2 rounded-lg font-bold text-white shadow-xs flex items-center gap-1.5 transition-all ${
+                      modalAllCompleted
+                        ? 'bg-emerald-600 hover:bg-emerald-700 active:scale-98 cursor-pointer'
+                        : 'bg-gray-400 cursor-not-allowed opacity-60'
+                    }`}
+                  >
+                    <FontAwesomeIcon icon={faCheck} />
+                    <span>Confirm Checklist & Place Order (Mark Packed)</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Inward Purchase Modal */}
       {showPurchaseModal && (

@@ -37,8 +37,8 @@ def list_surveys(
 
     query = db.query(Survey)
     if current_user.role == UserRole.TECHNICIAN:
-        query = query.filter(Survey.technician_id == current_user.id)
-    elif technician_id and current_user.role == UserRole.ADMIN:
+        query = query.filter((Survey.technician_id == current_user.id) | (Survey.technician_id == None))
+    elif technician_id and current_user.role in [UserRole.ADMIN, UserRole.SALES]:
         query = query.filter(Survey.technician_id == technician_id)
 
     if status:
@@ -83,7 +83,7 @@ def complete_survey(
     if not survey:
         raise HTTPException(status_code=404, detail="Survey not found")
 
-    if current_user.role == UserRole.TECHNICIAN and survey.technician_id != current_user.id:
+    if current_user.role == UserRole.TECHNICIAN and survey.technician_id and survey.technician_id != current_user.id:
         raise HTTPException(
             status_code=403,
             detail="Forbidden: You can only complete surveys assigned to you",
@@ -96,9 +96,9 @@ def complete_survey(
 def approve_survey(
     survey_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.ADMIN, UserRole.SALES)),
+    current_user: User = Depends(require_role(UserRole.ADMIN, UserRole.SALES, UserRole.TECHNICIAN)),
 ):
-    """Manager/Admin approves the survey (required gate for quote generation)."""
+    """Manager/Admin/Technician approves the survey (required gate for quote generation)."""
     return survey_service.approve_survey(db, survey_id, current_user.id)
 
 

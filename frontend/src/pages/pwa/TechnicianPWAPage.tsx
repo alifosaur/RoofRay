@@ -33,6 +33,7 @@ export const TechnicianPWAPage: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
 
   // Form states for site survey completion
+  const [certifyFeasibility, setCertifyFeasibility] = useState(true);
   const [surveyForm, setSurveyForm] = useState({
     roof_direction: 'South',
     roof_tilt_deg: 20.0,
@@ -88,10 +89,29 @@ export const TechnicianPWAPage: React.FC = () => {
         cable_distance_meters: Number(surveyForm.cable_distance_meters),
         notes: surveyForm.notes,
       });
-      alert('Survey report submitted successfully! Waiting for manager approval.');
+
+      if (certifyFeasibility) {
+        await api.post(`/surveys/${activeSurvey.id}/approve`);
+        alert('Survey report submitted & site feasibility APPROVED! Sales team is now authorized to create the quotation and submit BOM to warehouse.');
+      } else {
+        alert('Survey report submitted successfully! Waiting for final sign-off.');
+      }
       fetchSchedule();
     } catch (err: any) {
       alert(err.message || 'Failed to submit survey');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleApproveSurvey = async (surveyId: number) => {
+    try {
+      setSubmitting(true);
+      await api.post(`/surveys/${surveyId}/approve`);
+      alert('Site feasibility APPROVED! Sales team is now authorized to create the quotation and submit BOM to warehouse.');
+      fetchSchedule();
+    } catch (err: any) {
+      alert(err.message || 'Failed to approve survey');
     } finally {
       setSubmitting(false);
     }
@@ -519,13 +539,29 @@ export const TechnicianPWAPage: React.FC = () => {
                       ></textarea>
                     </div>
 
+                    <label className="flex items-center gap-2 text-xs text-amber-300 font-semibold cursor-pointer p-2.5 bg-amber-950/40 rounded-lg border border-amber-800/60">
+                      <input
+                        type="checkbox"
+                        checked={certifyFeasibility}
+                        onChange={(e) => setCertifyFeasibility(e.target.checked)}
+                        className="rounded text-amber-500 focus:ring-amber-400 w-4 h-4"
+                      />
+                      <span>Approve & Certify Feasibility (Unlocks Sales Quotation & Warehouse BOM)</span>
+                    </label>
+
                     <button
                       type="submit"
                       disabled={submitting}
                       className="w-full bg-amber-500 hover:bg-amber-400 active:scale-98 text-slate-950 font-bold py-3.5 rounded-xl text-sm flex items-center justify-center gap-2 shadow-lg transition-transform disabled:opacity-50"
                     >
                       <FontAwesomeIcon icon={faCheckCircle} />
-                      <span>{submitting ? 'Submitting Report...' : 'Submit Site Survey Report'}</span>
+                      <span>
+                        {submitting
+                          ? 'Processing...'
+                          : certifyFeasibility
+                          ? 'Submit & Approve Site Survey'
+                          : 'Submit Site Survey Report'}
+                      </span>
                     </button>
                   </form>
                 ) : (
@@ -550,14 +586,31 @@ export const TechnicianPWAPage: React.FC = () => {
                       </p>
                     )}
                     {activeSurvey.status === 'COMPLETED' && (
-                      <p className="text-[11px] text-amber-400 font-semibold text-center">
-                        Survey submitted. Pending manager approval to unlock quotation creation.
-                      </p>
+                      <div className="space-y-2 pt-2 border-t border-slate-700">
+                        <p className="text-[11px] text-amber-400 font-semibold text-center">
+                          Survey submitted. Ready for site feasibility approval.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => handleApproveSurvey(activeSurvey.id)}
+                          disabled={submitting}
+                          className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-md transition-colors"
+                        >
+                          <FontAwesomeIcon icon={faCheckCircle} />
+                          <span>Approve Site Feasibility (Unlock Quotations)</span>
+                        </button>
+                      </div>
                     )}
                     {activeSurvey.status === 'APPROVED' && (
-                      <p className="text-[11px] text-emerald-400 font-semibold text-center">
-                        ✓ Survey Approved by Engineering Manager. Quotations unlocked!
-                      </p>
+                      <div className="p-3 bg-emerald-950/40 border border-emerald-700/60 rounded-xl text-center space-y-1">
+                        <div className="text-xs font-bold text-emerald-400 flex items-center justify-center gap-1.5">
+                          <FontAwesomeIcon icon={faCheckCircle} />
+                          <span>Site Feasibility Approved!</span>
+                        </div>
+                        <p className="text-[11px] text-gray-300">
+                          Sales team is authorized to prepare the client quotation and submit the installation BOM checklist to the warehouse.
+                        </p>
+                      </div>
                     )}
                   </div>
                 )}

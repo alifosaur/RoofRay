@@ -38,6 +38,8 @@ class PickListLineOut(BaseModel):
 class PickListOut(BaseModel):
     id: int
     order_id: int
+    order_number: Optional[str] = None
+    customer_name: Optional[str] = None
     status: str
     created_at: datetime
     packed_at: Optional[datetime] = None

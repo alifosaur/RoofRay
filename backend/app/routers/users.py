@@ -13,7 +13,7 @@ router = APIRouter(prefix="/users", tags=["Users"])
 def list_users(
     role: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.ADMIN)),
+    current_user: User = Depends(require_role(UserRole.ADMIN, UserRole.SALES)),
 ):
     query = db.query(User)
     if role:

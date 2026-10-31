@@ -1,4 +1,5 @@
 from typing import List, Optional
+from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -59,6 +60,81 @@ def get_pick_list(
     pick_list = db.query(PickList).filter(PickList.id == pick_list_id).first()
     if not pick_list:
         raise HTTPException(status_code=404, detail="Pick list not found")
+    return pick_list
+
+
+class ScanCodePayload(BaseModel):
+    code: str
+
+
+@router.put("/pick-lists/{pick_list_id}/lines/{line_id}/pick", response_model=PickListOut)
+def pick_line_item(
+    pick_list_id: int,
+    line_id: int,
+    qty: Optional[int] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.WAREHOUSE, UserRole.ADMIN)),
+):
+    """Update picked quantity or toggle check for a single item in the installation pick list."""
+    pick_list = db.query(PickList).filter(PickList.id == pick_list_id).first()
+    if not pick_list:
+        raise HTTPException(status_code=404, detail="Pick list not found")
+
+    line = next((l for l in pick_list.lines if l.id == line_id), None)
+    if not line:
+        raise HTTPException(status_code=404, detail="Item line not found in pick list")
+
+    if qty is not None:
+        line.picked_qty = max(0, min(line.required_qty, qty))
+    else:
+        # Toggle: if already full, reset to 0; otherwise set to required_qty
+        if line.picked_qty >= line.required_qty:
+            line.picked_qty = 0
+        else:
+            line.picked_qty = line.required_qty
+
+    db.commit()
+    db.refresh(pick_list)
+    return pick_list
+
+
+@router.post("/pick-lists/{pick_list_id}/scan", response_model=PickListOut)
+def scan_pick_item(
+    pick_list_id: int,
+    payload: ScanCodePayload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.WAREHOUSE, UserRole.ADMIN)),
+):
+    """Scan barcode, SKU or serial to verify and tick item on installation pick list."""
+    pick_list = db.query(PickList).filter(PickList.id == pick_list_id).first()
+    if not pick_list:
+        raise HTTPException(status_code=404, detail="Pick list not found")
+
+    code = payload.code.strip().upper()
+    matched_line = None
+    for line in pick_list.lines:
+        if line.product:
+            if line.product.sku.upper() == code or code in line.product.sku.upper() or code in line.product.name.upper():
+                matched_line = line
+                break
+
+    if not matched_line:
+        from app.models.serial import SerialItem
+        serial_item = db.query(SerialItem).filter(
+            (SerialItem.serial_no.ilike(code)) | (SerialItem.serial_no.ilike(f"%{code}%"))
+        ).first()
+        if serial_item:
+            matched_line = next((l for l in pick_list.lines if l.product_id == serial_item.product_id), None)
+
+    if not matched_line:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Scanned barcode/SKU '{payload.code}' does not match any item in this installation's pre-generated checklist.",
+        )
+
+    matched_line.picked_qty = min(matched_line.required_qty, matched_line.picked_qty + 1)
+    db.commit()
+    db.refresh(pick_list)
     return pick_list
 
 

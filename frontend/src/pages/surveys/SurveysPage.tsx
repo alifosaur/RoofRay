@@ -110,7 +110,7 @@ export const SurveysPage: React.FC = () => {
               Complete Visit
             </button>
           )}
-          {r.status === 'COMPLETED' && (role === 'admin' || role === 'sales') && (
+          {r.status === 'COMPLETED' && (role === 'admin' || role === 'sales' || role === 'technician') && (
             <div className="flex gap-1.5">
               <button
                 onClick={() => handleApprove(r.id)}
@@ -118,12 +118,14 @@ export const SurveysPage: React.FC = () => {
               >
                 Approve (Unlock Quote)
               </button>
-              <button
-                onClick={() => handleReject(r.id)}
-                className="bg-red-600 hover:bg-red-700 text-white px-2 py-0.5 rounded text-[11px] font-semibold"
-              >
-                Reject
-              </button>
+              {(role === 'admin' || role === 'sales') && (
+                <button
+                  onClick={() => handleReject(r.id)}
+                  className="bg-red-600 hover:bg-red-700 text-white px-2 py-0.5 rounded text-[11px] font-semibold"
+                >
+                  Reject
+                </button>
+              )}
             </div>
           )}
           {r.status === 'APPROVED' && (

@@ -2,6 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../api/client';
+import { SiteNavbar } from '../../components/layout/SiteNavbar';
+import { SiteFooter } from '../../components/layout/SiteFooter';
+import { ScriptHeading } from '../../components/common/ScriptHeading';
+import { SquiggleLink } from '../../components/common/SquiggleLink';
 
 interface TrackerStage {
   key: string;
@@ -397,70 +401,63 @@ export const CustomerPortalPage: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] flex flex-col font-sans">
-      {/* Odoo Website-style Branded Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-30 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setActiveTab('catalogue')}>
-            <div className="w-10 h-10 rounded-lg bg-odoo-purple text-white flex items-center justify-center font-bold text-xl shadow">
-              <i className="fa-solid fa-solar-panel"></i>
+    <div className="min-h-screen bg-[#FDFCFD] flex flex-col font-sans select-text">
+      {/* 1. Global Site Navbar */}
+      <SiteNavbar />
+
+      {/* 2. Customer Portal Header Banner */}
+      <section className="bg-slate-50/80 py-8 sm:py-10 border-b border-gray-200">
+        <div className="max-w-[1320px] mx-auto px-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <span className="text-xs uppercase tracking-widest text-[#6B4B63] font-bold">
+              SunPower Customer Portal
+            </span>
+            <div className="mt-1">
+              <ScriptHeading as="h1" className="text-3xl sm:text-4xl md:text-5xl">
+                My Rooftop Solar Project
+              </ScriptHeading>
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-lg font-bold text-odoo-purple tracking-tight">SunPower Solutions</span>
-                <span className="text-[10px] font-semibold px-2 py-0.5 bg-purple-50 text-purple-700 rounded-full border border-purple-200">
-                  Customer Portal
-                </span>
-              </div>
-              <p className="text-[11px] text-gray-500">Rooftop Solar & PM Surya Ghar Partner</p>
-            </div>
+            <p className="mt-2 text-xs sm:text-sm text-[#6C757D]">
+              Welcome back, <strong>{user?.full_name || 'Customer'}</strong>. Track your installation stages, view quotations, and inspect warranties.
+            </p>
           </div>
 
-          <div className="flex items-center space-x-4">
-            <div className="text-right hidden sm:block">
-              <div className="text-xs font-semibold text-gray-800">{user?.full_name || 'Customer'}</div>
-              <div className="text-[11px] text-gray-500">{user?.email}</div>
-            </div>
-
-            <button
-              onClick={() => {
-                logout();
-                navigate('/login');
-              }}
-              className="text-xs font-medium text-gray-600 hover:text-red-600 px-3 py-1.5 border border-gray-200 rounded hover:bg-gray-50 transition-colors flex items-center gap-1.5"
-            >
-              <i className="fa-solid fa-right-from-bracket"></i>
-              <span>Sign Out</span>
-            </button>
+          <div className="flex items-center space-x-2">
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 mr-2 animate-pulse"></span>
+              {tracker?.current_stage_name || 'Active Account'}
+            </span>
           </div>
         </div>
 
         {/* Navigation Tabs Bar */}
-        <div className="bg-[#FAF8F9] border-t border-gray-200">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex space-x-1 sm:space-x-3 overflow-x-auto py-2">
+        <div className="max-w-[1320px] mx-auto px-6 mt-6">
+          <div className="flex space-x-2 overflow-x-auto pb-1 scrollbar-none">
             {[
               { id: 'catalogue', label: 'Solar Packages', icon: 'fa-cubes-stacked' },
               { id: 'enquiry', label: 'Enquiry & Sizing', icon: 'fa-ruler-combined' },
               { id: 'tracker', label: 'Project Tracker', icon: 'fa-route', badge: tracker?.current_stage_name },
               { id: 'quotes', label: 'Quotations & Orders', icon: 'fa-file-invoice-dollar', count: quotes.length },
-              { id: 'equipment', label: 'My Equipment & Warranty', icon: 'fa-shield-halved', count: equipment.length },
+              { id: 'equipment', label: 'Equipment & Warranty', icon: 'fa-shield-halved', count: equipment.length },
               { id: 'schemes', label: 'PM Surya Ghar & Subsidy', icon: 'fa-hand-holding-dollar' },
             ].map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`px-3 py-2 text-xs font-semibold rounded-md transition-all flex items-center gap-2 whitespace-nowrap ${
+                className={`px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-lg transition-all flex items-center gap-2 whitespace-nowrap ${
                   activeTab === tab.id
-                    ? 'bg-odoo-purple text-white shadow-sm'
-                    : 'text-gray-600 hover:text-odoo-purple hover:bg-purple-50/60'
+                    ? 'bg-[#6B4B63] text-white shadow-xs'
+                    : 'bg-white border border-gray-200 text-[#495057] hover:text-[#6B4B63] hover:border-[#6B4B63]/40'
                 }`}
               >
                 <i className={`fa-solid ${tab.icon} text-xs`}></i>
                 <span>{tab.label}</span>
                 {tab.count !== undefined && tab.count > 0 && (
-                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
-                    activeTab === tab.id ? 'bg-purple-900/60 text-white' : 'bg-gray-200 text-gray-700'
-                  }`}>
+                  <span
+                    className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+                      activeTab === tab.id ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-700'
+                    }`}
+                  >
                     {tab.count}
                   </span>
                 )}
@@ -473,7 +470,7 @@ export const CustomerPortalPage: React.FC = () => {
             ))}
           </div>
         </div>
-      </header>
+      </section>
 
       {/* Main Container */}
       <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full">
@@ -1578,6 +1575,9 @@ export const CustomerPortalPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Reference Odoo Site Footer */}
+      <SiteFooter />
     </div>
   );
 };

@@ -8,6 +8,10 @@ import { AppLayout } from './components/odoo/AppLayout';
 import { LoginPage } from './pages/auth/LoginPage';
 import { Forbidden403Page } from './pages/auth/Forbidden403Page';
 import { PublicWebsitePage } from './pages/public/PublicWebsitePage';
+import { PackagesPage } from './pages/public/PackagesPage';
+import { GovtSchemesPage } from './pages/public/GovtSchemesPage';
+import { HelpPage } from './pages/public/HelpPage';
+import { StyleguidePage } from './pages/public/StyleguidePage';
 import { CustomerPortalPage } from './pages/customer/CustomerPortalPage';
 import { CRMPage } from './pages/crm/CRMPage';
 import { LeadFormPage } from './pages/crm/LeadFormPage';
@@ -30,8 +34,12 @@ export const App: React.FC = () => {
     <BrowserRouter>
       <AuthProvider>
         <Routes>
-          {/* Public customer-facing website */}
+          {/* Public customer-facing website & portal pages */}
           <Route path="/" element={<PublicWebsitePage />} />
+          <Route path="/packages" element={<PackagesPage />} />
+          <Route path="/schemes" element={<GovtSchemesPage />} />
+          <Route path="/help" element={<HelpPage />} />
+          <Route path="/styleguide" element={<StyleguidePage />} />
 
           {/* Unified Login & Customer Self-Registration Page */}
           <Route path="/login" element={<LoginPage />} />

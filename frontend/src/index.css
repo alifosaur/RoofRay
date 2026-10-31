@@ -4,8 +4,29 @@
 
 @layer base {
   body {
-    @apply text-odoo-text bg-odoo-bg text-base;
+    @apply text-odoo-text bg-white antialiased font-sans;
   }
+}
+
+/* Reference Body Paragraph Style: ~18px, line-height ~1.9, justified on desktop, left on mobile */
+.body-paragraph {
+  font-size: 1.125rem; /* 18px */
+  line-height: 1.9;
+  color: #6C757D;
+  text-align: left;
+}
+
+@media (min-width: 768px) {
+  .body-paragraph {
+    text-align: justify;
+    text-justify: inter-word;
+  }
+}
+
+/* Custom handwritten script font utility */
+.font-script {
+  font-family: 'Caveat Brush', 'Caveat', cursive;
+  letter-spacing: -0.01em;
 }
 
 /* Odoo Status Bar Arrow Stage Pills */
@@ -49,12 +70,12 @@
 }
 
 .odoo-statusbar-arrow.active {
-  background-color: #714B67;
+  background-color: #6B4B63;
   color: #FFFFFF;
 }
 
 .odoo-statusbar-arrow.active::after {
-  border-left-color: #714B67;
+  border-left-color: #6B4B63;
 }
 
 .odoo-statusbar-arrow.past {

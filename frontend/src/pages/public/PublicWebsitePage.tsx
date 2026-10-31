@@ -1,28 +1,35 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
+import { SiteNavbar } from '../../components/layout/SiteNavbar';
+import { SiteFooter } from '../../components/layout/SiteFooter';
+import { ScriptHeading } from '../../components/common/ScriptHeading';
+import { SquiggleLink } from '../../components/common/SquiggleLink';
+import { SplitSection } from '../../components/common/SplitSection';
+import { FeatureBand, FeatureItem } from '../../components/common/FeatureBand';
+import { InfoList, InfoBulletItem } from '../../components/common/InfoList';
+import { RooftopSolarIllustration } from '../../components/brand/RooftopSolarIllustration';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-  faSun,
   faBolt,
-  faBatteryFull,
+  faSun,
   faCheckCircle,
   faArrowRight,
   faShieldAlt,
-  faLeaf,
-  faPhoneAlt,
-  faUserShield,
+  faTag,
+  faCalculator,
 } from '@fortawesome/free-solid-svg-icons';
 
 export const PublicWebsitePage: React.FC = () => {
   const navigate = useNavigate();
 
+  // Quote Form state
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [address, setAddress] = useState('');
   const [capacityKw, setCapacityKw] = useState(3.0);
-  const [systemType, setSystemType] = useState('ON_GRID');
+  const [systemType, setSystemType] = useState('On-Grid');
   const [notes, setNotes] = useState('');
 
   const [submitting, setSubmitting] = useState(false);
@@ -39,7 +46,7 @@ export const PublicWebsitePage: React.FC = () => {
         phone,
         email: email || undefined,
         address,
-        required_capacity_kw: Number(capacityKw),
+        required_capacity: Number(capacityKw),
         system_type: systemType,
         notes: notes || undefined,
       });
@@ -56,386 +63,430 @@ export const PublicWebsitePage: React.FC = () => {
     }
   };
 
-  const PACKAGES = [
+  const featureItems: FeatureItem[] = [
     {
-      kw: 1,
-      title: '1 kW Compact Solar',
-      onGridPrice: 55000,
-      offGridPrice: 85000,
-      panels: '2-3 High-efficiency Mono PERC Panels',
-      generation: '120 - 140 Units / month',
-      idealFor: '1-2 BHK apartments, small clinics, basic home appliances',
+      title: 'Lower electricity bills',
+      description:
+        'Generate your own clean solar energy and cut grid power bills by up to 90% from day one with net-metering export.',
     },
     {
+      title: 'Government subsidy support',
+      description:
+        'Direct Benefit Transfer (DBT) of up to ₹78,000 under PM Surya Ghar Muft Bijli Yojana with zero paperwork hassle.',
+    },
+    {
+      title: 'Certified quality kit',
+      description:
+        'Tier-1 monocrystalline PERC panels, IP65 smart on-grid inverters, and heavy-duty pre-galvanized structures.',
+    },
+    {
+      title: 'Expert survey and installation',
+      description:
+        'Comprehensive shadow analysis by our 15 in-house trained technicians, with turnkey DISCOM net-metering synchronization.',
+    },
+    {
+      title: 'Serial-tracked warranty',
+      description:
+        'Every inverter, battery, and panel is registered by barcode in your portal for genuine 20-to-25-year warranty protection.',
+    },
+    {
+      title: 'Live order tracking',
+      description:
+        'Real-time 13-stage visibility from initial enquiry and engineering feasibility to warehouse dispatch and commissioning.',
+    },
+  ];
+
+  const infoBullets: InfoBulletItem[] = [
+    {
+      leadIn: 'Enquire',
+      text: 'Submit your roof area and monthly electricity bill in under 2 minutes.',
+    },
+    {
+      leadIn: 'Survey',
+      text: 'Certified technician visits your roof to measure tilt, orientation, and shadow-free zones.',
+    },
+    {
+      leadIn: 'Quote',
+      text: 'Receive an instant transparent Bill of Materials quote with automated MNRE subsidy deductions.',
+    },
+    {
+      leadIn: 'Delivery',
+      text: 'Tier-1 panels and smart inverters barcode-scanned and reserved from our warehouse stock.',
+    },
+    {
+      leadIn: 'Installation',
+      text: 'Our in-house 15-technician crew completes mounting, wiring, earthing, and on-site generation testing.',
+    },
+    {
+      leadIn: 'Subsidy',
+      text: 'Direct Benefit Transfer (DBT) subsidy of up to ₹78,000 processed directly into your bank account.',
+    },
+  ];
+
+  const PREVIEW_PACKAGES = [
+    {
       kw: 2,
-      title: '2 kW Smart Solar',
-      onGridPrice: 105000,
-      offGridPrice: 155000,
-      panels: '4-5 Half-cut Mono Panels',
-      generation: '240 - 280 Units / month',
-      idealFor: '2-3 BHK homes, refrigerator, lighting, 1 AC in day',
+      name: '2 kW Smart On-Grid',
+      tag: 'Best for 2-3 BHK',
+      price: '₹ 1,15,000',
+      subsidy: '₹ 60,000',
+      netCost: '₹ 55,000',
+      generation: '240 - 280 Units/mo',
+      panels: '4-5 Mono PERC Panels',
     },
     {
       kw: 3,
-      title: '3 kW Popular Residential',
-      onGridPrice: 150000,
-      offGridPrice: 225000,
-      panels: '6-7 Bi-facial Mono Panels',
-      generation: '360 - 420 Units / month',
-      idealFor: '3-4 BHK homes, multiple ACs, zero electricity bill target',
-      recommended: true,
-    },
-    {
-      kw: 4,
-      title: '4 kW Executive Solar',
-      onGridPrice: 195000,
-      offGridPrice: 285000,
-      panels: '8-9 TopCon High Output Panels',
-      generation: '480 - 560 Units / month',
-      idealFor: 'Large villas, home offices, EV charging support',
+      name: '3 kW Popular Residential',
+      tag: 'Most Popular',
+      price: '₹ 1,65,000',
+      subsidy: '₹ 78,000 (Max)',
+      netCost: '₹ 87,000',
+      generation: '360 - 420 Units/mo',
+      panels: '6-7 Bi-facial Half-Cut Panels',
+      popular: true,
     },
     {
       kw: 5,
-      title: '5 kW Commercial Pro',
-      onGridPrice: 240000,
-      offGridPrice: 345000,
-      panels: '10-12 Industrial Tier-1 Panels',
-      generation: '600 - 700 Units / month',
-      idealFor: 'Commercial shops, schools, hospitals, farm houses',
+      name: '5 kW High-Capacity Villa',
+      tag: 'Commercial & Villas',
+      price: '₹ 2,75,000',
+      subsidy: '₹ 78,000',
+      netCost: '₹ 1,97,000',
+      generation: '600 - 700 Units/mo',
+      panels: '10-12 TopCon Panels',
     },
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
-      {/* Top Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-30 shadow-xs">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-lg bg-odoo-primary flex items-center justify-center text-white text-xl shadow-md">
-              <FontAwesomeIcon icon={faSun} className="text-amber-400" />
-            </div>
-            <div>
-              <span className="text-lg font-bold text-gray-900 tracking-tight">SunPower Solutions</span>
-              <span className="block text-[10px] text-gray-500 font-medium uppercase tracking-wider">
-                Rooftop Solar & Micro-Grid Systems
-              </span>
-            </div>
-          </div>
+    <div className="min-h-screen bg-white flex flex-col select-text">
+      {/* 1. Header & Navigation */}
+      <SiteNavbar />
 
-          <div className="flex items-center space-x-4">
-            <a
-              href="#packages"
-              className="text-xs font-semibold text-gray-600 hover:text-odoo-primary hidden sm:block"
-            >
-              Solar Packages
-            </a>
-            <a
-              href="#quote-form"
-              className="text-xs font-semibold text-gray-600 hover:text-odoo-primary hidden sm:block"
-            >
-              Instant Quote
-            </a>
-            <button
-              onClick={() => navigate('/web/crm')}
-              className="bg-odoo-primary hover:bg-odoo-primary-dark text-white px-4 py-2 rounded text-xs font-bold shadow-xs flex items-center gap-1.5 transition-colors"
-            >
-              <FontAwesomeIcon icon={faUserShield} />
-              <span>Staff Portal</span>
-            </button>
-          </div>
-        </div>
-      </header>
+      <main className="flex-1">
+        {/* 2. Hero SplitSection matching Screenshot 1 */}
+        <SplitSection
+          id="hero"
+          className="pt-10 sm:pt-14 pb-20 sm:pb-24"
+          left={
+            <div className="flex flex-col">
+              <ScriptHeading as="h1" underline className="mb-8">
+                About SunPower
+              </ScriptHeading>
 
-      {/* Hero Section */}
-      <section className="bg-gradient-to-br from-purple-950 via-slate-900 to-teal-950 text-white py-16 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-5xl mx-auto text-center space-y-6">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur border border-white/20 text-xs font-medium text-amber-300">
-            <FontAwesomeIcon icon={faLeaf} />
-            <span>Government Subsidy Available • Save up to 85% on Electricity</span>
-          </div>
-
-          <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight leading-tight">
-            Switch Your Rooftop to Clean Solar Power
-          </h1>
-
-          <p className="max-w-2xl mx-auto text-sm sm:text-base text-gray-300 leading-relaxed">
-            Turn your unused roof space into an energy asset. SunPower Solutions delivers end-to-end site survey, Tier-1 hardware, seamless installation, and guaranteed 25-year panel warranty.
-          </p>
-
-          <div className="pt-4 flex flex-wrap justify-center gap-4">
-            <a
-              href="#quote-form"
-              className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-6 py-3 rounded-lg text-sm shadow-lg flex items-center gap-2 transition-transform hover:scale-105"
-            >
-              <span>Get Free Site Survey & Quote</span>
-              <FontAwesomeIcon icon={faArrowRight} />
-            </a>
-            <a
-              href="#packages"
-              className="bg-white/10 hover:bg-white/20 text-white font-semibold px-6 py-3 rounded-lg text-sm border border-white/20 backdrop-blur transition-colors"
-            >
-              Explore Packages (1–5 kW)
-            </a>
-          </div>
-
-          {/* Key Selling Badges */}
-          <div className="pt-8 grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-3xl mx-auto text-xs text-left">
-            <div className="flex items-center gap-2.5 bg-white/5 p-3 rounded-lg border border-white/10">
-              <FontAwesomeIcon icon={faShieldAlt} className="text-amber-400 text-base" />
-              <span>20-Year Panel Warranty</span>
-            </div>
-            <div className="flex items-center gap-2.5 bg-white/5 p-3 rounded-lg border border-white/10">
-              <FontAwesomeIcon icon={faBolt} className="text-teal-400 text-base" />
-              <span>Tier-1 Smart Inverters</span>
-            </div>
-            <div className="flex items-center gap-2.5 bg-white/5 p-3 rounded-lg border border-white/10">
-              <FontAwesomeIcon icon={faCheckCircle} className="text-emerald-400 text-base" />
-              <span>Net-Metering Ready</span>
-            </div>
-            <div className="flex items-center gap-2.5 bg-white/5 p-3 rounded-lg border border-white/10">
-              <FontAwesomeIcon icon={faBatteryFull} className="text-blue-400 text-base" />
-              <span>Off-Grid Battery Options</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Packages Section */}
-      <section id="packages" className="py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-        <div className="text-center space-y-2 mb-12">
-          <span className="text-xs uppercase font-bold text-odoo-primary tracking-wider">
-            Standardised Packages
-          </span>
-          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
-            Rooftop Solar Capacities (1 kW to 5 kW)
-          </h2>
-          <p className="text-xs sm:text-sm text-gray-600 max-w-xl mx-auto">
-            Choose between On-Grid (grid-tied net metering) or Off-Grid (with high-capacity battery bank for 24/7 power backup).
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-          {PACKAGES.map((pkg) => (
-            <div
-              key={pkg.kw}
-              className={`bg-white rounded-xl border flex flex-col justify-between p-4 shadow-xs transition-all hover:shadow-md ${
-                pkg.recommended
-                  ? 'border-odoo-primary ring-2 ring-odoo-primary/20'
-                  : 'border-gray-200'
-              }`}
-            >
-              <div>
-                {pkg.recommended && (
-                  <span className="bg-odoo-primary text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider inline-block mb-2">
-                    Most Popular
-                  </span>
-                )}
-                <h3 className="font-bold text-sm text-gray-900">{pkg.title}</h3>
-                <div className="mt-3">
-                  <div className="text-[10px] text-gray-500 uppercase font-semibold">On-Grid System</div>
-                  <div className="text-lg font-bold text-odoo-primary">₹{pkg.onGridPrice.toLocaleString()}</div>
-                </div>
-                <div className="mt-1">
-                  <div className="text-[10px] text-gray-500 uppercase font-semibold">Off-Grid (with Battery)</div>
-                  <div className="text-sm font-bold text-gray-700">₹{pkg.offGridPrice.toLocaleString()}</div>
-                </div>
-
-                <div className="border-t border-gray-100 my-3 pt-3 space-y-2 text-[11px] text-gray-600">
-                  <div>
-                    <span className="font-semibold text-gray-800">Panels:</span> {pkg.panels}
-                  </div>
-                  <div>
-                    <span className="font-semibold text-gray-800">Generation:</span> {pkg.generation}
-                  </div>
-                  <div>
-                    <span className="font-semibold text-gray-800">Best for:</span> {pkg.idealFor}
-                  </div>
-                </div>
-              </div>
-
-              <a
-                href="#quote-form"
-                onClick={() => {
-                  setCapacityKw(pkg.kw);
-                }}
-                className={`mt-4 w-full py-1.5 rounded text-xs font-bold text-center block transition-colors ${
-                  pkg.recommended
-                    ? 'bg-odoo-primary hover:bg-odoo-primary-dark text-white'
-                    : 'bg-gray-100 hover:bg-gray-200 text-gray-800'
-                }`}
-              >
-                Select {pkg.kw} kW
-              </a>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Lead Capture Form Section */}
-      <section id="quote-form" className="bg-gray-100 py-16 px-4 sm:px-6 lg:px-8 border-t border-gray-200">
-        <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-md border border-gray-200 overflow-hidden">
-          <div className="bg-odoo-primary text-white p-6 sm:p-8">
-            <h2 className="text-xl sm:text-2xl font-bold">Request a Free Rooftop Assessment & Quote</h2>
-            <p className="text-xs sm:text-sm text-purple-200 mt-1">
-              Our certified solar engineer will conduct a shadow-free roof survey and calculate your exact electricity bill savings.
-            </p>
-          </div>
-
-          <div className="p-6 sm:p-8">
-            {submittedLead ? (
-              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-6 text-center space-y-3">
-                <FontAwesomeIcon icon={faCheckCircle} className="text-emerald-500 text-4xl" />
-                <h3 className="text-lg font-bold text-emerald-800">Thank You! Request Received</h3>
-                <p className="text-xs text-gray-700">
-                  Your enquiry reference number is{' '}
-                  <span className="font-mono font-bold text-odoo-primary">{submittedLead.lead_number}</span>.
-                  A dedicated solar consultant has been auto-assigned and will call you shortly.
+              <div className="space-y-6 body-paragraph">
+                <p>
+                  SunPower Solutions is an end-to-end rooftop solar engineering and installation company powering over 40 homes and commercial rooftops every single month. We specialize in residential bungalows, housing societies, and small-factory rooftops, turning unused terrace space into high-yield clean power plants.
                 </p>
-                <button
-                  onClick={() => setSubmittedLead(null)}
-                  className="mt-2 text-xs text-odoo-primary font-bold hover:underline"
-                >
-                  Submit Another Enquiry
-                </button>
+
+                <p>
+                  Our journey began with a simple commitment: transparent rooftop engineering, zero-compromise hardware, and lifelong after-sales support. Every project is configured with tier-1 monocrystalline panels backed by an authentic 20-to-25-year performance warranty, IP65 smart on-grid inverters, and heavy-duty pre-galvanized mounting structures engineered to withstand high wind zones.
+                </p>
+
+                <p>
+                  Today, SunPower handles the entire journey from structural shadow analysis to DISCOM net-metering synchronization and direct-to-bank{' '}
+                  <SquiggleLink to="/schemes">government subsidy</SquiggleLink>{' '}
+                  paperwork, delivering uninterrupted clean energy with complete peace of mind.
+                </p>
               </div>
-            ) : (
-              <form onSubmit={handleLeadSubmit} className="space-y-4 text-xs">
-                {errorMessage && (
-                  <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700 font-medium">
-                    {errorMessage}
-                  </div>
-                )}
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Action Buttons */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 mt-10">
+                <a
+                  href="#quote-section"
+                  className="bg-[#6B4B63] hover:bg-[#583D51] text-white text-[15px] font-medium px-7 py-3 rounded text-center transition-colors shadow-xs"
+                >
+                  Get a Free Quote
+                </a>
+                <Link
+                  to="/packages"
+                  className="border border-[#6B4B63] text-[#6B4B63] hover:bg-[#6B4B63] hover:text-white text-[15px] font-medium px-7 py-3 rounded text-center transition-colors"
+                >
+                  Browse Solar Packages
+                </Link>
+              </div>
+            </div>
+          }
+          right={<RooftopSolarIllustration />}
+        />
+
+        {/* 3. FeatureBand matching Screenshot 2 */}
+        <FeatureBand
+          id="features"
+          title="Why go solar with SunPower?"
+          items={featureItems}
+        />
+
+        {/* 4. Packages Preview Cards */}
+        <section id="packages" className="py-20 sm:py-24 bg-white border-b border-gray-100">
+          <div className="max-w-[1320px] mx-auto px-6">
+            <div className="text-center max-w-2xl mx-auto mb-16">
+              <span className="text-xs uppercase tracking-widest text-[#6B4B63] font-bold">
+                Standard Packages
+              </span>
+              <div className="mt-2 flex justify-center">
+                <ScriptHeading as="h2" align="center">
+                  Rooftop Solar Systems
+                </ScriptHeading>
+              </div>
+              <p className="mt-4 text-[#6C757D] text-base leading-relaxed">
+                Pre-engineered Bill of Materials with tier-1 panels, smart inverters, and full DISCOM net-metering approval.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {PREVIEW_PACKAGES.map((pkg, idx) => (
+                <div
+                  key={idx}
+                  className={`rounded-xl border transition-all duration-200 p-7 flex flex-col justify-between ${
+                    pkg.popular
+                      ? 'border-[#6B4B63] shadow-md relative bg-gradient-to-b from-white to-[#F8F4F7]/40 ring-2 ring-[#6B4B63]/20'
+                      : 'border-gray-200 shadow-xs hover:border-gray-300 bg-white'
+                  }`}
+                >
+                  {pkg.popular && (
+                    <span className="absolute -top-3.5 right-6 bg-[#6B4B63] text-white text-[11px] font-bold px-3 py-1 rounded-full uppercase tracking-wider">
+                      Most Popular
+                    </span>
+                  )}
+
                   <div>
-                    <label className="block text-gray-700 font-semibold mb-1">
-                      Full Name <span className="text-red-500">*</span>
+                    <span className="inline-block text-xs font-semibold px-2.5 py-1 rounded bg-gray-100 text-[#495057] mb-3">
+                      {pkg.tag}
+                    </span>
+                    <h3 className="text-xl font-bold text-[#212529] mb-1">{pkg.name}</h3>
+                    <p className="text-sm text-[#6C757D] mb-6">{pkg.panels}</p>
+
+                    <div className="border-t border-b border-gray-100 py-4 my-4 space-y-2">
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-gray-500">Gross Price:</span>
+                        <span className="font-semibold text-gray-800 line-through">{pkg.price}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-[#5CC9B0] font-medium">PM Surya Ghar Subsidy:</span>
+                        <span className="font-bold text-[#5CC9B0]">-{pkg.subsidy}</span>
+                      </div>
+                      <div className="flex justify-between items-center pt-2 border-t border-dashed border-gray-200">
+                        <span className="text-base font-bold text-[#212529]">Net Investment:</span>
+                        <span className="text-2xl font-extrabold text-[#6B4B63]">{pkg.netCost}</span>
+                      </div>
+                    </div>
+
+                    <ul className="space-y-2.5 text-sm text-[#495057] mb-8">
+                      <li className="flex items-center">
+                        <FontAwesomeIcon icon={faCheckCircle} className="text-[#5CC9B0] mr-2 text-xs" />
+                        <span>Generates {pkg.generation}</span>
+                      </li>
+                      <li className="flex items-center">
+                        <FontAwesomeIcon icon={faCheckCircle} className="text-[#5CC9B0] mr-2 text-xs" />
+                        <span>25-year panel performance guarantee</span>
+                      </li>
+                      <li className="flex items-center">
+                        <FontAwesomeIcon icon={faCheckCircle} className="text-[#5CC9B0] mr-2 text-xs" />
+                        <span>Turnkey net-metering & DISCOM approvals</span>
+                      </li>
+                    </ul>
+                  </div>
+
+                  <Link
+                    to="/packages"
+                    className={`w-full py-2.5 rounded font-medium text-sm text-center transition-colors ${
+                      pkg.popular
+                        ? 'bg-[#6B4B63] hover:bg-[#583D51] text-white shadow-xs'
+                        : 'border border-[#6B4B63] text-[#6B4B63] hover:bg-[#6B4B63] hover:text-white'
+                    }`}
+                  >
+                    View BOM & Details
+                  </Link>
+                </div>
+              ))}
+            </div>
+
+            <div className="text-center mt-12">
+              <Link
+                to="/packages"
+                className="inline-flex items-center space-x-2 text-[#6B4B63] hover:text-[#583D51] font-bold text-base hover:underline"
+              >
+                <span>Browse all 1 kW to 5 kW On-Grid & Off-Grid Packages</span>
+                <FontAwesomeIcon icon={faArrowRight} className="text-sm" />
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        {/* 5. InfoList matching Screenshot 3 */}
+        <InfoList
+          id="how-it-works"
+          title="How it works:"
+          items={infoBullets}
+          secondaryTitle="What if you switch?"
+          secondaryParagraphs={[
+            'Switching to solar with SunPower is designed to be frictionless. Our engineers take full responsibility for roof structural safety, shadow-free positioning, and liaison with your local DISCOM electricity board.',
+            'From the day your bi-directional meter is energized, you stop paying commercial and residential peak tariffs. Every kilowatt-hour generated is tracked through your live customer portal.',
+          ]}
+          sideIllustrationCaption="Power from your own roof!"
+        />
+
+        {/* 6. Embedded Quick Quote Form Section matching Design System */}
+        <section id="quote-section" className="py-20 sm:py-24 bg-[#F8F4F7]/40 border-t border-gray-100">
+          <div className="max-w-[1320px] mx-auto px-6">
+            <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-subtle border border-gray-200 p-8 sm:p-10">
+              <div className="text-center mb-8">
+                <span className="text-xs uppercase tracking-widest text-[#6B4B63] font-bold">
+                  Zero Commitment
+                </span>
+                <div className="mt-1 flex justify-center">
+                  <ScriptHeading as="h2" align="center">
+                    Get a Rooftop Solar Quote
+                  </ScriptHeading>
+                </div>
+                <p className="mt-3 text-sm text-[#6C757D]">
+                  Our sales engineers will contact you within 24 hours with an initial sizing assessment.
+                </p>
+              </div>
+
+              {submittedLead ? (
+                <div className="p-6 bg-teal-50 border border-teal-200 rounded-lg text-center animate-in fade-in">
+                  <FontAwesomeIcon icon={faCheckCircle} className="text-4xl text-[#5CC9B0] mb-3" />
+                  <h4 className="text-lg font-bold text-[#212529]">Thank you, {submittedLead.name}!</h4>
+                  <p className="text-sm text-[#495057] mt-2">
+                    Our sales representative has been auto-assigned and will reach out to you shortly at{' '}
+                    <strong>{submittedLead.phone}</strong>.
+                  </p>
+                  <button
+                    onClick={() => setSubmittedLead(null)}
+                    className="mt-5 text-sm text-[#6B4B63] hover:underline font-bold"
+                  >
+                    Submit another enquiry
+                  </button>
+                </div>
+              ) : (
+                <form onSubmit={handleLeadSubmit} className="space-y-5">
+                  {errorMessage && (
+                    <div className="p-3.5 bg-red-50 text-red-700 text-xs rounded border border-red-200">
+                      {errorMessage}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <div>
+                      <label className="block text-xs font-semibold text-[#212529] mb-1.5">
+                        Full Name <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Ramesh Kumar"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        className="w-full px-3.5 py-2.5 border border-gray-300 rounded text-sm text-[#212529] placeholder-gray-400 focus:outline-none focus:border-[#6B4B63] focus:ring-2 focus:ring-[#6B4B63]/20"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-[#212529] mb-1.5">
+                        Phone Number <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="tel"
+                        required
+                        placeholder="+91 98110 00000"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        className="w-full px-3.5 py-2.5 border border-gray-300 rounded text-sm text-[#212529] placeholder-gray-400 focus:outline-none focus:border-[#6B4B63] focus:ring-2 focus:ring-[#6B4B63]/20"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <div>
+                      <label className="block text-xs font-semibold text-[#212529] mb-1.5">
+                        Email Address
+                      </label>
+                      <input
+                        type="email"
+                        placeholder="ramesh@example.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="w-full px-3.5 py-2.5 border border-gray-300 rounded text-sm text-[#212529] placeholder-gray-400 focus:outline-none focus:border-[#6B4B63] focus:ring-2 focus:ring-[#6B4B63]/20"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-[#212529] mb-1.5">
+                        System Type <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={systemType}
+                        onChange={(e) => setSystemType(e.target.value)}
+                        className="w-full px-3.5 py-2.5 border border-gray-300 rounded text-sm text-[#212529] focus:outline-none focus:border-[#6B4B63] focus:ring-2 focus:ring-[#6B4B63]/20"
+                      >
+                        <option value="On-Grid">On-Grid (Connected to Grid, Net-metering)</option>
+                        <option value="Off-Grid">Off-Grid (with Battery Energy Storage Bank)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-[#212529] mb-1.5">
+                      Rooftop Address & City <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
                       required
-                      placeholder="e.g. Ramesh Patel"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-odoo-primary"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-gray-700 font-semibold mb-1">
-                      Phone Number <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="tel"
-                      required
-                      placeholder="e.g. +91 98765 43210"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-odoo-primary"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-gray-700 font-semibold mb-1">Email Address</label>
-                    <input
-                      type="email"
-                      placeholder="e.g. ramesh@example.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-odoo-primary"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-gray-700 font-semibold mb-1">
-                      System Type <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      value={systemType}
-                      onChange={(e) => setSystemType(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-odoo-primary"
-                    >
-                      <option value="ON_GRID">On-Grid (Connected to Power Board / Net-meter)</option>
-                      <option value="OFF_GRID">Off-Grid (Independent with Battery Bank)</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-gray-700 font-semibold mb-1">
-                      Required System Capacity (kW) <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      value={capacityKw}
-                      onChange={(e) => setCapacityKw(Number(e.target.value))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-odoo-primary"
-                    >
-                      <option value={1}>1 kW (Basic Home)</option>
-                      <option value={2}>2 kW (Standard Home)</option>
-                      <option value={3}>3 kW (Family Home - Recommended)</option>
-                      <option value={4}>4 kW (Large Residence)</option>
-                      <option value={5}>5 kW (Commercial / Villa)</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-gray-700 font-semibold mb-1">
-                      Site Rooftop Address <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="House #, Street, City, Pincode"
+                      placeholder="House No., Street, Sector, City, State"
                       value={address}
                       onChange={(e) => setAddress(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-odoo-primary"
+                      className="w-full px-3.5 py-2.5 border border-gray-300 rounded text-sm text-[#212529] placeholder-gray-400 focus:outline-none focus:border-[#6B4B63] focus:ring-2 focus:ring-[#6B4B63]/20"
                     />
                   </div>
-                </div>
 
-                <div>
-                  <label className="block text-gray-700 font-semibold mb-1">
-                    Roof Details & Monthly Electricity Bill
-                  </label>
-                  <textarea
-                    rows={2}
-                    placeholder="e.g. Monthly bill ~₹4,500, concrete flat terrace with RCC water tank."
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-odoo-primary"
-                  />
-                </div>
+                  <div>
+                    <div className="flex justify-between items-center mb-1.5">
+                      <label className="block text-xs font-semibold text-[#212529]">
+                        Target Capacity: <span className="text-[#6B4B63] font-bold">{capacityKw} kW</span>
+                      </label>
+                      <span className="text-xs text-gray-400">1 to 5 kW</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="1"
+                      max="5"
+                      step="0.5"
+                      value={capacityKw}
+                      onChange={(e) => setCapacityKw(parseFloat(e.target.value))}
+                      className="w-full accent-[#6B4B63] cursor-pointer"
+                    />
+                  </div>
 
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="w-full bg-odoo-primary hover:bg-odoo-primary-dark text-white font-bold py-3 rounded-lg text-sm shadow-md transition-colors disabled:opacity-50"
-                >
-                  {submitting ? 'Submitting...' : 'Request Free Rooftop Assessment'}
-                </button>
+                  <div>
+                    <label className="block text-xs font-semibold text-[#212529] mb-1.5">
+                      Additional Notes / Monthly Bill
+                    </label>
+                    <textarea
+                      rows={2}
+                      placeholder="e.g. RCC flat terrace, approx monthly electricity bill ₹4,500..."
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      className="w-full px-3.5 py-2 border border-gray-300 rounded text-sm text-[#212529] placeholder-gray-400 focus:outline-none focus:border-[#6B4B63] focus:ring-2 focus:ring-[#6B4B63]/20"
+                    />
+                  </div>
 
-                <p className="text-[10px] text-gray-400 text-center">
-                  Protected by SunPower Privacy Policy. Rate limited lead submission.
-                </p>
-              </form>
-            )}
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="w-full bg-[#6B4B63] hover:bg-[#583D51] text-white font-bold py-3 rounded text-sm transition-colors shadow-xs disabled:opacity-50"
+                  >
+                    {submitting ? 'Submitting...' : 'Submit Quote Request'}
+                  </button>
+                </form>
+              )}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      </main>
 
-      {/* Footer */}
-      <footer className="bg-slate-900 text-gray-400 text-xs py-8 border-t border-slate-800 mt-auto">
-        <div className="max-w-7xl mx-auto px-4 text-center space-y-2">
-          <p>© 2026 SunPower Solutions. Rooftop Solar Installation & Maintenance Systems.</p>
-          <p className="text-[11px] text-gray-500">
-            Certified Solar EPC Provider • 40+ Projects/Month • 15 Field Engineers
-          </p>
-        </div>
-      </footer>
+      {/* 7. Footer matching Screenshot 3 */}
+      <SiteFooter />
     </div>
   );
 };
-

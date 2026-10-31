@@ -1,16 +1,38 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { api } from '../../api/client';
 import { FormView, FormTab } from '../../components/odoo/FormView';
 import { ControlPanel } from '../../components/odoo/ControlPanel';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+  faDolly,
+  faCheckCircle,
+  faBoxes,
+  faCalendarAlt,
+  faInfoCircle,
+  faArrowRight,
+  faSpinner,
+  faClipboardCheck,
+} from '@fortawesome/free-solid-svg-icons';
 
 export const LeadFormPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+
   const [lead, setLead] = useState<any>(null);
   const [chatter, setChatter] = useState<any[]>([]);
   const [showChecklistModal, setShowChecklistModal] = useState(false);
   const [showSurveyModal, setShowSurveyModal] = useState(false);
+
+  // Send Item Details to Warehouse state
+  const [showSendItemsModal, setShowSendItemsModal] = useState(false);
+  const [bomTemplates, setBomTemplates] = useState<any[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
+  const [submittingToWarehouse, setSubmittingToWarehouse] = useState(false);
+  const [warehouseNotes, setWarehouseNotes] = useState('');
+  const [subsidyAmount, setSubsidyAmount] = useState<number>(78000);
+  const [submissionSuccess, setSubmissionSuccess] = useState<any>(null);
 
   const [checklist, setChecklist] = useState({
     shadow_free_area_sqft: 350.0,
@@ -42,10 +64,34 @@ export const LeadFormPage: React.FC = () => {
     }
   };
 
+  const fetchBomTemplates = async (capacity?: number) => {
+    try {
+      const templates = await api.get<any[]>('/bom-templates');
+      setBomTemplates(templates);
+      if (templates.length > 0) {
+        if (capacity) {
+          const match = templates.find((t) => Math.abs(t.capacity_kw - capacity) < 0.5);
+          if (match) {
+            setSelectedTemplateId(match.id);
+            return;
+          }
+        }
+        setSelectedTemplateId(templates[0].id);
+      }
+    } catch (err) {
+      console.warn('Failed to load BOM templates', err);
+    }
+  };
+
   const fetchLeadData = async () => {
     try {
       const data = await api.get<any>(`/leads/${id}`);
       setLead(data);
+      if (data.required_capacity) {
+        const sub = data.required_capacity >= 3 ? 78000 : data.required_capacity >= 2 ? 60000 : 30000;
+        setSubsidyAmount(sub);
+      }
+      fetchBomTemplates(data.required_capacity);
       const chat = await api.get<any[]>(`/leads/${id}/chatter`);
       setChatter(chat);
     } catch (err) {
@@ -57,6 +103,13 @@ export const LeadFormPage: React.FC = () => {
     fetchLeadData();
     fetchTechnicians();
   }, [id]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('action') === 'send_to_warehouse') {
+      setShowSendItemsModal(true);
+    }
+  }, [location.search]);
 
   if (!lead) {
     return <div className="p-8 text-center text-gray-400">Loading lead...</div>;
@@ -99,6 +152,41 @@ export const LeadFormPage: React.FC = () => {
     }
   };
 
+  const handleApproveSurvey = async () => {
+    if (!lead.survey) return;
+    try {
+      await api.post(`/surveys/${lead.survey.id}/approve`);
+      alert('Site Survey Feasibility APPROVED! Lead stage has shifted to Survey Approved.');
+      fetchLeadData();
+    } catch (err: any) {
+      alert(err.message || 'Error approving site survey');
+    }
+  };
+
+  const handleSendToWarehouse = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedTemplateId) {
+      alert('Please select a pre-engineered BOM template.');
+      return;
+    }
+    setSubmittingToWarehouse(true);
+    try {
+      const res = await api.post<any>(`/leads/${id}/submit-to-warehouse`, {
+        template_id: selectedTemplateId,
+        subsidy_amount: subsidyAmount,
+        notes: warehouseNotes || `Item checklist dispatched for ${lead.name} (${lead.required_capacity} kW ${lead.system_type}).`,
+      });
+      setSubmissionSuccess(res);
+      setShowSendItemsModal(false);
+      fetchLeadData();
+      alert(`Success! ${res.message}`);
+    } catch (err: any) {
+      alert(err.message || 'Failed to dispatch items to warehouse');
+    } finally {
+      setSubmittingToWarehouse(false);
+    }
+  };
+
   const handleCreateQuoteClick = () => {
     if (lead.status !== 'SURVEY_APPROVED') {
       alert('GATE ENFORCED: Site survey must be APPROVED before creating a quotation according to the client and submitting to warehouse.');
@@ -106,6 +194,8 @@ export const LeadFormPage: React.FC = () => {
     }
     navigate(`/web/quotes?lead_id=${lead.id}`);
   };
+
+  const selectedTemplate = bomTemplates.find((t) => t.id === selectedTemplateId);
 
   const tabs: FormTab[] = [
     {
@@ -201,6 +291,11 @@ export const LeadFormPage: React.FC = () => {
     },
   ];
 
+  const isSurveyApproved =
+    lead.status === 'SURVEY_APPROVED' || (lead.survey && lead.survey.status === 'APPROVED');
+  const isSurveyScheduled =
+    lead.survey && lead.survey.status === 'SCHEDULED' && lead.status !== 'SURVEY_APPROVED';
+
   return (
     <div className="flex-1 flex flex-col">
       <ControlPanel
@@ -222,6 +317,61 @@ export const LeadFormPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Dynamic Survey Status Alert Banners */}
+      {isSurveyScheduled && (
+        <div className="bg-amber-50 border-b border-amber-200 px-6 py-2.5 flex items-center justify-between text-xs text-amber-900">
+          <div className="flex items-center gap-2">
+            <FontAwesomeIcon icon={faCalendarAlt} className="text-amber-600 text-sm" />
+            <span>
+              Site survey scheduled for <strong>{new Date(lead.survey.scheduled_date).toLocaleString()}</strong> with lead technician. Once roof feasibility is verified, approve survey.
+            </span>
+          </div>
+          <button
+            onClick={handleApproveSurvey}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded font-semibold text-xs flex items-center gap-1.5 shadow-xs transition-colors"
+          >
+            <FontAwesomeIcon icon={faCheckCircle} />
+            <span>Approve Survey Feasibility</span>
+          </button>
+        </div>
+      )}
+
+      {isSurveyApproved && (
+        <div className="bg-emerald-50 border-b border-emerald-200 px-6 py-2.5 flex items-center justify-between text-xs text-emerald-950">
+          <div className="flex items-center gap-2">
+            <FontAwesomeIcon icon={faCheckCircle} className="text-emerald-600 text-sm" />
+            <span>
+              <strong>Site Survey Feasibility Approved!</strong> Shadow analysis and roof structure verified. Now send the required installation items checklist to the warehouse.
+            </span>
+          </div>
+          <button
+            onClick={() => setShowSendItemsModal(true)}
+            className="bg-[#6B4B63] hover:bg-[#583D51] text-white px-3.5 py-1.5 rounded font-bold text-xs flex items-center gap-1.5 shadow-xs transition-colors"
+          >
+            <FontAwesomeIcon icon={faDolly} />
+            <span>Send Item Details Required to Warehouse</span>
+          </button>
+        </div>
+      )}
+
+      {submissionSuccess && (
+        <div className="bg-teal-50 border-b border-teal-200 px-6 py-2.5 flex items-center justify-between text-xs text-teal-950">
+          <div className="flex items-center gap-2">
+            <FontAwesomeIcon icon={faBoxes} className="text-teal-600 text-sm" />
+            <span>
+              <strong>Items Dispatched to Warehouse!</strong> Sales Order <strong>{submissionSuccess.order_number}</strong> confirmed and Pick List <strong>#{submissionSuccess.pick_list_id}</strong> ({submissionSuccess.items_count} items) generated for barcode scanning.
+            </span>
+          </div>
+          <Link
+            to="/web/inventory"
+            className="bg-[#5CC9B0] hover:bg-teal-500 text-gray-900 px-3 py-1 rounded font-bold text-xs flex items-center gap-1.5 shadow-xs transition-colors"
+          >
+            <span>Open Warehouse Pick List</span>
+            <FontAwesomeIcon icon={faArrowRight} />
+          </Link>
+        </div>
+      )}
+
       <FormView
         title={lead.name}
         subtitle={`Lead #${lead.id} • ${lead.system_type}`}
@@ -238,6 +388,7 @@ export const LeadFormPage: React.FC = () => {
                 Record Call Checklist
               </button>
             )}
+
             {lead.status === 'QUALIFIED' && (
               <button
                 onClick={() => setShowSurveyModal(true)}
@@ -246,16 +397,37 @@ export const LeadFormPage: React.FC = () => {
                 Schedule Survey
               </button>
             )}
+
+            {isSurveyScheduled && (
+              <button
+                onClick={handleApproveSurvey}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded text-xs font-semibold shadow-xs flex items-center gap-1.5"
+              >
+                <FontAwesomeIcon icon={faCheckCircle} />
+                <span>Approve Survey Feasibility</span>
+              </button>
+            )}
+
+            {isSurveyApproved && (
+              <button
+                onClick={() => setShowSendItemsModal(true)}
+                className="bg-[#6B4B63] hover:bg-[#583D51] text-white px-3 py-1 rounded text-xs font-bold shadow-xs flex items-center gap-1.5"
+              >
+                <FontAwesomeIcon icon={faDolly} />
+                <span>Send Item Details Required to Warehouse</span>
+              </button>
+            )}
+
             <button
               onClick={handleCreateQuoteClick}
               className={`px-3 py-1 rounded text-xs font-medium flex items-center gap-1.5 ${
-                lead.status === 'SURVEY_APPROVED'
-                  ? 'bg-[#6B4B63] hover:bg-[#583D51] text-white shadow-xs'
+                isSurveyApproved
+                  ? 'border border-[#6B4B63] text-[#6B4B63] hover:bg-purple-50'
                   : 'bg-gray-200 text-gray-500 cursor-not-allowed'
               }`}
             >
               <span>Create Quotation According to Client</span>
-              {lead.status !== 'SURVEY_APPROVED' && (
+              {!isSurveyApproved && (
                 <span className="text-[10px] opacity-75">(Requires Approved Survey)</span>
               )}
             </button>
@@ -304,6 +476,224 @@ export const LeadFormPage: React.FC = () => {
         tabs={tabs}
         auditLogs={chatter}
       />
+
+      {/* Modal: Send Item Details Required to Warehouse */}
+      {showSendItemsModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-2xl border border-odoo-border w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden text-xs">
+            {/* Modal Header */}
+            <div className="bg-[#6B4B63] text-white px-5 py-3 flex items-center justify-between font-semibold">
+              <div className="flex items-center gap-2">
+                <FontAwesomeIcon icon={faDolly} className="text-white text-sm" />
+                <span>Send Item Details Required to Warehouse (BOM Checklist)</span>
+              </div>
+              <button onClick={() => setShowSendItemsModal(false)} className="hover:text-gray-300 text-sm">✕</button>
+            </div>
+
+            {/* Modal Body */}
+            <form onSubmit={handleSendToWarehouse} className="flex-1 overflow-y-auto p-5 space-y-4">
+              {/* Client & Rooftop Specs summary */}
+              <div className="bg-purple-50/60 p-3 rounded-lg border border-purple-100 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                <div>
+                  <span className="text-gray-500 block text-[10px] uppercase font-bold">Client / Customer</span>
+                  <span className="font-bold text-gray-900">{lead.name}</span>
+                </div>
+                <div>
+                  <span className="text-gray-500 block text-[10px] uppercase font-bold">Phone Number</span>
+                  <span className="font-semibold text-gray-800">{lead.phone}</span>
+                </div>
+                <div>
+                  <span className="text-gray-500 block text-[10px] uppercase font-bold">System Target</span>
+                  <span className="font-extrabold text-[#6B4B63]">{lead.required_capacity} kW {lead.system_type}</span>
+                </div>
+                <div>
+                  <span className="text-gray-500 block text-[10px] uppercase font-bold">Survey Feasibility</span>
+                  <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                    APPROVED
+                  </span>
+                </div>
+              </div>
+
+              {/* Select Pre-Engineered BOM Package */}
+              <div>
+                <label className="block font-bold text-gray-800 mb-1">
+                  Select Pre-Engineered Bill of Materials (BOM) *
+                </label>
+                <select
+                  value={selectedTemplateId || ''}
+                  onChange={(e) => setSelectedTemplateId(Number(e.target.value))}
+                  className="w-full border border-gray-300 rounded px-3 py-2 text-xs font-medium focus:border-[#6B4B63] focus:outline-none"
+                  required
+                >
+                  {bomTemplates.map((tpl) => (
+                    <option key={tpl.id} value={tpl.id}>
+                      {tpl.name} ({tpl.capacity_kw} kW - {tpl.system_type})
+                    </option>
+                  ))}
+                </select>
+                <span className="text-[11px] text-gray-500 mt-1 block">
+                  Automatically matched to client's {lead.required_capacity} kW rooftop capacity.
+                </span>
+              </div>
+
+              {/* Exploded Item Checklist Table */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="font-bold text-gray-800">
+                    Required Installation Items ({selectedTemplate?.lines?.length || 0} Hardware Items)
+                  </span>
+                  <span className="text-[11px] text-gray-500 font-medium">
+                    Pre-generated checklist for warehouse staging
+                  </span>
+                </div>
+
+                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-gray-100 text-gray-600 font-bold border-b border-gray-200 text-[11px]">
+                      <tr>
+                        <th className="py-2 px-3">#</th>
+                        <th className="py-2 px-3">Component / Product Name</th>
+                        <th className="py-2 px-3">Category</th>
+                        <th className="py-2 px-3 text-center">Qty</th>
+                        <th className="py-2 px-3 text-right">Unit Cost</th>
+                        <th className="py-2 px-3 text-right">Subtotal</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {selectedTemplate?.lines && selectedTemplate.lines.length > 0 ? (
+                        selectedTemplate.lines.map((line: any, idx: number) => {
+                          const unitCost = line.product?.unit_cost || line.product?.list_price || 0;
+                          const lineTotal = unitCost * line.quantity;
+                          return (
+                            <tr key={line.id || idx} className="hover:bg-gray-50/80">
+                              <td className="py-2 px-3 text-gray-400 font-mono">{idx + 1}</td>
+                              <td className="py-2 px-3 font-semibold text-gray-900">
+                                {line.product?.name || `Product #${line.product_id}`}
+                                {line.product?.sku && (
+                                  <span className="block text-[10px] text-gray-400 font-normal">
+                                    SKU: {line.product.sku}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-2 px-3">
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-gray-100 text-gray-700">
+                                  {line.product?.category || 'Hardware'}
+                                </span>
+                              </td>
+                              <td className="py-2 px-3 text-center font-bold text-gray-800">
+                                {line.quantity} {line.product?.uom || 'Unit'}
+                              </td>
+                              <td className="py-2 px-3 text-right text-gray-600">
+                                ₹{unitCost.toLocaleString()}
+                              </td>
+                              <td className="py-2 px-3 text-right font-bold text-gray-900">
+                                ₹{lineTotal.toLocaleString()}
+                              </td>
+                            </tr>
+                          );
+                        })
+                      ) : (
+                        <tr>
+                          <td colSpan={6} className="py-4 text-center text-gray-400">
+                            Loading pre-generated items checklist...
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                    {selectedTemplate?.lines && selectedTemplate.lines.length > 0 && (
+                      <tfoot className="bg-gray-50 border-t border-gray-200 font-bold text-gray-900">
+                        <tr>
+                          <td colSpan={5} className="py-2 px-3 text-right">Total Hardware Stock Cost:</td>
+                          <td className="py-2 px-3 text-right text-odoo-primary text-sm">
+                            ₹
+                            {selectedTemplate.lines
+                              .reduce(
+                                (acc: number, l: any) =>
+                                  acc + (l.product?.unit_cost || l.product?.list_price || 0) * l.quantity,
+                                0
+                              )
+                              .toLocaleString()}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    )}
+                  </table>
+                </div>
+              </div>
+
+              {/* Subsidy and Notes Row */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-semibold text-gray-700 mb-1">
+                    Central Government Subsidy (PM Surya Ghar DBT) ₹
+                  </label>
+                  <input
+                    type="number"
+                    value={subsidyAmount}
+                    onChange={(e) => setSubsidyAmount(Number(e.target.value))}
+                    className="w-full border border-gray-300 rounded px-2.5 py-1.5 focus:border-[#6B4B63] focus:outline-none"
+                    placeholder="e.g. 78000"
+                  />
+                  <span className="text-[10px] text-gray-400 mt-0.5 block">
+                    Direct benefit credited to customer's DISCOM account.
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-gray-700 mb-1">
+                    Warehouse Dispatch Instructions
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={warehouseNotes}
+                    onChange={(e) => setWarehouseNotes(e.target.value)}
+                    placeholder="e.g. Priority dispatch. Verify tier-1 mono PERC serial barcodes before staging."
+                    className="w-full border border-gray-300 rounded px-2.5 py-1.5 focus:border-[#6B4B63] focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Warehouse Workflow Explanation Note */}
+              <div className="p-3 bg-purple-50/70 border border-purple-200 rounded-lg flex items-start gap-2.5 text-xs text-purple-900">
+                <FontAwesomeIcon icon={faInfoCircle} className="text-[#6B4B63] mt-0.5" />
+                <div>
+                  <span className="font-bold block">Warehouse Handover Workflow:</span>
+                  Submitting will create the confirmed Sales Order and automatically send the required item checklist to the warehouse. Warehouse staff will tick and scan each component's barcode before order dispatch.
+                </div>
+              </div>
+
+              {/* Modal Actions */}
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => setShowSendItemsModal(false)}
+                  className="px-4 py-2 border border-gray-300 rounded font-medium text-gray-700 hover:bg-gray-50"
+                  disabled={submittingToWarehouse}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingToWarehouse}
+                  className="px-5 py-2 bg-[#6B4B63] hover:bg-[#583D51] text-white rounded font-bold shadow-sm flex items-center gap-2 disabled:opacity-50"
+                >
+                  {submittingToWarehouse ? (
+                    <>
+                      <FontAwesomeIcon icon={faSpinner} className="animate-spin" />
+                      <span>Sending Item Checklist to Warehouse...</span>
+                    </>
+                  ) : (
+                    <>
+                      <FontAwesomeIcon icon={faDolly} />
+                      <span>Confirm & Send Item Details to Warehouse</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Checklist Modal */}
       {showChecklistModal && (
@@ -463,4 +853,3 @@ export const LeadFormPage: React.FC = () => {
     </div>
   );
 };
-

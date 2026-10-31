@@ -4,6 +4,8 @@ import { api } from '../../api/client';
 import { ControlPanel, ViewType } from '../../components/odoo/ControlPanel';
 import { KanbanView, KanbanColumn, KanbanItem } from '../../components/odoo/KanbanView';
 import { ListView, ColumnDef } from '../../components/odoo/ListView';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faDolly, faCheckCircle, faCalendarCheck } from '@fortawesome/free-solid-svg-icons';
 
 export const CRMPage: React.FC = () => {
   const [leads, setLeads] = useState<any[]>([]);
@@ -77,6 +79,31 @@ export const CRMPage: React.FC = () => {
     ],
     amount: l.quotes && l.quotes.length > 0 ? l.quotes[0].total_amount : undefined,
     priority: l.required_capacity >= 5.0,
+    meta:
+      l.status === 'SURVEY_APPROVED' ? (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            navigate(`/web/crm/${l.id}?action=send_to_warehouse`);
+          }}
+          className="w-full bg-[#6B4B63] hover:bg-[#583D51] text-white font-semibold py-1 px-2 rounded text-[11px] flex items-center justify-center gap-1.5 shadow-xs transition-colors"
+          title="Send required pre-engineered item details to warehouse"
+        >
+          <FontAwesomeIcon icon={faDolly} />
+          <span>Send Items to Warehouse</span>
+        </button>
+      ) : l.status === 'SURVEY_SCHEDULED' ? (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            navigate(`/web/crm/${l.id}`);
+          }}
+          className="w-full bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 font-medium py-0.5 px-2 rounded text-[10px] flex items-center justify-center gap-1 transition-colors"
+        >
+          <FontAwesomeIcon icon={faCalendarCheck} className="text-amber-600" />
+          <span>Survey Scheduled (Verify)</span>
+        </button>
+      ) : undefined,
   }));
 
   const listColumns: ColumnDef<any>[] = [

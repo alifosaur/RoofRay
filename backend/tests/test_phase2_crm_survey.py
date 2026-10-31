@@ -148,3 +148,23 @@ def test_survey_workflow():
     lead_after_appr = client.get(f"/api/leads/{lead_id}", headers=sales_headers).json()
     assert lead_after_appr["status"] == "SURVEY_APPROVED"
 
+    # 5. Salesman submits item details to warehouse directly from approved survey
+    bom_res = client.get("/api/bom-templates", headers=sales_headers)
+    assert bom_res.status_code == 200
+    templates = bom_res.json()
+    assert len(templates) > 0
+    tpl_id = templates[0]["id"]
+
+    sub_res = client.post(f"/api/leads/{lead_id}/submit-to-warehouse", headers=sales_headers, json={
+        "template_id": tpl_id,
+        "subsidy_amount": 78000,
+        "notes": "Items dispatched to warehouse for staging.",
+    })
+    assert sub_res.status_code == 200
+    sub_data = sub_res.json()
+    assert sub_data["success"] is True
+    assert sub_data["order_id"] > 0
+    assert sub_data["pick_list_id"] > 0
+    assert sub_data["items_count"] > 0
+
+

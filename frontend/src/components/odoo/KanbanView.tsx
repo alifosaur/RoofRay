@@ -100,6 +100,13 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                     </div>
                   )}
 
+                  {/* Card Action / Meta */}
+                  {item.meta && (
+                    <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+                      {item.meta}
+                    </div>
+                  )}
+
                   {/* Footer / Meta */}
                   <div className="mt-2.5 pt-2 border-t border-gray-100 flex items-center justify-between text-[11px]">
                     {item.amount !== undefined ? (

@@ -88,10 +88,10 @@ def approve_survey(db: Session, survey_id: int, approved_by_id: int) -> Survey:
     if not survey:
         raise HTTPException(status_code=404, detail="Survey not found")
 
-    if survey.status != SurveyStatus.COMPLETED:
+    if survey.status not in [SurveyStatus.COMPLETED, SurveyStatus.SCHEDULED]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Only completed surveys can be approved. Current status: {survey.status.value}",
+            detail=f"Only scheduled or completed surveys can be approved. Current status: {survey.status.value}",
         )
 
     survey.status = SurveyStatus.APPROVED

@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel, ConfigDict
 from app.models.lead import LeadStatus
+from app.schemas.survey import SurveyOut
 
 
 class LeadPublicCreate(BaseModel):
@@ -74,6 +75,23 @@ class LeadOut(BaseModel):
     created_at: datetime
     updated_at: datetime
     call_checklist: Optional[CallChecklistOut] = None
+    survey: Optional[SurveyOut] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class SubmitToWarehouseIn(BaseModel):
+    template_id: int
+    notes: Optional[str] = None
+    subsidy_amount: Optional[float] = None
+
+
+class SubmitToWarehouseOut(BaseModel):
+    success: bool
+    message: str
+    quote_number: str
+    order_id: int
+    order_number: str
+    pick_list_id: int
+    items_count: int
 

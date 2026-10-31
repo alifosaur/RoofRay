@@ -34,6 +34,9 @@ class QuoteOut(BaseModel):
     quote_number: str
     lead_id: int
     customer_id: int
+    customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None
+    customer_address: Optional[str] = None
     template_id: Optional[int] = None
     status: QuoteStatus
     subtotal: float

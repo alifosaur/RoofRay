@@ -64,4 +64,21 @@ class Order(Base):
 
     @property
     def customer_name(self):
-        return self.customer.name if self.customer else None
+        return self.customer.name if self.customer else (self.quote.lead.name if (self.quote and self.quote.lead) else None)
+
+    @property
+    def customer_phone(self):
+        return self.customer.phone if self.customer else (self.quote.lead.phone if (self.quote and self.quote.lead) else None)
+
+    @property
+    def customer_address(self):
+        c = self.customer
+        if c and c.address:
+            parts = [p for p in (c.address, c.city, c.pincode) if p]
+            if parts:
+                return ", ".join(parts)
+        if self.quote and self.quote.lead:
+            l = self.quote.lead
+            parts = [p for p in (l.address, l.city, l.state, l.pincode) if p]
+            return ", ".join(parts) if parts else l.address
+        return None

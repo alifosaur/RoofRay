@@ -180,6 +180,15 @@ export const OrderFormPage: React.FC = () => {
           <div className="text-sm font-semibold text-gray-800">
             {order.customer_name || `Customer #${order.customer_id}`}
           </div>
+          {order.customer_phone && (
+            <div className="text-xs text-gray-500 font-mono mt-0.5">📞 {order.customer_phone}</div>
+          )}
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500">Installation / Rooftop Address</label>
+          <div className="text-sm font-semibold text-gray-800 whitespace-pre-line">
+            📍 {order.customer_address || 'Address on file'}
+          </div>
         </div>
         <div>
           <label className="block text-xs font-medium text-gray-500">System Specifications</label>
@@ -193,7 +202,7 @@ export const OrderFormPage: React.FC = () => {
             ₹{order.total_amount?.toLocaleString()}
           </div>
         </div>
-        <div>
+        <div className="md:col-span-2">
           <label className="block text-xs font-medium text-gray-500">Payment Status</label>
           <span
             className={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${

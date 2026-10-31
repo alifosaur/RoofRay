@@ -296,12 +296,19 @@ export const QuoteFormPage: React.FC = () => {
           </>
         }
         fields={
-          <div className="grid grid-cols-2 gap-6 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-xs">
             <div>
               <span className="text-gray-500 block font-medium">Customer</span>
-              <span className="text-gray-900 font-bold text-sm">Customer #{quote.customer_id}</span>
+              <span className="text-gray-900 font-bold text-sm">{quote.customer_name || `Customer #${quote.customer_id}`}</span>
+              {quote.customer_phone && <span className="text-gray-500 block text-xs font-mono mt-0.5">📞 {quote.customer_phone}</span>}
               <span className="text-gray-500 block mt-2 font-medium">Associated Lead</span>
               <span className="text-odoo-primary font-semibold">Lead #{quote.lead_id}</span>
+            </div>
+            <div>
+              <span className="text-gray-500 block font-medium">Installation / Rooftop Address</span>
+              <span className="text-gray-900 font-semibold text-xs mt-0.5 block whitespace-pre-line">
+                📍 {quote.customer_address || 'Address on file'}
+              </span>
             </div>
             <div>
               <span className="text-gray-500 block font-medium">Net Quotation Total</span>

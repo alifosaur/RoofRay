@@ -71,7 +71,25 @@ export const SurveysPage: React.FC = () => {
 
   const columns: ColumnDef<any>[] = [
     { key: 'id', header: 'Survey #' },
-    { key: 'lead_id', header: 'Lead ID', render: (r) => `Lead #${r.lead_id}` },
+    {
+      key: 'customer',
+      header: 'Customer',
+      render: (r) => (
+        <div>
+          <div className="font-bold text-gray-900">{r.customer_name || `Lead #${r.lead_id}`}</div>
+          {r.customer_phone && <div className="text-[10px] text-gray-500 font-mono">{r.customer_phone}</div>}
+        </div>
+      ),
+    },
+    {
+      key: 'site_address',
+      header: 'Site Address',
+      render: (r) => (
+        <span className="text-gray-700 max-w-[200px] truncate block" title={r.site_address}>
+          {r.site_address || '—'}
+        </span>
+      ),
+    },
     {
       key: 'scheduled_date',
       header: 'Scheduled Date',

@@ -48,7 +48,12 @@ class InstallationJob(Base):
     @property
     def site_address(self):
         c = self.order.customer if self.order else None
-        return ", ".join(p for p in (c.address, c.city, c.pincode) if p) if c else None
+        addr = ", ".join(p for p in (c.address, c.city, c.pincode) if p) if c and c.address else None
+        if not addr and self.order and self.order.quote and self.order.quote.lead:
+            l = self.order.quote.lead
+            parts = [p for p in (l.address, l.city, l.state, l.pincode) if p]
+            addr = ", ".join(parts) if parts else l.address
+        return addr or "Site address not provided"
 
     @property
     def customer_phone(self) -> str:

@@ -45,6 +45,29 @@ class Survey(Base):
     approved_by = relationship("User", foreign_keys=[approved_by_id])
     photos = relationship("SurveyPhoto", back_populates="survey", cascade="all, delete-orphan")
 
+    @property
+    def site_address(self):
+        if not self.lead:
+            return None
+        parts = [p for p in (self.lead.address, self.lead.city, self.lead.state, self.lead.pincode) if p]
+        return ", ".join(parts) if parts else self.lead.address
+
+    @property
+    def customer_name(self):
+        return self.lead.name if self.lead else None
+
+    @property
+    def customer_phone(self):
+        return self.lead.phone if self.lead else None
+
+    @property
+    def required_capacity(self):
+        return self.lead.required_capacity if self.lead else None
+
+    @property
+    def system_type(self):
+        return self.lead.system_type if self.lead else None
+
 
 class SurveyPhoto(Base):
     __tablename__ = "survey_photos"

@@ -110,6 +110,15 @@ export const CRMPage: React.FC = () => {
   const listColumns: ColumnDef<any>[] = [
     { key: 'name', header: 'Lead Name' },
     { key: 'phone', header: 'Phone' },
+    {
+      key: 'address',
+      header: 'Installation Address',
+      render: (r) => (
+        <span className="text-gray-700 max-w-[220px] truncate block" title={[r.address, r.city, r.state, r.pincode].filter(Boolean).join(', ')}>
+          {[r.address, r.city, r.pincode].filter(Boolean).join(', ') || r.address}
+        </span>
+      ),
+    },
     { key: 'required_capacity', header: 'Capacity (kW)', render: (r) => `${r.required_capacity} kW` },
     { key: 'system_type', header: 'System Type' },
     {

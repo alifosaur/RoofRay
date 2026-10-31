@@ -478,7 +478,9 @@ export const LeadFormPage: React.FC = () => {
               </div>
               <div>
                 <label className="text-gray-500 block mb-0.5 font-medium">Installation Address</label>
-                <div className="text-gray-800 whitespace-pre-line">{lead.address}</div>
+                <div className="text-gray-800 whitespace-pre-line font-medium">
+                  📍 {[lead.address, lead.city, lead.state, lead.pincode].filter(Boolean).join(', ') || lead.address}
+                </div>
               </div>
             </div>
 

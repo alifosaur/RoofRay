@@ -352,10 +352,15 @@ export const TechnicianPWAPage: React.FC = () => {
                 <div className="text-xs font-bold text-amber-400">
                   {job.job_number || `JOB-${String(job.id).padStart(4, '0')}`}
                 </div>
-                <div className="text-xs font-semibold text-white truncate max-w-[140px]">
+                <div className="text-xs font-semibold text-white truncate max-w-[150px]">
                   {job.customer_name || `Order #${job.order_id}`}
                 </div>
-                <div className="text-[10px] mt-0.5 text-gray-300">
+                {job.site_address && (
+                  <div className="text-[10px] text-gray-300 truncate max-w-[150px]">
+                    📍 {job.site_address}
+                  </div>
+                )}
+                <div className="text-[10px] mt-0.5 text-gray-400">
                   {job.capacity_kw || 3} kW • {job.status}
                 </div>
               </button>
@@ -705,10 +710,15 @@ export const TechnicianPWAPage: React.FC = () => {
                     }`}
                   >
                     <div className="text-xs font-bold text-amber-400">Survey #{s.id}</div>
-                    <div className="text-xs font-semibold text-white truncate max-w-[140px]">
+                    <div className="text-xs font-semibold text-white truncate max-w-[150px]">
                       {s.customer_name || `Lead #${s.lead_id}`}
                     </div>
-                    <div className="text-[10px] mt-0.5 text-gray-300">
+                    {s.site_address && (
+                      <div className="text-[10px] text-gray-300 truncate max-w-[150px]">
+                        📍 {s.site_address}
+                      </div>
+                    )}
+                    <div className="text-[10px] mt-0.5 text-gray-400">
                       {s.required_capacity ? `${s.required_capacity} kW` : ''} • {s.status}
                     </div>
                   </button>

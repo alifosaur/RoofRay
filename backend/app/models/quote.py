@@ -38,6 +38,26 @@ class Quote(Base):
     lines = relationship("QuoteLine", back_populates="quote", cascade="all, delete-orphan")
     order = relationship("Order", back_populates="quote", uselist=False)
 
+    @property
+    def customer_name(self):
+        return self.customer.name if self.customer else (self.lead.name if self.lead else None)
+
+    @property
+    def customer_phone(self):
+        return self.customer.phone if self.customer else (self.lead.phone if self.lead else None)
+
+    @property
+    def customer_address(self):
+        c = self.customer
+        if c and c.address:
+            parts = [p for p in (c.address, c.city, c.pincode) if p]
+            if parts:
+                return ", ".join(parts)
+        if self.lead:
+            parts = [p for p in (self.lead.address, self.lead.city, self.lead.state, self.lead.pincode) if p]
+            return ", ".join(parts) if parts else self.lead.address
+        return None
+
 
 class QuoteLine(Base):
     __tablename__ = "quote_lines"

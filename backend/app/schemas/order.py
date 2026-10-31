@@ -41,6 +41,8 @@ class OrderOut(BaseModel):
     invoice_id: Optional[int] = None
     pick_list_id: Optional[int] = None
     customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None
+    customer_address: Optional[str] = None
     capacity_kw: Optional[float] = None
     system_type: Optional[str] = None
 

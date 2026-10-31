@@ -107,9 +107,20 @@ def submit_customer_enquiry(
             name=payload.name,
             phone=payload.phone,
             email=payload.email,
-            address=f"{payload.address}, {payload.city or ''} {payload.state or ''} {payload.pincode or ''}".strip(),
+            address=payload.address or "",
+            city=payload.city,
+            pincode=payload.pincode,
         )
         db.add(cust)
+        db.flush()
+    else:
+        # Update customer profile with the submitted rooftop address
+        if payload.address:
+            cust.address = payload.address
+        if payload.city:
+            cust.city = payload.city
+        if payload.pincode:
+            cust.pincode = payload.pincode
         db.flush()
 
     # 3. Calculate roof area if length & width provided

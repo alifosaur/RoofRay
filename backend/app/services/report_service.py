@@ -34,7 +34,12 @@ def get_date_filter_range(date_range: str):
         start = datetime(start.year, start.month, start.day)
         return start, now
     elif date_range == "this_month":
-        start = datetime(now.year, now.month, 1)
+        # Cover current month-to-date, or at least trailing 30 days if month is young (first 5 days)
+        if now.day <= 5:
+            prev_month = datetime(now.year, now.month, 1) - timedelta(days=1)
+            start = datetime(prev_month.year, prev_month.month, 1)
+        else:
+            start = datetime(now.year, now.month, 1)
         return start, now
     # default all time
     return datetime(2020, 1, 1), now
@@ -170,25 +175,68 @@ def _compute_director_metrics(db: Session, date_range: str, granularity: str) ->
     payouts_unpaid = round(sum(p.total_amount for p in payouts if not p.is_paid), 2)
     payouts_paid = round(sum(p.total_amount for p in payouts if p.is_paid and in_range(p.paid_at)), 2)
 
-    # Time series (only buckets that have data; the chart shows an empty state when there are none)
+    # Continuous timeline buckets so the chart draws an actual continuous trend line graph
     series: Dict[str, Dict[str, float]] = {}
 
+    timeline_start = start_dt
+    timeline_end = end_dt
+    now = datetime.utcnow()
+
+    if date_range == "all":
+        # Show at least 14 to 30 continuous days of trend line
+        all_dts = [p.created_at for p in payments] + [datetime.strptime(j["created_at"], "%Y-%m-%d") for j in jobs]
+        earliest_dt = min(all_dts) if all_dts else (now - timedelta(days=14))
+        timeline_start = min(earliest_dt - timedelta(days=7), now - timedelta(days=14))
+        timeline_end = now
+    elif date_range == "this_month":
+        # Always span at least 14 days or from month start to today
+        timeline_start = min(start_dt, now - timedelta(days=10))
+        timeline_end = now
+    elif date_range == "this_week":
+        timeline_start = end_dt - timedelta(days=end_dt.weekday())
+        timeline_end = now
+    elif date_range == "today":
+        timeline_start = now - timedelta(days=6)
+        timeline_end = now
+
+    # Pre-populate continuous timeline keys
+    if granularity == "day":
+        cur = timeline_start.date()
+        while cur <= timeline_end.date():
+            series[cur.strftime("%Y-%m-%d")] = {"revenue": 0.0, "received": 0.0, "spent": 0.0, "profit": 0.0}
+            cur += timedelta(days=1)
+    elif granularity == "week":
+        cur = timeline_start.date()
+        while cur <= timeline_end.date():
+            mon = cur - timedelta(days=cur.weekday())
+            series[mon.strftime("%Y-%m-%d")] = {"revenue": 0.0, "received": 0.0, "spent": 0.0, "profit": 0.0}
+            cur += timedelta(days=7)
+    elif granularity == "month":
+        cur = datetime(timeline_start.year, timeline_start.month, 1)
+        while cur <= timeline_end:
+            series[cur.strftime("%Y-%m")] = {"revenue": 0.0, "received": 0.0, "spent": 0.0, "profit": 0.0}
+            nxt_month = cur.month + 1 if cur.month < 12 else 1
+            nxt_year = cur.year if cur.month < 12 else cur.year + 1
+            cur = datetime(nxt_year, nxt_month, 1)
+
     def add(dt: datetime, field: str, amount: float):
-        b = series.setdefault(_bucket_key(dt, granularity), {"revenue": 0.0, "received": 0.0, "spent": 0.0, "profit": 0.0})
+        k = _bucket_key(dt, granularity)
+        b = series.setdefault(k, {"revenue": 0.0, "received": 0.0, "spent": 0.0, "profit": 0.0})
         b[field] = round(b[field] + amount, 2)
 
     for j in jobs:
         dt = datetime.strptime(j["created_at"], "%Y-%m-%d")
         add(dt, "revenue", j["revenue"])
         add(dt, "profit", j["net_profit"])
+        # Operational job costs (BOM components + technician labor + order expenses)
+        add(dt, "spent", j.get("total_costs", 0.0))
+
     for p in payments:
         add(p.created_at, "received", p.amount)
-    for m in purchases:
-        add(m.created_at, "spent", m.quantity * m.unit_cost)
-    for t in timesheets:
-        add(t.finish_time, "spent", t.total_cost)
+
     for e in expenses:
         add(datetime.combine(e.expense_date, datetime.min.time()), "spent", e.amount)
+
     profit_series = [{"period": k, **v} for k, v in sorted(series.items())]
 
     unfinished_by_stage = {

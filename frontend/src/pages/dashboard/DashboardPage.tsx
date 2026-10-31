@@ -65,6 +65,30 @@ const STAGE_LABELS: Record<string, string> = {
   installs_in_progress: 'Installs in progress',
 };
 
+const formatXAxisDate = (val: string) => {
+  if (!val) return '';
+  if (val.length === 7) {
+    const [y, m] = val.split('-');
+    const date = new Date(Number(y), Number(m) - 1, 1);
+    return date.toLocaleDateString('en-IN', { month: 'short', year: '2-digit' });
+  }
+  const parts = val.split('-');
+  if (parts.length === 3) {
+    const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+    return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+  }
+  return val;
+};
+
+const formatYAxisINR = (val: number) => {
+  if (!val || val === 0) return '₹0';
+  const abs = Math.abs(val);
+  if (abs >= 10000000) return `₹${(val / 10000000).toFixed(1)}Cr`;
+  if (abs >= 100000) return `₹${(val / 100000).toFixed(1)}L`;
+  if (abs >= 1000) return `₹${(val / 1000).toFixed(0)}k`;
+  return `₹${val}`;
+};
+
 export const DashboardPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const shareToken = searchParams.get('token');
@@ -81,6 +105,16 @@ export const DashboardPage: React.FC = () => {
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareableUrl, setShareableUrl] = useState('');
   const [copied, setCopied] = useState(false);
+  const [visibleLines, setVisibleLines] = useState<Record<string, boolean>>({
+    Revenue: true,
+    Received: true,
+    Spent: true,
+    Profit: true,
+  });
+
+  const toggleLine = (key: string) => {
+    setVisibleLines((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
 
   const fetchDashboardData = async () => {
     setLoading(true);
@@ -261,27 +295,119 @@ export const DashboardPage: React.FC = () => {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="bg-white rounded border border-odoo-border shadow-xs p-5 lg:col-span-2">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-gray-700 mb-4 flex items-center gap-2">
-                  <FontAwesomeIcon icon={faChartLine} className="text-[#6B4B63]" />
-                  <span>Revenue, cash and profit per {granularity}</span>
-                </h3>
-                <div className="h-64">
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-gray-700 flex items-center gap-2">
+                    <FontAwesomeIcon icon={faChartLine} className="text-[#6B4B63]" />
+                    <span>Revenue, cash and profit per {granularity}</span>
+                  </h3>
+                  <div className="flex items-center gap-1.5">
+                    {[
+                      { key: 'Revenue', label: 'Revenue', color: '#714B67' },
+                      { key: 'Received', label: 'Received', color: '#017E84' },
+                      { key: 'Spent', label: 'Spent', color: '#D97706' },
+                      { key: 'Profit', label: 'Profit', color: '#10B981' },
+                    ].map(({ key, label, color }) => {
+                      const active = visibleLines[key];
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => toggleLine(key)}
+                          className={`text-[11px] px-2 py-0.5 rounded-full font-semibold border transition-all flex items-center gap-1.5 cursor-pointer ${
+                            active
+                              ? 'bg-white shadow-xs'
+                              : 'bg-gray-100 text-gray-400 border-gray-200 line-through opacity-60'
+                          }`}
+                          style={{
+                            borderColor: active ? color : undefined,
+                            color: active ? color : undefined,
+                          }}
+                        >
+                          <span
+                            className="w-2 h-2 rounded-full inline-block"
+                            style={{ backgroundColor: active ? color : '#9CA3AF' }}
+                          />
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="h-72">
                   {series.length === 0 ? (
                     <div className="h-full flex items-center justify-center text-xs text-gray-400 border border-dashed rounded">
                       No financial activity in this period yet.
                     </div>
                   ) : (
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={series}>
+                      <LineChart data={series} margin={{ top: 10, right: 15, left: 10, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F3F5" />
-                        <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#6C757D' }} />
-                        <YAxis tick={{ fontSize: 11, fill: '#6C757D' }} tickFormatter={(val) => `₹${(val / 1000).toFixed(0)}k`} />
-                        <Tooltip formatter={(value: any) => inr(Number(value))} contentStyle={{ borderRadius: '8px', fontSize: '12px' }} />
-                        <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
-                        <Line type="monotone" dataKey="Revenue" stroke="#6B4B63" strokeWidth={2.5} dot={{ r: 3 }} />
-                        <Line type="monotone" dataKey="Received" stroke="#017E84" strokeWidth={2} dot={{ r: 3 }} />
-                        <Line type="monotone" dataKey="Spent" stroke="#F59E0B" strokeWidth={1.8} strokeDasharray="4 4" dot={{ r: 3 }} />
-                        <Line type="monotone" dataKey="Profit" stroke="#10B981" strokeWidth={2.5} dot={{ r: 3 }} />
+                        <XAxis
+                          dataKey="name"
+                          tick={{ fontSize: 11, fill: '#6C757D' }}
+                          tickFormatter={formatXAxisDate}
+                          minTickGap={20}
+                        />
+                        <YAxis
+                          tick={{ fontSize: 11, fill: '#6C757D' }}
+                          tickFormatter={formatYAxisINR}
+                          width={60}
+                        />
+                        <Tooltip
+                          formatter={(value: any, name: any) => [inr(Number(value)), name]}
+                          labelFormatter={(label: any) => {
+                            if (!label) return '';
+                            const parts = String(label).split('-');
+                            if (parts.length === 3) {
+                              const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+                              return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+                            }
+                            return label;
+                          }}
+                          contentStyle={{ borderRadius: '8px', fontSize: '12px', border: '1px solid #E5E7EB', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                        />
+                        {visibleLines.Revenue && (
+                          <Line
+                            type="monotone"
+                            dataKey="Revenue"
+                            stroke="#714B67"
+                            strokeWidth={2.5}
+                            dot={{ r: 3, fill: '#714B67' }}
+                            activeDot={{ r: 6 }}
+                          />
+                        )}
+                        {visibleLines.Received && (
+                          <Line
+                            type="monotone"
+                            dataKey="Received"
+                            stroke="#017E84"
+                            strokeWidth={2.5}
+                            dot={{ r: 3, fill: '#017E84' }}
+                            activeDot={{ r: 6 }}
+                          />
+                        )}
+                        {visibleLines.Spent && (
+                          <Line
+                            type="monotone"
+                            dataKey="Spent"
+                            stroke="#D97706"
+                            strokeWidth={2}
+                            strokeDasharray="4 4"
+                            dot={{ r: 3, fill: '#D97706' }}
+                            activeDot={{ r: 5 }}
+                          />
+                        )}
+                        {visibleLines.Profit && (
+                          <Line
+                            type="monotone"
+                            dataKey="Profit"
+                            stroke="#10B981"
+                            strokeWidth={2.5}
+                            dot={{ r: 3, fill: '#10B981' }}
+                            activeDot={{ r: 6 }}
+                          />
+                        )}
                       </LineChart>
                     </ResponsiveContainer>
                   )}

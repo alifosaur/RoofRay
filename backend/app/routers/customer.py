@@ -62,6 +62,21 @@ FULFILMENT_ORDER = [
 ]
 
 
+@router.get("/enquiry")
+def get_my_enquiry(db: Session = Depends(get_db), current_user: User = Depends(require_role(UserRole.CUSTOMER))):
+    """The customer's active enquiry (shown read-only once submitted), or null."""
+    cust = _get_customer_profile(db, current_user)
+    lead = (db.query(Lead).filter(Lead.customer_id == cust.id, Lead.is_deleted == False, Lead.status != LeadStatus.LOST)
+            .order_by(Lead.id.desc()).first()) if cust else None
+    if not lead:
+        return None
+    fields = ("name", "phone", "email", "address", "city", "state", "pincode", "property_type", "roof_type", "roof_area_sqft",
+              "shadow_free_area_sqft", "floor_number", "roof_direction", "monthly_bill_amount", "required_capacity", "system_type", "notes")
+    return {"id": lead.id, "status": lead.status.value, "created_at": lead.created_at,
+            "sales_contact": lead.assigned_to.full_name if lead.assigned_to else None,
+            **{f: getattr(lead, f) for f in fields}}
+
+
 @router.post("/enquiry", response_model=CustomerEnquiryResponse, status_code=status.HTTP_201_CREATED)
 def submit_customer_enquiry(
     payload: CustomerEnquiryCreate,
@@ -84,6 +99,9 @@ def submit_customer_enquiry(
     cust = db.query(Customer).filter(
         (Customer.phone == payload.phone) | (Customer.email == payload.email)
     ).first()
+    if cust and db.query(Lead).filter(Lead.customer_id == cust.id, Lead.is_deleted == False,
+                                      Lead.status != LeadStatus.LOST).first():
+        raise HTTPException(status_code=400, detail="You already have an active enquiry. Your sales advisor will update it with you.")
     if not cust:
         cust = Customer(
             name=payload.name,

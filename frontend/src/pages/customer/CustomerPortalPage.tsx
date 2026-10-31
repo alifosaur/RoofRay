@@ -137,6 +137,7 @@ export const CustomerPortalPage: React.FC = () => {
   const nationalScheme = schemes.find((sc) => sc.state.toLowerCase().includes('national'));
   const [subsidy, setSubsidy] = useState<SubsidyRecord | null>(null);
   const [invoices, setInvoices] = useState<any[]>([]);
+  const [myEnquiry, setMyEnquiry] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
   const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
 
@@ -188,6 +189,7 @@ export const CustomerPortalPage: React.FC = () => {
         api.get<SubsidyRecord>('/customer/subsidy'),
       ]);
       api.get<any[]>('/finance/invoices').then(setInvoices).catch(() => setInvoices([]));
+      api.get<any>('/customer/enquiry').then(setMyEnquiry).catch(() => setMyEnquiry(null));
 
       if (tData.status === 'fulfilled') setTracker(tData.value);
       if (qData.status === 'fulfilled') setQuotes(qData.value);
@@ -551,7 +553,54 @@ export const CustomerPortalPage: React.FC = () => {
         {/* ---------------------------------------------------- */}
         {/* TAB 2: ENQUIRY & MEASUREMENTS FORM */}
         {/* ---------------------------------------------------- */}
-        {activeTab === 'enquiry' && (
+        {activeTab === 'enquiry' && myEnquiry && (
+          <div className="max-w-4xl mx-auto">
+            <div className="bg-white border border-gray-200 rounded-xl p-6 sm:p-8 shadow-sm">
+              <div className="border-b border-gray-200 pb-4 mb-5 flex flex-wrap justify-between gap-2">
+                <div>
+                  <span className="text-xs font-bold uppercase tracking-wider text-odoo-purple">Enquiry submitted</span>
+                  <h2 className="text-xl font-bold text-gray-900 mt-1">Your rooftop details</h2>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Locked after consultation. To change anything, contact your sales advisor
+                    {myEnquiry.sales_contact ? ` (${myEnquiry.sales_contact})` : ''}.
+                  </p>
+                </div>
+                <span className="self-start text-[11px] font-semibold px-2 py-1 rounded bg-gray-100 text-gray-700">
+                  <i className="fa-solid fa-lock mr-1"></i>
+                  {String(myEnquiry.status).replace(/_/g, ' ')}
+                </span>
+              </div>
+              <dl className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-3 text-xs">
+                {[
+                  ['Full name', myEnquiry.name],
+                  ['Phone', myEnquiry.phone],
+                  ['Email', myEnquiry.email],
+                  ['Installation address', myEnquiry.address],
+                  ['City', myEnquiry.city],
+                  ['State', myEnquiry.state],
+                  ['PIN code', myEnquiry.pincode],
+                  ['Property type', myEnquiry.property_type],
+                  ['Roof type', myEnquiry.roof_type],
+                  ['Roof area', myEnquiry.roof_area_sqft ? `${myEnquiry.roof_area_sqft} sq.ft` : null],
+                  ['Shadow-free area', myEnquiry.shadow_free_area_sqft ? `${myEnquiry.shadow_free_area_sqft} sq.ft` : null],
+                  ['Floor', myEnquiry.floor_number],
+                  ['Roof direction', myEnquiry.roof_direction],
+                  ['Monthly bill', myEnquiry.monthly_bill_amount ? `₹${Math.round(myEnquiry.monthly_bill_amount).toLocaleString('en-IN')}` : null],
+                  ['System', `${myEnquiry.required_capacity} kW ${myEnquiry.system_type}`],
+                  ['Submitted', new Date(myEnquiry.created_at + 'Z').toLocaleDateString()],
+                ].map(([label, value]) => (
+                  <div key={label as string}>
+                    <dt className="text-gray-400">{label}</dt>
+                    <dd className="font-semibold text-gray-900 mt-0.5">{value ?? '—'}</dd>
+                  </div>
+                ))}
+              </dl>
+              {myEnquiry.notes && <p className="mt-4 text-xs text-gray-600"><span className="text-gray-400">Notes: </span>{myEnquiry.notes}</p>}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'enquiry' && !myEnquiry && (
           <div className="max-w-4xl mx-auto">
             <div className="bg-white border border-gray-200 rounded-xl p-6 sm:p-8 shadow-sm mb-6">
               <div className="border-b border-gray-200 pb-4 mb-6">

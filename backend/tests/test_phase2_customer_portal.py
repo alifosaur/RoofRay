@@ -187,3 +187,16 @@ def test_customer_subsidy_tracker():
         assert "status" in sub
         assert "eligible_amount" in sub
 
+
+
+def test_enquiry_is_locked_after_submission():
+    phone = f"97{uuid.uuid4().int % 10**8:08d}"
+    email = f"lock_{uuid.uuid4().hex[:6]}@example.com"
+    reg = client.post("/api/auth/register", json={"email": email, "password": "lockpass1", "full_name": "Lock Test", "phone": phone})
+    hdr = {"Authorization": f"Bearer {reg.json()['access_token']}"}
+    assert client.get("/api/customer/enquiry", headers=hdr).json() is None
+    body = {"name": "Lock Test", "phone": phone, "email": email, "address": "5 Lock Street", "preferred_capacity_kw": 2}
+    assert client.post("/api/customer/enquiry", json=body).status_code == 201
+    mine = client.get("/api/customer/enquiry", headers=hdr).json()
+    assert mine["address"] == "5 Lock Street" and mine["required_capacity"] == 2
+    assert client.post("/api/customer/enquiry", json=body).status_code == 400

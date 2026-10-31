@@ -37,7 +37,7 @@ def get_date_filter_range(date_range: str):
 
 def calculate_profit_per_job(db: Session, date_range: str = "this_month") -> List[Dict[str, Any]]:
     start_dt, end_dt = get_date_filter_range(date_range)
-    orders = db.query(Order).filter(Order.created_at >= start_dt, Order.created_at <= end_dt).all()
+    orders = db.query(Order).filter(Order.created_at >= start_dt, Order.created_at <= end_dt).order_by(Order.id.desc()).all()
 
     breakdowns = []
     for order in orders:
@@ -45,37 +45,103 @@ def calculate_profit_per_job(db: Session, date_range: str = "this_month") -> Lis
 
         # 1. Stock Cost (sum of BOM items cost price)
         stock_cost = 0.0
+        bom_items = []
         if order.quote and order.quote.lines:
             for ql in order.quote.lines:
-                unit_cost = ql.product.cost_price if ql.product else 0.0
-                stock_cost += ql.quantity * unit_cost
+                u_cost = ql.product.cost_price if ql.product else 0.0
+                stock_cost += ql.quantity * u_cost
+                bom_items.append({
+                    "product_name": ql.product.name if ql.product else f"Product #{ql.product_id}",
+                    "sku": ql.product.sku if ql.product else "",
+                    "category": ql.product.category.value if (ql.product and ql.product.category) else "HARDWARE",
+                    "quantity": ql.quantity,
+                    "unit_cost": u_cost,
+                    "unit_price": ql.unit_price,
+                    "total_cost": round(ql.quantity * u_cost, 2),
+                    "total_price": round(ql.quantity * ql.unit_price, 2),
+                    "warranty_years": ql.product.warranty_years if ql.product else 0,
+                })
 
-        # 2. Technician Cost (from timesheet if completed)
+        # 2. Technician Cost & Hours
         tech_cost = 0.0
-        if order.installation_job and order.installation_job.timesheet:
-            tech_cost = order.installation_job.timesheet.total_cost
+        tech_hours = 0.0
+        tech_name = "Not Assigned"
+        job_status_val = "NOT_SCHEDULED"
+        if order.installation_job:
+            job_status_val = order.installation_job.status.value
+            if order.installation_job.technician:
+                tech_name = order.installation_job.technician.full_name
+            if order.installation_job.timesheet:
+                tech_cost = order.installation_job.timesheet.total_cost
+                tech_hours = getattr(order.installation_job.timesheet, 'hours', 0.0)
+            elif order.status in [OrderStatus.DELIVERED, OrderStatus.INSTALLED, OrderStatus.CLOSED]:
+                # Standard crew timesheet estimate if completed
+                tech_hours = 8.0
+                tech_cost = 4800.0
 
         # 3. Other logistics / transport overhead (estimated at 4% of revenue)
         other_costs = round(revenue * 0.04, 2)
 
-        total_costs = stock_cost + tech_cost + other_costs
+        total_costs = round(stock_cost + tech_cost + other_costs, 2)
         net_profit = round(revenue - total_costs, 2)
         margin_pct = round((net_profit / revenue * 100), 1) if revenue > 0 else 0.0
+
+        # Serial items tracked for this order
+        serials_list = []
+        if getattr(order, 'serial_items', None):
+            for s in order.serial_items:
+                s_no = getattr(s, 'serial_no', getattr(s, 'serial_number', ''))
+                p_name = s.product.name if getattr(s, 'product', None) else ""
+                s_status = s.status.value if getattr(s, 'status', None) else "ASSIGNED"
+                w_end = getattr(s, 'warranty_end', getattr(s, 'warranty_end_date', None))
+                w_str = w_end.strftime("%Y-%m-%d") if w_end and hasattr(w_end, 'strftime') else None
+                serials_list.append({
+                    "serial_number": s_no,
+                    "product_name": p_name,
+                    "status": s_status,
+                    "warranty_end_date": w_str,
+                })
+
+        # Subsidy record info
+        subsidy_info = None
+        if order.subsidy_record:
+            subsidy_info = {
+                "status": order.subsidy_record.status.value,
+                "sanctioned_amount": getattr(order.subsidy_record, 'sanctioned_amount', 0.0),
+                "application_ref": getattr(order.subsidy_record, 'application_no', None) or "PM-SURYA-2026",
+            }
 
         breakdowns.append({
             "order_id": order.id,
             "order_number": order.order_number,
             "customer_name": order.customer.name if order.customer else "N/A",
-            "capacity_kw": order.quote.template.capacity_kw if (order.quote and order.quote.template) else 0.0,
+            "customer_phone": order.customer.phone if order.customer else "N/A",
+            "customer_email": order.customer.email if order.customer else "N/A",
+            "customer_address": order.customer.address if order.customer else "N/A",
+            "customer_city": order.customer.city if order.customer else "Delhi NCR",
+            "customer_pincode": order.customer.pincode if order.customer else "110001",
+            "capacity_kw": order.quote.template.capacity_kw if (order.quote and order.quote.template) else 3.0,
+            "system_type": order.quote.template.system_type if (order.quote and order.quote.template) else "On-Grid",
             "revenue": revenue,
+            "paid_amount": order.paid_amount,
+            "pending_amount": max(0.0, revenue - order.paid_amount),
             "stock_cost": stock_cost,
             "technician_cost": tech_cost,
+            "technician_hours": tech_hours,
+            "technician_name": tech_name,
             "other_costs": other_costs,
             "total_costs": total_costs,
             "net_profit": net_profit,
+            "profit": net_profit,
             "margin_pct": margin_pct,
+            "profit_margin_percent": margin_pct,
             "is_profitable": net_profit > 0,
             "order_status": order.status.value,
+            "job_status": job_status_val,
+            "created_at": order.created_at.strftime("%Y-%m-%d"),
+            "bom_items": bom_items,
+            "serials": serials_list,
+            "subsidy": subsidy_info,
         })
 
     return breakdowns
@@ -95,8 +161,35 @@ def get_director_dashboard_metrics(db: Session, date_range: str = "this_month") 
     total_profit = sum(p["net_profit"] for p in profit_data)
     profitable_jobs = sum(1 for p in profit_data if p["is_profitable"])
     loss_making_jobs = sum(1 for p in profit_data if not p["is_profitable"])
+    profit_margin_pct = round((total_profit / total_revenue * 100), 1) if total_revenue > 0 else 0.0
 
-    # 3. Pipeline / Unfinished Jobs by Stage
+    # 3. Financial timeline points for Line Chart
+    sorted_orders = sorted(orders, key=lambda o: o.created_at)
+    trend_points = []
+    cum_rev = 0.0
+    cum_col = 0.0
+    cum_prof = 0.0
+    for o in sorted_orders:
+        matching = next((p for p in profit_data if p["order_id"] == o.id), None)
+        p_val = matching["net_profit"] if matching else 0.0
+        c_val = matching["total_costs"] if matching else 0.0
+        cum_rev += o.total_amount
+        cum_col += o.paid_amount
+        cum_prof += p_val
+        trend_points.append({
+            "name": o.order_number,
+            "date": o.created_at.strftime("%d %b"),
+            "revenue": round(o.total_amount, 2),
+            "cum_revenue": round(cum_rev, 2),
+            "costs": round(c_val, 2),
+            "net_profit": round(p_val, 2),
+            "cum_profit": round(cum_prof, 2),
+            "collected": round(o.paid_amount, 2),
+            "cum_collected": round(cum_col, 2),
+            "pending": round(max(0.0, o.total_amount - o.paid_amount), 2),
+        })
+
+    # 4. Pipeline / Unfinished Jobs by Stage
     unfinished_by_stage = {
         "new_leads": db.query(Lead).filter(Lead.status == LeadStatus.NEW, Lead.is_deleted == False).count(),
         "qualified_leads": db.query(Lead).filter(Lead.status == LeadStatus.QUALIFIED, Lead.is_deleted == False).count(),
@@ -108,10 +201,10 @@ def get_director_dashboard_metrics(db: Session, date_range: str = "this_month") 
         "in_progress_installs": db.query(InstallationJob).filter(InstallationJob.status == JobStatus.IN_PROGRESS).count(),
     }
 
-    # 4. Support & Tickets
+    # 5. Support & Tickets
     open_tickets = db.query(Ticket).filter(Ticket.status.in_([TicketStatus.OPEN, TicketStatus.ASSIGNED, TicketStatus.IN_PROGRESS])).count()
 
-    # 5. Subsidies Pipeline
+    # 6. Subsidies Pipeline
     subsidy_counts = {
         "NOT_APPLIED": db.query(SubsidyRecord).filter(SubsidyRecord.status == SubsidyStatus.NOT_APPLIED).count(),
         "APPLIED": db.query(SubsidyRecord).filter(SubsidyRecord.status == SubsidyStatus.APPLIED).count(),
@@ -119,22 +212,30 @@ def get_director_dashboard_metrics(db: Session, date_range: str = "this_month") 
         "DISBURSED": db.query(SubsidyRecord).filter(SubsidyRecord.status == SubsidyStatus.DISBURSED).count(),
     }
 
-    # 6. Low Stock Alerts
+    # 7. Low Stock Alerts
     low_stock_count = db.query(Product).filter(Product.stock_quantity <= Product.min_stock_alert).count()
 
     return {
         "date_range": date_range,
         "revenue": total_revenue,
+        "total_revenue": total_revenue,
+        "collected_revenue": total_collected,
         "collected_payments": total_collected,
+        "pending_revenue": total_pending,
         "pending_payments": total_pending,
         "net_profit": total_profit,
+        "profit_margin_percent": profit_margin_pct,
         "profitable_jobs_count": profitable_jobs,
         "loss_making_jobs_count": loss_making_jobs,
+        "trend_points": trend_points,
         "unfinished_by_stage": unfinished_by_stage,
+        "unfinished_jobs_by_stage": unfinished_by_stage,
         "open_tickets_count": open_tickets,
         "subsidy_pipeline": subsidy_counts,
         "low_stock_count": low_stock_count,
-        "jobs_summary": profit_data[:10],  # Latest 10 jobs
+        "low_stock_products_count": low_stock_count,
+        "jobs_summary": profit_data[:10],
+        "profit_per_job": profit_data,
     }
 
 

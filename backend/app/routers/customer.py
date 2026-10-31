@@ -698,6 +698,69 @@ def raise_customer_ticket(
     }
 
 
+@router.get("/tickets")
+def get_customer_tickets(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.CUSTOMER, UserRole.ADMIN)),
+):
+    """List service tickets and live progress for the current customer."""
+    cust = _get_customer_profile(db, current_user)
+    if not cust and current_user.role == UserRole.ADMIN:
+        cust = db.query(Customer).order_by(Customer.id.desc()).first()
+    if not cust:
+        return []
+
+    tickets = db.query(Ticket).filter(Ticket.customer_id == cust.id).order_by(Ticket.created_at.desc()).all()
+    out = []
+    for t in tickets:
+        assigned_tech = t.assigned_to
+        out.append({
+            "id": t.id,
+            "ticket_number": t.ticket_number,
+            "subject": t.subject,
+            "description": t.description,
+            "status": t.status.value,
+            "is_billable": t.is_billable,
+            "repair_cost": t.repair_cost,
+            "resolution_notes": t.resolution_notes,
+            "created_at": t.created_at.strftime("%Y-%m-%d %H:%M") if t.created_at else None,
+            "resolved_at": t.resolved_at.strftime("%Y-%m-%d %H:%M") if t.resolved_at else None,
+            "closed_at": t.closed_at.strftime("%Y-%m-%d %H:%M") if t.closed_at else None,
+            "customer_confirmed_at": t.customer_confirmed_at.strftime("%Y-%m-%d %H:%M") if t.customer_confirmed_at else None,
+            "serial_item": {
+                "serial_no": t.serial_item.serial_no,
+                "product_name": t.serial_item.product.name if t.serial_item.product else "Solar Component",
+            } if t.serial_item else None,
+            "technician": {
+                "name": assigned_tech.full_name or assigned_tech.username,
+                "phone": assigned_tech.phone or "Assigned (Contact via Helpdesk)",
+            } if assigned_tech else None,
+        })
+    return out
+
+
+@router.post("/tickets/{ticket_id}/confirm")
+def confirm_customer_ticket(
+    ticket_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.CUSTOMER, UserRole.ADMIN)),
+):
+    """Customer confirms resolution of their query after technician fixes it."""
+    cust = _get_customer_profile(db, current_user)
+    ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Service ticket not found")
+
+    if current_user.role == UserRole.CUSTOMER and (not cust or ticket.customer_id != cust.id):
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    ticket.status = TicketStatus.CUSTOMER_CONFIRMED
+    ticket.customer_confirmed_at = datetime.utcnow()
+    db.commit()
+
+    return {"message": f"Service query #{ticket.ticket_number} marked as confirmed and satisfied!"}
+
+
 @router.get("/packages")
 def list_solar_packages(db: Session = Depends(get_db)):
     """Public package catalogue built from the BOM templates, product prices and the schemes table."""

@@ -337,6 +337,7 @@ export const CustomerPortalPage: React.FC = () => {
   const nationalScheme = schemes.find((sc) => sc.state.toLowerCase().includes('national'));
   const [subsidy, setSubsidy] = useState<SubsidyRecord | null>(null);
   const [invoices, setInvoices] = useState<any[]>([]);
+  const [tickets, setTickets] = useState<any[]>([]);
   const [myEnquiry, setMyEnquiry] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
   const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
@@ -395,6 +396,7 @@ export const CustomerPortalPage: React.FC = () => {
         api.get<SubsidyRecord>('/customer/subsidy'),
       ]);
       api.get<any[]>('/finance/invoices').then(setInvoices).catch(() => setInvoices([]));
+      api.get<any[]>('/customer/tickets').then(setTickets).catch(() => setTickets([]));
       api.get<any>('/customer/enquiry').then(setMyEnquiry).catch(() => setMyEnquiry(null));
 
       if (tData.status === 'fulfilled') setTracker(tData.value);
@@ -407,6 +409,18 @@ export const CustomerPortalPage: React.FC = () => {
       console.error('Failed to load portal data:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Confirm ticket resolution
+  const handleConfirmTicket = async (ticketId: number) => {
+    if (!window.confirm('Confirm that the technician has resolved this service request to your satisfaction?')) return;
+    try {
+      await api.post(`/customer/tickets/${ticketId}/confirm`);
+      setNoticeMessage('Thank you! Service resolution confirmed.');
+      await loadData();
+    } catch (err: any) {
+      alert(err.message || 'Failed to confirm resolution');
     }
   };
 
@@ -612,7 +626,7 @@ export const CustomerPortalPage: React.FC = () => {
               { id: 'enquiry', label: 'Enquiry & Sizing', icon: 'fa-ruler-combined' },
               { id: 'tracker', label: 'Project Tracker', icon: 'fa-route', badge: tracker?.current_stage_name },
               { id: 'quotes', label: 'Quotations & Orders', icon: 'fa-file-invoice-dollar', count: quotes.length },
-              { id: 'equipment', label: 'Equipment & Warranty', icon: 'fa-shield-halved', count: equipment.length },
+              { id: 'equipment', label: 'Equipment & Queries', icon: 'fa-shield-halved', count: equipment.length, badge: tickets.filter((t) => t.status !== 'CLOSED' && t.status !== 'CUSTOMER_CONFIRMED').length > 0 ? `${tickets.filter((t) => t.status !== 'CLOSED' && t.status !== 'CUSTOMER_CONFIRMED').length} Active Query` : undefined },
               { id: 'schemes', label: 'PM Surya Ghar & Subsidy', icon: 'fa-hand-holding-dollar' },
             ].map((tab) => (
               <button
@@ -1536,6 +1550,179 @@ export const CustomerPortalPage: React.FC = () => {
                 <span>Raise Service Request</span>
               </button>
             </div>
+
+            {/* LIVE QUERY & TECHNICIAN RESOLUTION TRACKER */}
+            {tickets.length > 0 && (
+              <div className="mb-8 bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-4 pb-2 border-b border-gray-100">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
+                    <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">
+                      Live Service Query Tracker ({tickets.length})
+                    </h3>
+                  </div>
+                  <span className="text-[11px] text-gray-500 hidden sm:inline">Real-Time Technician Dispatch & Resolution</span>
+                </div>
+
+                <div className="space-y-6">
+                  {tickets.map((t) => {
+                    const stageIndex = (() => {
+                      switch (t.status) {
+                        case 'OPEN': return 0;
+                        case 'ASSIGNED': return 1;
+                        case 'IN_PROGRESS': return 2;
+                        case 'RESOLVED': return 3;
+                        case 'CUSTOMER_CONFIRMED':
+                        case 'CLOSED': return 4;
+                        default: return 0;
+                      }
+                    })();
+
+                    const stages = [
+                      { title: 'Query Logged', desc: 'Registered on system' },
+                      { title: 'Tech Assigned', desc: t.technician?.name ? `Allocated to ${t.technician.name}` : 'Dispatch in progress' },
+                      { title: 'On-Site Repair', desc: 'Technician inspecting rooftop' },
+                      { title: 'Fixed & Verified', desc: 'Work completed by technician' },
+                    ];
+
+                    return (
+                      <div key={t.id} className="p-5 border border-purple-100 rounded-xl bg-gradient-to-b from-purple-50/30 to-white space-y-4">
+                        {/* Query header */}
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-mono font-bold text-gray-900 text-sm">{t.ticket_number}</span>
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                t.status === 'RESOLVED' || t.status === 'CUSTOMER_CONFIRMED' || t.status === 'CLOSED'
+                                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                  : t.status === 'IN_PROGRESS'
+                                  ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                                  : 'bg-blue-100 text-blue-800 border border-blue-200'
+                              }`}>
+                                {t.status === 'CUSTOMER_CONFIRMED' ? 'RESOLVED & VERIFIED' : t.status}
+                              </span>
+                              {t.is_billable ? (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                  Paid Service (Out of Warranty)
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  ✓ Free Under Warranty
+                                </span>
+                              )}
+                            </div>
+                            <h4 className="font-bold text-gray-900 text-sm mt-1">{t.subject}</h4>
+                            {t.serial_item && (
+                              <p className="text-xs text-odoo-purple font-mono mt-0.5">
+                                Component: {t.serial_item.product_name} ({t.serial_item.serial_no})
+                              </p>
+                            )}
+                          </div>
+                          <div className="text-right text-xs text-gray-400">
+                            <span>Raised on: {t.created_at || 'Recently'}</span>
+                          </div>
+                        </div>
+
+                        {/* Technician Dispatch Info Banner */}
+                        <div className="bg-white p-3 rounded-lg border border-gray-200 text-xs flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-full bg-purple-100 text-odoo-purple flex items-center justify-center font-bold text-xs">
+                              👷
+                            </div>
+                            <div>
+                              <span className="text-[10px] text-gray-400 uppercase font-semibold block">Field Technician</span>
+                              <strong className="text-gray-900 font-bold">
+                                {t.technician?.name || 'Assigning nearest technician...'}
+                              </strong>
+                              {t.technician?.phone && (
+                                <span className="text-gray-500 block text-[11px]">Contact: {t.technician.phone}</span>
+                              )}
+                            </div>
+                          </div>
+                          {t.status === 'IN_PROGRESS' && (
+                            <span className="px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 text-[11px] font-bold border border-amber-200 flex items-center gap-1.5 animate-pulse">
+                              <i className="fa-solid fa-wrench text-amber-600"></i>
+                              <span>Technician On-Site Currently</span>
+                            </span>
+                          )}
+                          {(t.status === 'RESOLVED' || t.status === 'CUSTOMER_CONFIRMED' || t.status === 'CLOSED') && (
+                            <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 text-[11px] font-bold border border-emerald-200 flex items-center gap-1.5">
+                              <i className="fa-solid fa-check text-emerald-600"></i>
+                              <span>Fixed by Technician</span>
+                            </span>
+                          )}
+                        </div>
+
+                        {/* 4-Stage Stepper */}
+                        <div className="pt-2">
+                          <div className="grid grid-cols-4 gap-2 text-center">
+                            {stages.map((st, sIdx) => {
+                              const isPast = stageIndex > sIdx;
+                              const isCur = stageIndex === sIdx;
+                              return (
+                                <div key={sIdx} className="space-y-1.5">
+                                  <div className="relative flex items-center justify-center">
+                                    <div
+                                      className={`w-7 h-7 mx-auto rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                                        isPast
+                                          ? 'bg-emerald-600 text-white shadow-xs'
+                                          : isCur
+                                          ? 'bg-odoo-purple text-white ring-4 ring-purple-100 shadow-sm'
+                                          : 'bg-gray-100 text-gray-400 border border-gray-200'
+                                      }`}
+                                    >
+                                      {isPast ? <i className="fa-solid fa-check text-[10px]"></i> : sIdx + 1}
+                                    </div>
+                                  </div>
+                                  <div className={`text-[11px] font-bold ${isCur ? 'text-odoo-purple' : isPast ? 'text-gray-800' : 'text-gray-400'}`}>
+                                    {st.title}
+                                  </div>
+                                  <div className="text-[10px] text-gray-500 leading-tight hidden sm:block">
+                                    {st.desc}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Resolution & Confirmation Box */}
+                        {t.status === 'RESOLVED' && (
+                          <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                            <div className="text-xs">
+                              <strong className="text-emerald-900 block font-bold mb-0.5">
+                                ✓ Issue Marked Fixed by Technician
+                              </strong>
+                              <p className="text-emerald-800">
+                                {t.resolution_notes || 'All checks and repair tests passed. Please test and confirm resolution.'}
+                              </p>
+                              {t.resolved_at && (
+                                <span className="text-[10px] text-emerald-600 mt-1 block">Resolved on: {t.resolved_at}</span>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleConfirmTicket(t.id)}
+                              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm whitespace-nowrap flex items-center gap-1.5"
+                            >
+                              <i className="fa-solid fa-circle-check"></i>
+                              <span>Confirm Fixed & Close</span>
+                            </button>
+                          </div>
+                        )}
+
+                        {(t.status === 'CUSTOMER_CONFIRMED' || t.status === 'CLOSED') && (
+                          <div className="p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-600 flex items-center gap-2">
+                            <i className="fa-solid fa-circle-check text-emerald-600"></i>
+                            <span>You verified and confirmed resolution on {t.customer_confirmed_at || 'completion'}. Query settled.</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {equipment.length === 0 ? (
               <div className="bg-white border border-gray-200 rounded-xl p-8 text-center text-gray-500">

@@ -30,7 +30,15 @@ export const TechnicianPWAPage: React.FC = () => {
   // Form states for installation job completion
   const [powerGenPassed, setPowerGenPassed] = useState(true);
   const [capacityKw, setCapacityKw] = useState<number>(0);
+  // "HH:MM" on the day the job was started; blank = keep the time the Start button was pressed
   const [startTime, setStartTime] = useState('');
+  const startTimeIso = () => {
+    if (!startTime || !activeJob) return undefined;
+    const base = activeJob.started_at ? new Date(activeJob.started_at + 'Z') : new Date();
+    const [h, m] = startTime.split(':').map(Number);
+    base.setHours(h, m, 0, 0);
+    return base.toISOString();
+  };
   const [notes, setNotes] = useState('');
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -190,7 +198,7 @@ export const TechnicianPWAPage: React.FC = () => {
         power_generating: powerGenPassed,
         signature_data: signatureDataUrl,
         customer_name: activeJob.customer_name,
-        start_time: startTime ? new Date(startTime).toISOString() : undefined,
+        start_time: startTimeIso(),
         notes: notes || undefined,
       });
       alert('Installation job marked COMPLETED! Timesheet generated.');
@@ -375,9 +383,14 @@ export const TechnicianPWAPage: React.FC = () => {
             {activeJob.status === 'IN_PROGRESS' && (
               <form onSubmit={handleCompleteJob} className="space-y-4">
                 <label className="block text-xs text-gray-300 font-semibold bg-slate-800 rounded-2xl p-4 border border-slate-700">
-                  Start time (leave blank to use when you pressed Start)
-                  <input type="datetime-local" value={startTime} onChange={(e) => setStartTime(e.target.value)}
+                  Start time (optional: change only if you started earlier than you pressed Start)
+                  <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)}
                     className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white mt-1" />
+                  {activeJob.started_at && (
+                    <span className="block text-[11px] text-gray-400 mt-1 font-normal">
+                      Started at {new Date(activeJob.started_at + 'Z').toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  )}
                 </label>
                 {/* Step 1: Photos */}
                 <div className="bg-slate-800 rounded-2xl p-4 border border-slate-700">

@@ -295,6 +295,7 @@ export const LeadFormPage: React.FC = () => {
   const isSurveyApproved =
     lead.status === 'SURVEY_APPROVED' || (lead.survey && lead.survey.status === 'APPROVED');
   const isSurveyScheduled = lead.survey && lead.survey.status === 'SCHEDULED';
+  const canScheduleSurvey = !lead.survey && ['NEW', 'CONTACTED', 'QUALIFIED'].includes(lead.status);
   const isSurveySubmitted = lead.survey && lead.survey.status === 'COMPLETED';
 
   return (
@@ -390,7 +391,17 @@ export const LeadFormPage: React.FC = () => {
         subtitle={`Lead #${lead.id} • ${lead.system_type}`}
         stages={stages}
         currentStage={lead.status}
-        onStageClick={(st) => api.put(`/leads/${id}`, { status: st }).then(fetchLeadData)}
+        onStageClick={(st) => {
+          // Survey scheduling needs a technician and date, so that stage opens the form
+          if (st === 'SURVEY_SCHEDULED' && canScheduleSurvey) {
+            setShowSurveyModal(true);
+            return;
+          }
+          api
+            .put(`/leads/${id}`, { status: st })
+            .then(fetchLeadData)
+            .catch((err) => alert(err.message || 'This stage is set automatically by the workflow'));
+        }}
         headerButtons={
           <>
             {!lead.call_checklist && (
@@ -402,7 +413,7 @@ export const LeadFormPage: React.FC = () => {
               </button>
             )}
 
-            {lead.status === 'QUALIFIED' && (
+            {canScheduleSurvey && (
               <button
                 onClick={() => setShowSurveyModal(true)}
                 className="bg-odoo-accent hover:bg-odoo-accent-dark text-white px-2.5 py-1 rounded text-xs font-medium"

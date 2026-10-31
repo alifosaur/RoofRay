@@ -12,6 +12,9 @@ from app.services import finance_service
 router = APIRouter(prefix="/finance", tags=["Finance & Billing"])
 
 
+from app.models.order import Order
+
+
 @router.get("/invoices", response_model=List[InvoiceOut])
 def list_invoices(
     customer_id: Optional[int] = None,
@@ -19,9 +22,16 @@ def list_invoices(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    if current_user.role == UserRole.TECHNICIAN:
+        raise HTTPException(status_code=403, detail="Forbidden: Technicians cannot view invoices")
+
     query = db.query(Invoice)
-    if customer_id:
+    if current_user.role == UserRole.CUSTOMER:
+        cust_id = current_user.customer_profile.id if current_user.customer_profile else -1
+        query = query.filter(Invoice.customer_id == cust_id)
+    elif customer_id and current_user.role == UserRole.ADMIN:
         query = query.filter(Invoice.customer_id == customer_id)
+
     if order_id:
         query = query.filter(Invoice.order_id == order_id)
     return query.order_by(Invoice.created_at.desc()).all()
@@ -33,9 +43,18 @@ def get_invoice(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    if current_user.role == UserRole.TECHNICIAN:
+        raise HTTPException(status_code=403, detail="Forbidden: Technicians cannot view invoices")
+
     inv = db.query(Invoice).filter(Invoice.id == invoice_id).first()
     if not inv:
         raise HTTPException(status_code=404, detail="Invoice not found")
+
+    if current_user.role == UserRole.CUSTOMER:
+        cust_id = current_user.customer_profile.id if current_user.customer_profile else -1
+        if inv.customer_id != cust_id:
+            raise HTTPException(status_code=403, detail="Forbidden: You cannot view another customer's invoice")
+
     return inv
 
 
@@ -45,7 +64,15 @@ def list_subsidies(
     current_user: User = Depends(get_current_user),
 ):
     """Tracks national solar subsidy paperwork stages."""
-    return db.query(SubsidyRecord).order_by(SubsidyRecord.updated_at.desc()).all()
+    if current_user.role == UserRole.TECHNICIAN:
+        raise HTTPException(status_code=403, detail="Forbidden: Technicians cannot view subsidy records")
+
+    query = db.query(SubsidyRecord)
+    if current_user.role == UserRole.CUSTOMER:
+        cust_id = current_user.customer_profile.id if current_user.customer_profile else -1
+        query = query.join(Order).filter(Order.customer_id == cust_id)
+
+    return query.order_by(SubsidyRecord.updated_at.desc()).all()
 
 
 @router.put("/subsidies/{subsidy_id}", response_model=SubsidyRecordOut)
@@ -53,7 +80,7 @@ def update_subsidy(
     subsidy_id: int,
     payload: SubsidyRecordUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.ACCOUNTS, UserRole.ADMIN, UserRole.SALES)),
+    current_user: User = Depends(require_role(UserRole.ADMIN, UserRole.SALES)),
 ):
     """Updates subsidy tracking status (NOT_APPLIED -> APPLIED -> APPROVED -> DISBURSED)."""
     return finance_service.update_subsidy_record(db, subsidy_id, payload, current_user.id)
@@ -66,11 +93,15 @@ def list_payouts(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    if current_user.role == UserRole.CUSTOMER:
+        raise HTTPException(status_code=403, detail="Forbidden: Customers cannot access technician payouts")
+
     query = db.query(TechnicianPayout)
-    if technician_id:
-        query = query.filter(TechnicianPayout.technician_id == technician_id)
-    elif current_user.role == UserRole.TECHNICIAN:
+    if current_user.role == UserRole.TECHNICIAN:
         query = query.filter(TechnicianPayout.technician_id == current_user.id)
+    elif technician_id and current_user.role == UserRole.ADMIN:
+        query = query.filter(TechnicianPayout.technician_id == technician_id)
+
     if is_paid is not None:
         query = query.filter(TechnicianPayout.is_paid == is_paid)
     return query.order_by(TechnicianPayout.created_at.desc()).all()
@@ -80,7 +111,7 @@ def list_payouts(
 def disburse_payout(
     payout_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.ACCOUNTS, UserRole.ADMIN)),
+    current_user: User = Depends(require_role(UserRole.ADMIN)),
 ):
     """Marks technician timesheet payout as disbursed."""
     return finance_service.mark_payout_paid(db, payout_id, current_user.id)

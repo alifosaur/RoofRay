@@ -35,11 +35,17 @@ def list_tickets(
     current_user: User = Depends(get_current_user),
 ):
     query = db.query(Ticket)
+    if current_user.role == UserRole.CUSTOMER:
+        cust_id = current_user.customer_profile.id if current_user.customer_profile else -1
+        query = query.filter(Ticket.customer_id == cust_id)
+    elif current_user.role == UserRole.TECHNICIAN:
+        query = query.filter(Ticket.assigned_to_id == current_user.id)
+    elif customer_id and current_user.role == UserRole.ADMIN:
+        query = query.filter(Ticket.customer_id == customer_id)
+
     if status:
         query = query.filter(Ticket.status == status)
-    if customer_id:
-        query = query.filter(Ticket.customer_id == customer_id)
-    if assigned_to_id:
+    if assigned_to_id and current_user.role in (UserRole.ADMIN, UserRole.SALES):
         query = query.filter(Ticket.assigned_to_id == assigned_to_id)
     return query.order_by(Ticket.created_at.desc()).all()
 
@@ -53,6 +59,15 @@ def get_ticket(
     ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
+
+    if current_user.role == UserRole.CUSTOMER:
+        cust_id = current_user.customer_profile.id if current_user.customer_profile else -1
+        if ticket.customer_id != cust_id:
+            raise HTTPException(status_code=403, detail="Forbidden: You can only view your own support tickets")
+    elif current_user.role == UserRole.TECHNICIAN:
+        if ticket.assigned_to_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Forbidden: You can only view tickets assigned to you")
+
     return ticket
 
 
@@ -60,13 +75,18 @@ def get_ticket(
 def create_ticket(
     payload: TicketCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.SUPPORT, UserRole.ADMIN, UserRole.SALES)),
+    current_user: User = Depends(require_role(UserRole.ADMIN, UserRole.SALES, UserRole.CUSTOMER)),
 ):
     """
     Creates ticket. Automatically evaluates warranty:
     In-warranty -> billable = False (Free repair/service)
     Out-of-warranty -> billable = True (Parts & labor will be billed).
     """
+    if current_user.role == UserRole.CUSTOMER:
+        cust_id = current_user.customer_profile.id if current_user.customer_profile else None
+        if not cust_id or payload.customer_id != cust_id:
+            # Overwrite customer_id to authenticated customer's id
+            payload.customer_id = cust_id
     return ticket_service.create_ticket(db, payload, current_user.id)
 
 
@@ -75,7 +95,7 @@ def resolve_ticket(
     ticket_id: int,
     payload: TicketResolveRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.SUPPORT, UserRole.ADMIN, UserRole.TECHNICIAN)),
+    current_user: User = Depends(require_role(UserRole.ADMIN, UserRole.SALES, UserRole.TECHNICIAN)),
 ):
     """
     Resolves ticket.
@@ -88,9 +108,18 @@ def resolve_ticket(
 def customer_confirm(
     ticket_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.SUPPORT, UserRole.ADMIN)),
+    current_user: User = Depends(require_role(UserRole.CUSTOMER, UserRole.ADMIN, UserRole.SALES)),
 ):
     """Records customer satisfaction confirmation."""
+    ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    if current_user.role == UserRole.CUSTOMER:
+        cust_id = current_user.customer_profile.id if current_user.customer_profile else -1
+        if ticket.customer_id != cust_id:
+            raise HTTPException(status_code=403, detail="Forbidden: You can only confirm your own ticket")
+
     return ticket_service.customer_confirm_ticket(db, ticket_id, current_user.id)
 
 
@@ -98,7 +127,7 @@ def customer_confirm(
 def close_ticket(
     ticket_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.SUPPORT, UserRole.ADMIN)),
+    current_user: User = Depends(require_role(UserRole.ADMIN, UserRole.SALES)),
 ):
     """
     GATE: Blocks closure (HTTP 400) if ticket is not CUSTOMER_CONFIRMED.

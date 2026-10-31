@@ -43,7 +43,7 @@ export const HomeMenu: React.FC<HomeMenuProps> = ({ isOpen, onClose }) => {
       path: '/web/crm',
       icon: faUsers,
       color: 'bg-emerald-600',
-      allowedRoles: ['admin', 'sales', 'support'],
+      allowedRoles: ['admin', 'sales'],
     },
     {
       id: 'surveys',
@@ -51,7 +51,7 @@ export const HomeMenu: React.FC<HomeMenuProps> = ({ isOpen, onClose }) => {
       path: '/web/surveys',
       icon: faClipboardCheck,
       color: 'bg-teal-600',
-      allowedRoles: ['admin', 'sales', 'technician'],
+      allowedRoles: ['admin', 'sales'],
     },
     {
       id: 'sales',
@@ -59,7 +59,7 @@ export const HomeMenu: React.FC<HomeMenuProps> = ({ isOpen, onClose }) => {
       path: '/web/quotes',
       icon: faFileInvoiceDollar,
       color: 'bg-purple-600',
-      allowedRoles: ['admin', 'sales', 'accounts'],
+      allowedRoles: ['admin', 'sales'],
     },
     {
       id: 'orders',
@@ -67,7 +67,7 @@ export const HomeMenu: React.FC<HomeMenuProps> = ({ isOpen, onClose }) => {
       path: '/web/orders',
       icon: faClipboardCheck,
       color: 'bg-indigo-600',
-      allowedRoles: ['admin', 'sales', 'warehouse', 'accounts'],
+      allowedRoles: ['admin', 'sales', 'warehouse'],
     },
     {
       id: 'inventory',
@@ -86,20 +86,12 @@ export const HomeMenu: React.FC<HomeMenuProps> = ({ isOpen, onClose }) => {
       allowedRoles: ['admin', 'warehouse'],
     },
     {
-      id: 'field-service',
-      name: 'Field Service',
-      path: '/web/jobs',
-      icon: faTools,
-      color: 'bg-blue-600',
-      allowedRoles: ['admin', 'technician'],
-    },
-    {
       id: 'helpdesk',
       name: 'Helpdesk',
       path: '/web/helpdesk',
       icon: faHeadset,
       color: 'bg-rose-600',
-      allowedRoles: ['admin', 'support'],
+      allowedRoles: ['admin', 'sales'],
     },
     {
       id: 'accounting',
@@ -107,7 +99,7 @@ export const HomeMenu: React.FC<HomeMenuProps> = ({ isOpen, onClose }) => {
       path: '/web/accounting',
       icon: faCalculator,
       color: 'bg-slate-700',
-      allowedRoles: ['admin', 'accounts'],
+      allowedRoles: ['admin'],
     },
     {
       id: 'dashboard',
@@ -115,7 +107,7 @@ export const HomeMenu: React.FC<HomeMenuProps> = ({ isOpen, onClose }) => {
       path: '/web/dashboard',
       icon: faChartPie,
       color: 'bg-violet-700',
-      allowedRoles: ['admin', 'accounts'],
+      allowedRoles: ['admin'],
     },
   ];
 

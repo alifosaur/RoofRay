@@ -35,12 +35,16 @@ def list_serials(
 ):
     """Lists registered serial items with warranty and order details."""
     query = db.query(SerialItem)
+    if current_user.role == UserRole.CUSTOMER:
+        cust_id = current_user.customer_profile.id if current_user.customer_profile else -1
+        query = query.filter(SerialItem.customer_id == cust_id)
+    elif customer_id and current_user.role == UserRole.ADMIN:
+        query = query.filter(SerialItem.customer_id == customer_id)
+
     if product_id:
         query = query.filter(SerialItem.product_id == product_id)
     if order_id:
         query = query.filter(SerialItem.order_id == order_id)
-    if customer_id:
-        query = query.filter(SerialItem.customer_id == customer_id)
     if status:
         query = query.filter(SerialItem.status == status)
     return query.order_by(SerialItem.created_at.desc()).all()

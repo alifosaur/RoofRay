@@ -18,7 +18,7 @@ router = APIRouter(prefix="/inventory", tags=["Inventory & Warehouse"])
 def get_stock_levels(
     low_stock_only: bool = False,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(UserRole.WAREHOUSE, UserRole.ADMIN, UserRole.SALES)),
 ):
     """Returns current inventory stock levels, optionally filtered by low stock."""
     query = db.query(Product)
@@ -41,7 +41,7 @@ def record_purchase(
 def list_pick_lists(
     status: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(UserRole.WAREHOUSE, UserRole.ADMIN, UserRole.SALES)),
 ):
     """Lists warehouse pick lists."""
     query = db.query(PickList)
@@ -54,7 +54,7 @@ def list_pick_lists(
 def get_pick_list(
     pick_list_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(UserRole.WAREHOUSE, UserRole.ADMIN, UserRole.SALES)),
 ):
     pick_list = db.query(PickList).filter(PickList.id == pick_list_id).first()
     if not pick_list:

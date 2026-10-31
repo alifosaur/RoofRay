@@ -27,15 +27,28 @@ def list_leads(
     include_deleted: bool = False,
     search: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.SALES, UserRole.ADMIN, UserRole.SUPPORT)),
+    current_user: User = Depends(require_role(UserRole.SALES, UserRole.ADMIN, UserRole.CUSTOMER)),
 ):
+    if current_user.role in (UserRole.TECHNICIAN, UserRole.WAREHOUSE):
+        raise HTTPException(
+            status_code=403,
+            detail="Forbidden: Technicians and warehouse staff cannot view CRM leads",
+        )
+
     query = db.query(Lead)
     if not include_deleted:
         query = query.filter(Lead.is_deleted == False)
+
+    # Object-level access control: Customer can only view their own leads
+    if current_user.role == UserRole.CUSTOMER:
+        query = query.filter(
+            (Lead.phone == current_user.phone) | (Lead.email == current_user.email)
+        )
+    elif assigned_to_id:
+        query = query.filter(Lead.assigned_to_id == assigned_to_id)
+
     if status:
         query = query.filter(Lead.status == status)
-    if assigned_to_id:
-        query = query.filter(Lead.assigned_to_id == assigned_to_id)
     if search:
         search_filter = f"%{search}%"
         query = query.filter(
@@ -52,9 +65,24 @@ def get_lead(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    if current_user.role in (UserRole.TECHNICIAN, UserRole.WAREHOUSE):
+        raise HTTPException(
+            status_code=403,
+            detail="Forbidden: Technicians and warehouse staff cannot view CRM leads",
+        )
+
     lead = db.query(Lead).filter(Lead.id == lead_id).first()
     if not lead:
         raise HTTPException(status_code=404, detail="Lead not found")
+
+    # Object-level check: Customer can only view their own lead
+    if current_user.role == UserRole.CUSTOMER:
+        if (lead.phone != current_user.phone) and (lead.email != current_user.email):
+            raise HTTPException(
+                status_code=403,
+                detail="Forbidden: You cannot view another customer's lead",
+            )
+
     return lead
 
 

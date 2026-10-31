@@ -18,8 +18,7 @@ def seed_users():
         {"email": "sales@sunpower.com", "full_name": "Rohan Sharma (Sales)", "role": UserRole.SALES, "uid": "sales_uid", "phone": "9876543211"},
         {"email": "tech@sunpower.com", "full_name": "Amit Verma (Lead Technician)", "role": UserRole.TECHNICIAN, "uid": "tech_uid", "phone": "9876543212"},
         {"email": "warehouse@sunpower.com", "full_name": "Deepak Kumar (Warehouse)", "role": UserRole.WAREHOUSE, "uid": "warehouse_uid", "phone": "9876543213"},
-        {"email": "support@sunpower.com", "full_name": "Priya Nair (Support)", "role": UserRole.SUPPORT, "uid": "support_uid", "phone": "9876543214"},
-        {"email": "accounts@sunpower.com", "full_name": "Kavita Rao (Accounts)", "role": UserRole.ACCOUNTS, "uid": "accounts_uid", "phone": "9876543215"},
+        {"email": "customer@sunpower.com", "full_name": "Vikram Malhotra (Customer)", "role": UserRole.CUSTOMER, "uid": "customer_uid", "phone": "9876543214"},
     ]
 
     for data in users_data:

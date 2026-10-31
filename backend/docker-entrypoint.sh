@@ -40,3 +40,4 @@ fi
 
 echo "Starting Uvicorn Server..."
 exec "$@"
+

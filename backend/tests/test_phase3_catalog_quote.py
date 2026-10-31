@@ -148,5 +148,5 @@ def test_quote_survey_approval_gate(setup_catalog):
     assert "SO-" in data["order_number"]
 
     # Assert lead marked WON
-    won_lead = client.get(f"/api/leads/{lead['id']}", headers=sales_headers).json()
+    won_lead = client.get(f"/api/leads/{lead['id']}", headers=admin_headers).json()
     assert won_lead["status"] == "WON"

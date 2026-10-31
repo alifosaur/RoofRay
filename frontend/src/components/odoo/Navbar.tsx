@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth, UserRole } from '../../context/AuthContext';
+import { useAuth, UserRole, getRoleHomePath } from '../../context/AuthContext';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faTh,
@@ -27,8 +27,7 @@ export const Navbar: React.FC<NavbarProps> = ({ appName, onToggleHomeMenu, isHom
     { id: 'sales', label: 'Sales Officer' },
     { id: 'technician', label: 'Technician (Field)' },
     { id: 'warehouse', label: 'Warehouse Manager' },
-    { id: 'support', label: 'Helpdesk Support' },
-    { id: 'accounts', label: 'Accounts Officer' },
+    { id: 'customer', label: 'Customer Portal' },
   ];
 
   return (
@@ -108,9 +107,10 @@ export const Navbar: React.FC<NavbarProps> = ({ appName, onToggleHomeMenu, isHom
               {roles.map((r) => (
                 <button
                   key={r.id}
-                  onClick={() => {
-                    switchRole(r.id);
+                  onClick={async () => {
+                    await switchRole(r.id);
                     setShowUserMenu(false);
+                    navigate(getRoleHomePath(r.id));
                   }}
                   className={`w-full text-left px-3 py-1.5 flex items-center justify-between hover:bg-odoo-bg transition-colors ${
                     role === r.id ? 'font-bold text-odoo-primary bg-purple-50' : 'text-gray-700'

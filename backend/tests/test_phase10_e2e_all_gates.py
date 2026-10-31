@@ -50,15 +50,8 @@ def test_full_solar_lifecycle_and_all_gates(client: TestClient):
         wh_user = User(email=f"wh_{uid_suffix}@sunpower.com", full_name="Warehouse", role=UserRole.WAREHOUSE, firebase_uid=f"wh_{uid_suffix}")
         db.add(wh_user)
 
-    support_user = db.query(User).filter(User.role == UserRole.SUPPORT).first()
-    if not support_user:
-        support_user = User(email=f"supp_{uid_suffix}@sunpower.com", full_name="Support", role=UserRole.SUPPORT, firebase_uid=f"supp_{uid_suffix}")
-        db.add(support_user)
-
-    accounts_user = db.query(User).filter(User.role == UserRole.ACCOUNTS).first()
-    if not accounts_user:
-        accounts_user = User(email=f"acc_{uid_suffix}@sunpower.com", full_name="Accounts", role=UserRole.ACCOUNTS, firebase_uid=f"acc_{uid_suffix}")
-        db.add(accounts_user)
+    support_user = admin_user
+    accounts_user = admin_user
 
     # 2. Ensure a serialized product and BOM template exist
     pnl = Product(

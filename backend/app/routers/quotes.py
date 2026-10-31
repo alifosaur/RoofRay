@@ -27,6 +27,25 @@ def create_quote(
     return quote_service.create_quote_from_bom(db, payload, current_user.id)
 
 
+def _validate_quote_access(quote: Quote, current_user: User):
+    if current_user.role in (UserRole.ADMIN, UserRole.SALES):
+        return
+    if current_user.role in (UserRole.TECHNICIAN, UserRole.WAREHOUSE):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: Technicians and warehouse staff cannot access quotations",
+        )
+    if current_user.role == UserRole.CUSTOMER:
+        cust_id = current_user.customer_profile.id if current_user.customer_profile else None
+        phone_match = quote.lead and quote.lead.phone == current_user.phone
+        email_match = quote.lead and quote.lead.email == current_user.email
+        if quote.customer_id != cust_id and not phone_match and not email_match:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Forbidden: You can only view your own quotation",
+            )
+
+
 @router.get("", response_model=List[QuoteOut])
 def list_quotes(
     lead_id: Optional[int] = None,
@@ -35,10 +54,20 @@ def list_quotes(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    if current_user.role in (UserRole.TECHNICIAN, UserRole.WAREHOUSE):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: Technicians and warehouse staff cannot access quotations",
+        )
+
     query = db.query(Quote)
+    if current_user.role == UserRole.CUSTOMER:
+        cust_id = current_user.customer_profile.id if current_user.customer_profile else -1
+        query = query.filter(Quote.customer_id == cust_id)
+
     if lead_id:
         query = query.filter(Quote.lead_id == lead_id)
-    if customer_id:
+    if customer_id and current_user.role == UserRole.ADMIN:
         query = query.filter(Quote.customer_id == customer_id)
     if status:
         query = query.filter(Quote.status == status)
@@ -54,6 +83,7 @@ def get_quote(
     quote = db.query(Quote).filter(Quote.id == quote_id).first()
     if not quote:
         raise HTTPException(status_code=404, detail="Quote not found")
+    _validate_quote_access(quote, current_user)
     return quote
 
 
@@ -67,6 +97,7 @@ def download_quote_pdf(
     quote = db.query(Quote).filter(Quote.id == quote_id).first()
     if not quote or not quote.pdf_path or not os.path.exists(quote.pdf_path):
         raise HTTPException(status_code=404, detail="Quotation PDF not found")
+    _validate_quote_access(quote, current_user)
     return FileResponse(
         quote.pdf_path,
         media_type="application/pdf",
@@ -78,9 +109,13 @@ def download_quote_pdf(
 def accept_quote(
     quote_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.SALES, UserRole.ADMIN)),
+    current_user: User = Depends(get_current_user),
 ):
     """Accepts quote, marks lead WON, and creates Sales Order in DRAFT."""
+    quote = db.query(Quote).filter(Quote.id == quote_id).first()
+    if not quote:
+        raise HTTPException(status_code=404, detail="Quote not found")
+    _validate_quote_access(quote, current_user)
     order = quote_service.accept_quote(db, quote_id, current_user.id)
     return {
         "message": "Quote accepted successfully",

@@ -24,8 +24,23 @@ from app.routers import (
     reports,
 )
 
+from sqlalchemy import text
+
 # Create all tables on startup (works with both SQLite and PostgreSQL)
 Base.metadata.create_all(bind=engine)
+
+# Ensure newly added columns and migrated roles exist in existing schemas
+with engine.connect() as conn:
+    try:
+        conn.execute(text("ALTER TABLE customers ADD COLUMN user_id INTEGER REFERENCES users(id)"))
+        conn.commit()
+    except Exception:
+        pass
+    try:
+        conn.execute(text("UPDATE users SET role = 'ADMIN' WHERE role IN ('SUPPORT', 'ACCOUNTS', 'support', 'accounts')"))
+        conn.commit()
+    except Exception:
+        pass
 
 app = FastAPI(
     title=f"{settings.PROJECT_NAME} API",

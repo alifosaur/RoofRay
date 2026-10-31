@@ -4,6 +4,7 @@ from datetime import datetime, date, timedelta
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
+from sqlalchemy import text
 from app.core.database import SessionLocal, engine, Base
 import app.models
 from app.models.user import User, UserRole
@@ -26,17 +27,22 @@ from app.models.audit import AuditLog
 def run_seed():
     print("Initializing SunPower Solutions Demo Seeder...")
     Base.metadata.create_all(bind=engine)
+    with engine.connect() as conn:
+        try:
+            conn.execute(text("ALTER TABLE customers ADD COLUMN user_id INTEGER REFERENCES users(id)"))
+            conn.commit()
+        except Exception:
+            pass
     db = SessionLocal()
 
     # 1. SEED USERS & 15-TECHNICIAN CREW
     print("--- Seeding Staff & Technicians ---")
     core_users = [
-        {"email": "admin@sunpower.com", "full_name": "Rajesh Singhania (Director)", "role": UserRole.ADMIN, "uid": "admin_uid", "phone": "+91 98110 00001"},
+        {"email": "admin@sunpower.com", "full_name": "Rajesh Singhania (Director & Admin)", "role": UserRole.ADMIN, "uid": "admin_uid", "phone": "+91 98110 00001"},
         {"email": "sales@sunpower.com", "full_name": "Rohan Sharma (Sr. Sales)", "role": UserRole.SALES, "uid": "sales_uid", "phone": "+91 98110 00002"},
         {"email": "sales2@sunpower.com", "full_name": "Ananya Joshi (Sales)", "role": UserRole.SALES, "uid": "sales2_uid", "phone": "+91 98110 00003"},
         {"email": "warehouse@sunpower.com", "full_name": "Deepak Kumar (Warehouse Lead)", "role": UserRole.WAREHOUSE, "uid": "warehouse_uid", "phone": "+91 98110 00004"},
-        {"email": "support@sunpower.com", "full_name": "Priya Nair (Support)", "role": UserRole.SUPPORT, "uid": "support_uid", "phone": "+91 98110 00005"},
-        {"email": "accounts@sunpower.com", "full_name": "Kavita Rao (Accounts)", "role": UserRole.ACCOUNTS, "uid": "accounts_uid", "phone": "+91 98110 00006"},
+        {"email": "customer@sunpower.com", "full_name": "Vikram Malhotra (Customer)", "role": UserRole.CUSTOMER, "uid": "customer_uid", "phone": "+91 98110 00007"},
     ]
 
     # Add 15 Technicians
@@ -75,14 +81,19 @@ def run_seed():
             db.flush()
             user_map[u["role"]] = user_map.get(u["role"], []) + [user]
         else:
+            # Migrate any deprecated roles to ADMIN
+            if existing.role not in [UserRole.CUSTOMER, UserRole.SALES, UserRole.TECHNICIAN, UserRole.WAREHOUSE, UserRole.ADMIN]:
+                existing.role = UserRole.ADMIN
+                db.flush()
             user_map[u["role"]] = user_map.get(u["role"], []) + [existing]
 
     admin_user = user_map[UserRole.ADMIN][0]
     sales_user = user_map[UserRole.SALES][0]
     lead_tech = user_map[UserRole.TECHNICIAN][0]
     warehouse_user = user_map[UserRole.WAREHOUSE][0]
-    support_user = user_map[UserRole.SUPPORT][0]
-    accounts_user = user_map[UserRole.ACCOUNTS][0]
+    customer_user = user_map[UserRole.CUSTOMER][0]
+    support_user = admin_user
+    accounts_user = admin_user
 
     # 2. SEED 30+ PRODUCTS
     print("--- Seeding 30+ Products & Hardware Catalog ---")
@@ -346,11 +357,11 @@ def run_seed():
             "kw": 5.0,
             "system_type": "On-Grid"
         },
-        # Customer 10: INVOICED & SUBSIDY APPROVED with Tickets
+        # Customer 10: INVOICED & SUBSIDY APPROVED with Tickets (Demo Customer)
         {
-            "cust_name": "Rajendra Prasad",
-            "phone": "+91 98303 10101",
-            "email": "r.prasad@biharsteel.com",
+            "cust_name": "Vikram Malhotra",
+            "phone": "+91 98110 00007",
+            "email": "customer@sunpower.com",
             "address": "Boring Road, Patna",
             "stage": "CLOSED",
             "kw": 3.0,
@@ -360,9 +371,11 @@ def run_seed():
 
     for idx, sc in enumerate(scenarios, start=1):
         # Create or find customer
-        cust = db.query(Customer).filter(Customer.phone == sc["phone"]).first()
+        cust = db.query(Customer).filter((Customer.phone == sc["phone"]) | (Customer.email == sc["email"])).first()
         if not cust:
+            user_link_id = customer_user.id if sc["email"] == "customer@sunpower.com" else None
             cust = Customer(
+                user_id=user_link_id,
                 name=sc["cust_name"],
                 phone=sc["phone"],
                 email=sc["email"],
@@ -370,6 +383,10 @@ def run_seed():
             )
             db.add(cust)
             db.flush()
+        else:
+            if sc["email"] == "customer@sunpower.com":
+                cust.user_id = customer_user.id
+                db.flush()
 
         # Create Lead
         lead = db.query(Lead).filter(Lead.customer_id == cust.id).first()

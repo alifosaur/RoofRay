@@ -29,11 +29,18 @@ def list_surveys(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    if current_user.role == UserRole.CUSTOMER:
+        raise HTTPException(
+            status_code=403,
+            detail="Forbidden: Customers cannot access site surveys",
+        )
+
     query = db.query(Survey)
-    if technician_id:
-        query = query.filter(Survey.technician_id == technician_id)
-    elif current_user.role == UserRole.TECHNICIAN:
+    if current_user.role == UserRole.TECHNICIAN:
         query = query.filter(Survey.technician_id == current_user.id)
+    elif technician_id and current_user.role == UserRole.ADMIN:
+        query = query.filter(Survey.technician_id == technician_id)
+
     if status:
         query = query.filter(Survey.status == status)
     return query.order_by(Survey.scheduled_date.asc()).all()
@@ -45,9 +52,21 @@ def get_survey(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    if current_user.role == UserRole.CUSTOMER:
+        raise HTTPException(
+            status_code=403,
+            detail="Forbidden: Customers cannot access site surveys",
+        )
+
     survey = db.query(Survey).filter(Survey.id == survey_id).first()
     if not survey:
         raise HTTPException(status_code=404, detail="Survey not found")
+
+    if current_user.role == UserRole.TECHNICIAN and survey.technician_id != current_user.id:
+        raise HTTPException(
+            status_code=403,
+            detail="Forbidden: You can only view surveys assigned to you",
+        )
     return survey
 
 
@@ -59,6 +78,16 @@ def complete_survey(
     current_user: User = Depends(require_role(UserRole.TECHNICIAN, UserRole.ADMIN)),
 ):
     """Technician records roof direction, tilt angle, cable distance, and notes."""
+    survey = db.query(Survey).filter(Survey.id == survey_id).first()
+    if not survey:
+        raise HTTPException(status_code=404, detail="Survey not found")
+
+    if current_user.role == UserRole.TECHNICIAN and survey.technician_id != current_user.id:
+        raise HTTPException(
+            status_code=403,
+            detail="Forbidden: You can only complete surveys assigned to you",
+        )
+
     return survey_service.complete_survey(db, survey_id, payload, current_user.id)
 
 

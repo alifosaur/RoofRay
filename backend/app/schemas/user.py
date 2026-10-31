@@ -28,7 +28,32 @@ class UserUpdate(BaseModel):
 class UserOut(UserBase):
     id: int
     firebase_uid: str
+    customer_id: Optional[int] = None
     created_at: datetime
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class UserRegisterRequest(BaseModel):
+    email: str
+    full_name: str
+    phone: str
+    password: Optional[str] = None
+    address: Optional[str] = "Delhi NCR"
+    city: Optional[str] = "Delhi NCR"
+    pincode: Optional[str] = "110001"
+    firebase_uid: Optional[str] = None
+    # Any role field provided is ignored/discarded for security
+
+
+class UserLoginRequest(BaseModel):
+    email: str
+    password: Optional[str] = None
+    role: Optional[str] = None
+
+
+class AuthResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserOut

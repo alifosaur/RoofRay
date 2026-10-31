@@ -16,7 +16,7 @@ router = APIRouter(prefix="/reports", tags=["Executive Reports & Dashboard"])
 def get_dashboard(
     range: str = Query("this_month", pattern="^(today|this_week|this_month|all)$"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(UserRole.ADMIN, UserRole.SALES)),
 ):
     """
     Director executive dashboard:
@@ -30,7 +30,7 @@ def get_dashboard(
 def get_profit_per_job(
     range: str = Query("this_month", pattern="^(today|this_week|this_month|all)$"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.ADMIN, UserRole.ACCOUNTS)),
+    current_user: User = Depends(require_role(UserRole.ADMIN)),
 ):
     """
     Detailed profit per job analysis:
@@ -42,7 +42,7 @@ def get_profit_per_job(
 @router.get("/export.xlsx")
 def export_excel(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.ADMIN, UserRole.ACCOUNTS)),
+    current_user: User = Depends(require_role(UserRole.ADMIN)),
 ):
     """Generates and downloads full financial & operations Excel spreadsheet."""
     file_path = report_service.export_dashboard_to_excel(db)

@@ -111,6 +111,14 @@ export const HomeMenu: React.FC<HomeMenuProps> = ({ isOpen, onClose }) => {
       allowedRoles: ['admin'],
     },
     {
+      id: 'schemes',
+      name: 'Govt. Schemes',
+      path: '/web/schemes',
+      icon: faCalculator,
+      color: 'bg-orange-600',
+      allowedRoles: ['admin'],
+    },
+    {
       id: 'dashboard',
       name: 'Dashboard',
       path: '/web/dashboard',

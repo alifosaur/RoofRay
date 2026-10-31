@@ -38,5 +38,8 @@ class OrderOut(BaseModel):
     created_at: datetime
     updated_at: datetime
     payments: List[PaymentOut] = []
+    invoice_id: Optional[int] = None
+    pick_list_id: Optional[int] = None
+    customer_name: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)

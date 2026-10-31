@@ -36,23 +36,25 @@ export const LeadFormPage: React.FC = () => {
   const [subsidyAmount, setSubsidyAmount] = useState<number | null>(null);
 
   const [checklist, setChecklist] = useState({
-    shadow_free_area_sqft: 350.0,
-    monthly_bill_amount: 5500.0,
+    shadow_free_area_sqft: 0,
+    monthly_bill_amount: 0,
     is_grid_suitable: true,
-    remarks: 'Clear RCC terrace with direct sunlight exposure.',
+    remarks: '',
     lost_reason: '',
   });
 
   const [surveySchedule, setSurveySchedule] = useState({
-    technician_id: 6,
-    scheduled_date: new Date(Date.now() + 86400000 * 2).toISOString().slice(0, 16),
-    notes: 'Check inverter cable run to main distribution box and measure roof tilt.',
+    technician_id: 0,
+    scheduled_date: '',
+    notes: '',
   });
   const [technicians, setTechnicians] = useState<any[]>([]);
+  const [availability, setAvailability] = useState<any[]>([]);
 
   const fetchTechnicians = async () => {
     try {
-      const data = await api.get<any[]>('/users?role=technician');
+      const data = (await api.get<any[]>('/users?role=technician')).filter((t) => t.is_active);
+      api.get<any>('/users/technicians/availability?days=14').then((a) => setAvailability(a.technicians)).catch(() => setAvailability([]));
       if (data && data.length > 0) {
         setTechnicians(data);
         setSurveySchedule((prev) => ({
@@ -292,8 +294,8 @@ export const LeadFormPage: React.FC = () => {
 
   const isSurveyApproved =
     lead.status === 'SURVEY_APPROVED' || (lead.survey && lead.survey.status === 'APPROVED');
-  const isSurveyScheduled =
-    lead.survey && lead.survey.status === 'SCHEDULED' && lead.status !== 'SURVEY_APPROVED';
+  const isSurveyScheduled = lead.survey && lead.survey.status === 'SCHEDULED';
+  const isSurveySubmitted = lead.survey && lead.survey.status === 'COMPLETED';
 
   return (
     <div className="flex-1 flex flex-col">
@@ -311,7 +313,7 @@ export const LeadFormPage: React.FC = () => {
             Sales Directive
           </span>
           <span className="text-[#212529]">
-            Client booked a consultation call. Conduct the call checklist, verify roof measurements, <strong>create quotation according to the client</strong>, and <strong>submit it to warehouse</strong>.
+            Call the customer and record the checklist, schedule the site survey, approve the technician's report, then <strong>create and send the quotation</strong>.
           </span>
         </div>
       </div>
@@ -322,16 +324,45 @@ export const LeadFormPage: React.FC = () => {
           <div className="flex items-center gap-2">
             <FontAwesomeIcon icon={faCalendarAlt} className="text-amber-600 text-sm" />
             <span>
-              Site survey scheduled for <strong>{new Date(lead.survey.scheduled_date).toLocaleString()}</strong> with lead technician. Once roof feasibility is verified, approve survey.
+              Site survey scheduled for <strong>{new Date(lead.survey.scheduled_date).toLocaleString()}</strong>. Waiting for the technician to submit the survey.
             </span>
           </div>
-          <button
-            onClick={handleApproveSurvey}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded font-semibold text-xs flex items-center gap-1.5 shadow-xs transition-colors"
-          >
-            <FontAwesomeIcon icon={faCheckCircle} />
-            <span>Approve Survey Feasibility</span>
-          </button>
+        </div>
+      )}
+
+      {isSurveySubmitted && (
+        <div className="bg-amber-50 border-b border-amber-200 px-6 py-3 text-xs text-amber-950 space-y-2">
+          <div className="flex items-center justify-between">
+            <strong>Survey submitted by the technician. Review and approve.</strong>
+            <button
+              onClick={handleApproveSurvey}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded font-semibold text-xs flex items-center gap-1.5 shadow-xs"
+            >
+              <FontAwesomeIcon icon={faCheckCircle} />
+              <span>Approve Survey</span>
+            </button>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <span>Address confirmed: <b>{lead.survey.address_confirmed ? 'Yes' : 'No'}</b></span>
+            <span>Roof: <b>{lead.survey.roof_length_ft ?? '—'} × {lead.survey.roof_width_ft ?? '—'} ft</b></span>
+            <span>Shadow-free: <b>{lead.survey.shadow_free_area_sqft ?? '—'} sq ft</b></span>
+            <span>Out of shade: <b>{lead.survey.out_of_shade_zone ? 'Yes' : 'No'}</b></span>
+            <span>Direction: <b>{lead.survey.roof_direction}</b></span>
+            <span>Tilt: <b>{lead.survey.roof_tilt_deg}°</b></span>
+            <span>Cable run: <b>{lead.survey.cable_distance_meters} m</b></span>
+            <span>Photos: <b>{lead.survey.photos?.length || 0}</b></span>
+          </div>
+          {lead.survey.shade_notes && <p>Shade notes: {lead.survey.shade_notes}</p>}
+          {lead.survey.notes && <p>Notes: {lead.survey.notes}</p>}
+          {lead.survey.photos?.length > 0 && (
+            <div className="flex gap-2 flex-wrap">
+              {lead.survey.photos.map((p: any) => (
+                <a key={p.id} href={p.photo_url} target="_blank" rel="noreferrer">
+                  <img src={p.photo_url} alt={p.caption || 'Survey photo'} className="h-16 w-16 object-cover rounded border" />
+                </a>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -380,7 +411,7 @@ export const LeadFormPage: React.FC = () => {
               </button>
             )}
 
-            {isSurveyScheduled && (
+            {isSurveySubmitted && (
               <button
                 onClick={handleApproveSurvey}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded text-xs font-semibold shadow-xs flex items-center gap-1.5"
@@ -798,9 +829,29 @@ export const LeadFormPage: React.FC = () => {
                       </option>
                     ))
                   ) : (
-                    <option value={6}>Amit Verma (Lead Tech #1)</option>
+                    <option value={0}>No active technicians. Ask an admin to add one.</option>
                   )}
                 </select>
+              </div>
+
+              {/* Availability: existing bookings for the next two weeks */}
+              <div className="border border-gray-200 rounded p-2 max-h-40 overflow-y-auto">
+                <span className="block font-semibold text-gray-700 mb-1">Technician calendar (next 14 days)</span>
+                {availability.length === 0 && <span className="text-gray-400">No technicians.</span>}
+                {availability.map((t) => (
+                  <div key={t.technician_id} className={`py-1 ${t.technician_id === surveySchedule.technician_id ? 'font-semibold' : ''}`}>
+                    <span className="text-gray-800">{t.name}:</span>{' '}
+                    {t.bookings.length === 0 ? (
+                      <span className="text-emerald-700">free</span>
+                    ) : (
+                      t.bookings.map((b: any) => (
+                        <span key={`${b.type}-${b.id}`} className="inline-block mr-1 mb-0.5 px-1.5 rounded bg-gray-100 text-gray-700">
+                          {new Date(b.at).toLocaleString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })} {b.type}
+                        </span>
+                      ))
+                    )}
+                  </div>
+                ))}
               </div>
 
               <div>

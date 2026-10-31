@@ -3,6 +3,7 @@ import { useLiveRefresh } from '../../live/LiveEvents';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { api, downloadFile } from '../../api/client';
+import { SUBSIDY_STEPS, subsidyStepIndex } from '../../constants/subsidy';
 import { SiteNavbar } from '../../components/layout/SiteNavbar';
 import { SiteFooter } from '../../components/layout/SiteFooter';
 import { ScriptHeading } from '../../components/common/ScriptHeading';
@@ -99,6 +100,7 @@ interface SubsidyRecord {
   disbursed_date?: string | null;
   rejection_notes?: string | null;
   remarks?: string | null;
+  events?: { status: string; event_date: string; reference_no?: string | null; document_url?: string | null; notes?: string | null }[];
 }
 
 interface SchemeData {
@@ -134,6 +136,7 @@ export const CustomerPortalPage: React.FC = () => {
   const [schemes, setSchemes] = useState<SchemeData[]>([]);
   const nationalScheme = schemes.find((sc) => sc.state.toLowerCase().includes('national'));
   const [subsidy, setSubsidy] = useState<SubsidyRecord | null>(null);
+  const [invoices, setInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
 
@@ -143,17 +146,17 @@ export const CustomerPortalPage: React.FC = () => {
     phone: user?.phone || '',
     email: user?.email || '',
     address: '',
-    city: 'Mumbai',
-    state: 'Maharashtra',
-    pincode: '400076',
-    property_type: 'Residential',
-    roof_type: 'Concrete / Flat',
-    roof_length_ft: 25,
-    roof_width_ft: 20,
-    shadow_free_area_sqft: 450,
-    floor_number: 2,
-    roof_direction: 'South',
-    monthly_bill_amount: 3500,
+    city: '',
+    state: '',
+    pincode: '',
+    property_type: '',
+    roof_type: '',
+    roof_length_ft: 0,
+    roof_width_ft: 0,
+    shadow_free_area_sqft: 0,
+    floor_number: 1,
+    roof_direction: '',
+    monthly_bill_amount: 0,
     preferred_system_type: 'On-Grid',
     preferred_capacity_kw: 3.0,
     notes: '',
@@ -184,6 +187,7 @@ export const CustomerPortalPage: React.FC = () => {
         api.get<SchemeData[]>('/customer/schemes'),
         api.get<SubsidyRecord>('/customer/subsidy'),
       ]);
+      api.get<any[]>('/finance/invoices').then(setInvoices).catch(() => setInvoices([]));
 
       if (tData.status === 'fulfilled') setTracker(tData.value);
       if (qData.status === 'fulfilled') setQuotes(qData.value);
@@ -242,10 +246,11 @@ export const CustomerPortalPage: React.FC = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await api.post<any>('/customer/enquiry', {
-        ...enquiryForm,
-        roof_area_sqft: computedRoofArea || undefined,
-      });
+      // Blank / zero measurements mean "not known" and are sent as missing, never as values
+      const body = Object.fromEntries(
+        Object.entries({ ...enquiryForm, roof_area_sqft: computedRoofArea }).map(([k, v]) => [k, v === '' || v === 0 ? undefined : v])
+      );
+      const res = await api.post<any>('/customer/enquiry', body);
       setNoticeMessage(res.message || 'Thank you! Our sales representative will contact you soon.');
       await loadData();
       setActiveTab('tracker');
@@ -577,7 +582,7 @@ export const CustomerPortalPage: React.FC = () => {
                         value={enquiryForm.name}
                         onChange={(e) => setEnquiryForm({ ...enquiryForm, name: e.target.value })}
                         className="w-full px-3 py-2 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-odoo-purple focus:border-odoo-purple"
-                        placeholder="e.g. Vikram Malhotra"
+                        placeholder="Your full name"
                       />
                     </div>
                     <div>
@@ -646,6 +651,7 @@ export const CustomerPortalPage: React.FC = () => {
                         onChange={(e) => setEnquiryForm({ ...enquiryForm, property_type: e.target.value })}
                         className="w-full px-3 py-2 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-odoo-purple"
                       >
+                        <option value="">Select property type</option>
                         <option value="Residential">Residential Individual House / Villa</option>
                         <option value="Housing Society">Housing Society / Apartment Complex</option>
                         <option value="Commercial">Commercial / Industrial Building</option>
@@ -707,6 +713,7 @@ export const CustomerPortalPage: React.FC = () => {
                         onChange={(e) => setEnquiryForm({ ...enquiryForm, roof_type: e.target.value })}
                         className="w-full px-3 py-2 text-xs border border-gray-300 rounded"
                       >
+                        <option value="">Select roof type</option>
                         <option value="Concrete / Flat">Concrete / Flat Terrace</option>
                         <option value="Tiled / Slanted">Slanted Clay Tiled Roof</option>
                         <option value="Tin / Metal Sheet">Tin / Metal Industrial Sheet</option>
@@ -730,6 +737,7 @@ export const CustomerPortalPage: React.FC = () => {
                         onChange={(e) => setEnquiryForm({ ...enquiryForm, roof_direction: e.target.value })}
                         className="w-full px-3 py-2 text-xs border border-gray-300 rounded"
                       >
+                        <option value="">Don't know</option>
                         <option value="South">South (Optimal 100% Generation)</option>
                         <option value="South-West">South-West</option>
                         <option value="South-East">South-East</option>
@@ -982,6 +990,29 @@ export const CustomerPortalPage: React.FC = () => {
               </div>
             </div>
 
+            <div className="bg-white border border-gray-200 rounded-xl p-4">
+              <h3 className="text-sm font-bold text-gray-900 mb-2">Invoices</h3>
+              {invoices.length === 0 ? (
+                <p className="text-xs text-gray-500">No invoices yet. An invoice is issued when your order is confirmed.</p>
+              ) : (
+                <ul className="divide-y divide-gray-100 text-xs">
+                  {invoices.map((inv) => (
+                    <li key={inv.id} className="py-2 flex items-center justify-between">
+                      <span className="font-mono font-semibold">{inv.invoice_number}</span>
+                      <span>₹{Math.round(inv.total_amount).toLocaleString('en-IN')}</span>
+                      <span className={inv.status === 'PAID' ? 'text-emerald-700 font-semibold' : 'text-amber-700 font-semibold'}>{inv.status}</span>
+                      <button
+                        onClick={() => downloadFile(`/finance/invoices/${inv.id}/pdf`, `${inv.invoice_number}.pdf`).catch((err) => alert(err.message))}
+                        className="underline text-odoo-purple"
+                      >
+                        PDF
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
             {/* Quotations List */}
             {quotes.length === 0 ? (
               <div className="bg-white border border-gray-200 rounded-xl p-8 text-center text-gray-500">
@@ -1024,7 +1055,7 @@ export const CustomerPortalPage: React.FC = () => {
                         <i className="fa-solid fa-file-pdf text-red-500"></i>
                         <span>Download PDF</span>
                       </button>
-                      {q.status !== 'ACCEPTED' && (
+                      {q.status === 'SENT' && (
                         <button
                           onClick={() => handleAcceptQuote(q.id)}
                           className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded flex items-center gap-1.5 shadow-sm"
@@ -1433,31 +1464,36 @@ export const CustomerPortalPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Subsidy Milestones Stepper */}
-                  <div className="grid grid-cols-2 sm:grid-cols-6 gap-2 text-center text-xs">
-                    {[
-                      { key: 'NOT_APPLIED', label: '1. Not Applied' },
-                      { key: 'APPLICATION_SUBMITTED', label: '2. Application Filed' },
-                      { key: 'DISCOM_FEASIBILITY_APPROVED', label: '3. Feasibility Approved' },
-                      { key: 'INSTALLATION_INSPECTION_DONE', label: '4. Net Meter Inspected' },
-                      { key: 'APPROVED', label: '5. Subsidy Sanctioned' },
-                      { key: 'DISBURSED', label: '6. Credited via DBT' },
-                    ].map((step, idx) => {
-                      const stepIndex: Record<string, number> = {
-                        NOT_APPLIED: 0, APPLIED: 1, APPLICATION_SUBMITTED: 1, DISCOM_FEASIBILITY_APPROVED: 2,
-                        INSTALLATION_INSPECTION_DONE: 3, SUBSIDY_CLAIMED: 3, APPROVED: 4, DISBURSED: 5,
-                      };
-                      const isPast = idx <= (stepIndex[subsidy.status] ?? -1);
+                  {/* Subsidy tracker: every step with its date, reference and document */}
+                  {subsidy.remarks?.startsWith('Not eligible') && (
+                    <div className="p-3 mb-3 bg-gray-50 border border-gray-200 rounded text-xs text-gray-600">{subsidy.remarks}</div>
+                  )}
+                  {subsidy.status === 'REJECTED' && (
+                    <div className="p-3 mb-3 bg-red-50 border border-red-200 rounded text-xs text-red-700">Rejected: {subsidy.rejection_notes || 'see notes'}</div>
+                  )}
+                  <ol className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-9 gap-2 text-xs">
+                    {SUBSIDY_STEPS.map((step, idx) => {
+                      const done = idx <= subsidyStepIndex(subsidy.status);
+                      const ev = (subsidy.events || []).find((e) => e.status === step.key);
                       return (
-                        <div key={step.key} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                          <div className={`w-6 h-6 mx-auto rounded-full ${isPast ? 'bg-emerald-500 text-white' : 'bg-gray-200 text-gray-500'} flex items-center justify-center text-[10px] font-bold mb-1`}>
-                            {isPast ? <i className="fa-solid fa-check"></i> : idx + 1}
+                        <li key={step.key} className={`p-2.5 rounded-lg border ${done ? 'bg-emerald-50 border-emerald-200' : 'bg-gray-50 border-gray-200'}`}>
+                          <div className={`w-6 h-6 rounded-full ${done ? 'bg-emerald-500 text-white' : 'bg-gray-200 text-gray-500'} flex items-center justify-center text-[10px] font-bold mb-1`}>
+                            {done ? <i className="fa-solid fa-check"></i> : idx + 1}
                           </div>
-                          <span className="text-[11px] font-semibold text-gray-800">{step.label}</span>
-                        </div>
+                          <span className="text-[11px] font-semibold text-gray-800 block">{step.label}</span>
+                          {ev && (
+                            <span className="text-[10px] text-gray-500 block mt-0.5">
+                              {ev.event_date}
+                              {ev.reference_no && <> · {ev.reference_no}</>}
+                              {ev.document_url && (
+                                <> · <a href={ev.document_url} target="_blank" rel="noreferrer" className="underline">doc</a></>
+                              )}
+                            </span>
+                          )}
+                        </li>
                       );
                     })}
-                  </div>
+                  </ol>
                 </div>
               ) : (
                 <div className="text-center py-6 text-gray-500 text-xs">

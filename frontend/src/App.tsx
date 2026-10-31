@@ -29,6 +29,7 @@ import { HelpdeskPage } from './pages/helpdesk/HelpdeskPage';
 import { AccountingPage } from './pages/accounting/AccountingPage';
 import { DashboardPage } from './pages/dashboard/DashboardPage';
 import { UsersPage } from './pages/admin/UsersPage';
+import { SchemesAdminPage } from './pages/admin/SchemesAdminPage';
 
 export const App: React.FC = () => {
   return (
@@ -207,6 +208,14 @@ export const App: React.FC = () => {
               element={
                 <RoleRouteGuard allowedRoles={['admin']}>
                   <AccountingPage />
+                </RoleRouteGuard>
+              }
+            />
+            <Route
+              path="schemes"
+              element={
+                <RoleRouteGuard allowedRoles={['admin']}>
+                  <SchemesAdminPage />
                 </RoleRouteGuard>
               }
             />

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth, getRoleHomePath } from '../../context/AuthContext';
+import { NotificationBell } from '../common/NotificationBell';
 import { RoofRayLogo } from '../brand/SunPowerLogo';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -94,6 +95,7 @@ export const SiteNavbar: React.FC = () => {
 
         {/* Right: User Profile with Caret dropdown matching Screenshot 1 */}
         <div className="flex items-center space-x-3">
+          {user && <NotificationBell dark={false} />}
           {user ? (
             <div className="relative" ref={dropdownRef}>
               <button

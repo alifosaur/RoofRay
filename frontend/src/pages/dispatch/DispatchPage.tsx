@@ -13,6 +13,15 @@ import {
   faExclamationTriangle,
 } from '@fortawesome/free-solid-svg-icons';
 
+// Strict fulfilment sequence (the backend enforces it; PACKED and DELIVERED also require every serial scanned)
+const NEXT_STAGE: Record<string, { stage: string; label: string }> = {
+  CONFIRMED: { stage: 'PACKING', label: 'Start Packing' },
+  PACKING: { stage: 'PACKED', label: 'Mark Packed (all serials scanned)' },
+  PACKED: { stage: 'DISPATCHED', label: 'Mark Dispatched' },
+  DISPATCHED: { stage: 'OUT_FOR_DELIVERY', label: 'Out for Delivery' },
+  OUT_FOR_DELIVERY: { stage: 'DELIVERED', label: 'Confirm Delivered (starts warranties, releases install job)' },
+};
+
 export const DispatchPage: React.FC = () => {
   const [orders, setOrders] = useState<any[]>([]);
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
@@ -68,7 +77,7 @@ export const DispatchPage: React.FC = () => {
     setIsDelivering(true);
     setActionMessage(null);
     try {
-      await api.put(`/dispatch/orders/${selectedOrderId}/stage?status=${newStage}`);
+      await api.put(`/dispatch/orders/${selectedOrderId}/stage`, { stage: newStage });
       setActionMessage({
         type: 'success',
         text: `Order stage updated to ${newStage.replace(/_/g, ' ')}!`,
@@ -281,47 +290,20 @@ export const DispatchPage: React.FC = () => {
                     <span className="text-xs uppercase text-gray-400 font-bold">Fulfillment Target</span>
                     <h1 className="text-xl font-bold text-gray-900">{selectedOrder.order_number}</h1>
                     <p className="text-xs text-gray-600 mt-0.5">
-                      {selectedOrder.customer_name} • {selectedOrder.capacity_kw} kW {selectedOrder.system_type} • Current Stage: <span className="font-bold text-odoo-primary">{selectedOrder.status}</span>
+                      {selectedOrder.customer_name} • Current Stage: <span className="font-bold text-odoo-primary">{selectedOrder.status}</span>
                     </p>
                   </div>
 
                   {/* Stage Advancement Action Buttons */}
                   <div className="flex flex-wrap items-center gap-2">
-                    {selectedOrder.status === 'CONFIRMED' && (
+                    {NEXT_STAGE[selectedOrder.status] && (
                       <button
-                        onClick={() => handleUpdateStage('PACKING')}
+                        onClick={() => handleUpdateStage(NEXT_STAGE[selectedOrder.status].stage)}
                         disabled={isDelivering}
-                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-3 py-1.5 rounded text-xs shadow-xs"
-                      >
-                        Begin Packing
-                      </button>
-                    )}
-                    {['PACKING', 'PACKED'].includes(selectedOrder.status) && (
-                      <button
-                        onClick={() => handleUpdateStage('DISPATCHED')}
-                        disabled={isDelivering}
-                        className="bg-amber-600 hover:bg-amber-700 text-white font-bold px-3 py-1.5 rounded text-xs shadow-xs"
-                      >
-                        Mark Dispatched (Gate)
-                      </button>
-                    )}
-                    {selectedOrder.status === 'DISPATCHED' && (
-                      <button
-                        onClick={() => handleUpdateStage('OUT_FOR_DELIVERY')}
-                        disabled={isDelivering}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-3 py-1.5 rounded text-xs shadow-xs"
-                      >
-                        Out for Delivery
-                      </button>
-                    )}
-                    {['OUT_FOR_DELIVERY', 'DISPATCHED'].includes(selectedOrder.status) && (
-                      <button
-                        onClick={handleConfirmDelivery}
-                        disabled={isDelivering}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded text-xs shadow-xs flex items-center gap-1.5"
+                        className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold px-3 py-1.5 rounded text-xs shadow-xs flex items-center gap-1.5"
                       >
                         <FontAwesomeIcon icon={faCheckCircle} />
-                        <span>Confirm Delivered & Activate Warranty</span>
+                        <span>{NEXT_STAGE[selectedOrder.status].label}</span>
                       </button>
                     )}
                   </div>
@@ -432,15 +414,17 @@ export const DispatchPage: React.FC = () => {
                             <th className="py-2 px-3">Serial #</th>
                             <th className="py-2 px-3">Component</th>
                             <th className="py-2 px-3">Status</th>
-                            <th className="py-2 px-3">Delivered On</th>
-                            <th className="py-2 px-3">Warranty Expiration</th>
+                            <th className="py-2 px-3">Scanned</th>
+                            <th className="py-2 px-3">Warranty</th>
+                            <th className="py-2 px-3">Warranty Start</th>
+                            <th className="py-2 px-3">Warranty End</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100 font-mono">
                           {scannedItems.map((item) => (
                             <tr key={item.id} className="hover:bg-gray-50/50">
                               <td className="py-2 px-3 font-bold text-odoo-primary">{item.serial_no}</td>
-                              <td className="py-2 px-3 font-sans text-gray-800">{item.product_name}</td>
+                              <td className="py-2 px-3 font-sans text-gray-800">{item.product?.name}</td>
                               <td className="py-2 px-3 font-sans">
                                 <span
                                   className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
@@ -453,14 +437,18 @@ export const DispatchPage: React.FC = () => {
                                 </span>
                               </td>
                               <td className="py-2 px-3 font-sans text-gray-600">
+                                {item.scanned_at ? new Date(item.scanned_at + 'Z').toLocaleString() : '—'}
+                              </td>
+                              <td className="py-2 px-3 font-sans text-gray-600">{item.product?.warranty_years} yrs</td>
+                              <td className="py-2 px-3 font-sans text-gray-600">
                                 {item.delivered_on
                                   ? new Date(item.delivered_on).toLocaleDateString()
-                                  : 'Pending Delivery'}
+                                  : 'Set on delivery'}
                               </td>
                               <td className="py-2 px-3 font-sans font-semibold text-emerald-700">
                                 {item.warranty_end
                                   ? new Date(item.warranty_end).toLocaleDateString()
-                                  : 'Auto on Delivery'}
+                                  : 'Set on delivery'}
                               </td>
                             </tr>
                           ))}

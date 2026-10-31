@@ -46,3 +46,14 @@ class Order(Base):
     invoice = relationship("Invoice", back_populates="order", uselist=False)
     subsidy_record = relationship("SubsidyRecord", back_populates="order", uselist=False)
 
+    @property
+    def invoice_id(self):
+        return self.invoice.id if self.invoice else None
+
+    @property
+    def pick_list_id(self):
+        return self.pick_list.id if self.pick_list else None
+
+    @property
+    def customer_name(self):
+        return self.customer.name if self.customer else None

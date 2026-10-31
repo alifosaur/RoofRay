@@ -17,7 +17,7 @@ export const QuotesPage: React.FC = () => {
   const [newQuote, setNewQuote] = useState({
     lead_id: Number(searchParams.get('lead_id')) || 0,
     template_id: 0,
-    notes: 'Standard 20-year linear performance warranty included.',
+    notes: '',
   });
 
   const fetchData = async () => {

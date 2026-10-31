@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useLiveRefresh } from '../../live/LiveEvents';
+import { NotificationBell } from '../../components/common/NotificationBell';
 import { api } from '../../api/client';
 import { useNavigate } from 'react-router-dom';
 import SignatureCanvas from 'react-signature-canvas';
@@ -26,21 +27,26 @@ export const TechnicianPWAPage: React.FC = () => {
 
   // Form states for installation job completion
   const [powerGenPassed, setPowerGenPassed] = useState(true);
-  const [generationKw, setGenerationKw] = useState<number>(2.8);
-  const [inverterSerialVerified, setInverterSerialVerified] = useState('INV-904821');
-  const [capacityKw, setCapacityKw] = useState(3.0);
+  const [capacityKw, setCapacityKw] = useState<number>(0);
+  const [startTime, setStartTime] = useState('');
   const [notes, setNotes] = useState('');
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   // Form states for site survey completion
-  const [certifyFeasibility, setCertifyFeasibility] = useState(true);
-  const [surveyForm, setSurveyForm] = useState({
-    roof_direction: 'South',
-    roof_tilt_deg: 20.0,
-    cable_distance_meters: 15.0,
-    notes: 'Structure verified. RCC roof with direct sunlight and short cable run to meter.',
-  });
+  const emptySurvey = {
+    address_confirmed: false,
+    roof_length_ft: '',
+    roof_width_ft: '',
+    shadow_free_area_sqft: '',
+    out_of_shade_zone: true,
+    shade_notes: '',
+    roof_direction: '',
+    roof_tilt_deg: '',
+    cable_distance_meters: '',
+    notes: '',
+  };
+  const [surveyForm, setSurveyForm] = useState(emptySurvey);
 
   const sigPadRef = useRef<SignatureCanvas | null>(null);
 
@@ -59,7 +65,7 @@ export const TechnicianPWAPage: React.FC = () => {
         if (found) setActiveJob(found);
       } else if (jobsData && jobsData.length > 0) {
         setActiveJob(jobsData[0]);
-        setCapacityKw(jobsData[0].capacity_kw || 3.0);
+        setCapacityKw(jobsData[0].capacity_kw || 0);
       }
 
       if (activeSurvey) {
@@ -82,24 +88,27 @@ export const TechnicianPWAPage: React.FC = () => {
     fetchSchedule();
   }, []);
 
+  const num = (v: string) => (v === '' ? undefined : Number(v));
+
   const handleCompleteSurvey = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeSurvey) return;
     try {
       setSubmitting(true);
       await api.post(`/surveys/${activeSurvey.id}/complete`, {
+        address_confirmed: surveyForm.address_confirmed,
+        roof_length_ft: num(surveyForm.roof_length_ft),
+        roof_width_ft: num(surveyForm.roof_width_ft),
+        shadow_free_area_sqft: num(surveyForm.shadow_free_area_sqft),
+        out_of_shade_zone: surveyForm.out_of_shade_zone,
+        shade_notes: surveyForm.shade_notes || undefined,
         roof_direction: surveyForm.roof_direction,
         roof_tilt_deg: Number(surveyForm.roof_tilt_deg),
         cable_distance_meters: Number(surveyForm.cable_distance_meters),
-        notes: surveyForm.notes,
+        notes: surveyForm.notes || undefined,
       });
-
-      if (certifyFeasibility) {
-        await api.post(`/surveys/${activeSurvey.id}/approve`);
-        alert('Survey report submitted & site feasibility APPROVED! Sales team is now authorized to create the quotation and submit BOM to warehouse.');
-      } else {
-        alert('Survey report submitted successfully! Waiting for final sign-off.');
-      }
+      setSurveyForm(emptySurvey);
+      alert('Survey submitted. Sales has been notified to review and approve it.');
       fetchSchedule();
     } catch (err: any) {
       alert(err.message || 'Failed to submit survey');
@@ -108,16 +117,22 @@ export const TechnicianPWAPage: React.FC = () => {
     }
   };
 
-  const handleApproveSurvey = async (surveyId: number) => {
+  const handleSurveyPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files?.length || !activeSurvey) return;
     try {
-      setSubmitting(true);
-      await api.post(`/surveys/${surveyId}/approve`);
-      alert('Site feasibility APPROVED! Sales team is now authorized to create the quotation and submit BOM to warehouse.');
-      fetchSchedule();
+      setUploadingPhoto(true);
+      for (const file of Array.from(e.target.files)) {
+        const fd = new FormData();
+        fd.append('file', file);
+        fd.append('caption', 'Survey photo');
+        await api.post(`/surveys/${activeSurvey.id}/photos`, fd);
+      }
+      setActiveSurvey(await api.get(`/surveys/${activeSurvey.id}`));
     } catch (err: any) {
-      alert(err.message || 'Failed to approve survey');
+      alert(err.message || 'Failed to upload photo');
     } finally {
-      setSubmitting(false);
+      setUploadingPhoto(false);
+      e.target.value = '';
     }
   };
 
@@ -132,14 +147,14 @@ export const TechnicianPWAPage: React.FC = () => {
 
   const handlePhotoCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0 || !activeJob) return;
-    const file = e.target.files[0];
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('caption', 'Field PWA Photo');
-
     try {
       setUploadingPhoto(true);
-      await api.post(`/jobs/${activeJob.id}/photos`, formData);
+      for (const file of Array.from(e.target.files)) {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('caption', 'Installation photo');
+        await api.post(`/jobs/${activeJob.id}/photos`, formData);
+      }
       const updated = await api.get(`/jobs/${activeJob.id}`);
       setActiveJob(updated);
       fetchSchedule();
@@ -164,10 +179,11 @@ export const TechnicianPWAPage: React.FC = () => {
       setSubmitting(true);
       await api.post(`/jobs/${activeJob.id}/complete`, {
         confirmed_capacity_kw: Number(capacityKw),
-        power_generated_test: powerGenPassed,
-        customer_signature_base64: signatureDataUrl,
-        customer_name: activeJob.customer_name || 'Customer',
-        notes: notes,
+        power_generating: powerGenPassed,
+        signature_data: signatureDataUrl,
+        customer_name: activeJob.customer_name,
+        start_time: startTime ? new Date(startTime).toISOString() : undefined,
+        notes: notes || undefined,
       });
       alert('Installation job marked COMPLETED! Timesheet generated.');
       fetchSchedule();
@@ -197,6 +213,7 @@ export const TechnicianPWAPage: React.FC = () => {
             <p className="text-[11px] text-gray-400">Crew Mobile Portal</p>
           </div>
         </div>
+        <NotificationBell />
 
         <span className="text-xs bg-emerald-950 text-emerald-400 border border-emerald-800 px-2 py-0.5 rounded-full font-mono">
           Online
@@ -244,7 +261,7 @@ export const TechnicianPWAPage: React.FC = () => {
                 key={job.id}
                 onClick={() => {
                   setActiveJob(job);
-                  setCapacityKw(job.confirmed_capacity_kw || job.capacity_kw || 3.0);
+                  setCapacityKw(job.confirmed_capacity_kw || job.capacity_kw || 0);
                 }}
                 className={`flex-shrink-0 px-4 py-2.5 rounded-xl text-left border transition-all ${
                   activeJob?.id === job.id
@@ -321,9 +338,37 @@ export const TechnicianPWAPage: React.FC = () => {
               )}
             </div>
 
+            {/* BOM and delivered serials (released to the technician on delivery) */}
+            <div className="bg-slate-800 rounded-2xl p-4 border border-slate-700 text-xs space-y-3">
+              <h4 className="font-bold uppercase tracking-wider text-gray-300">Bill of materials</h4>
+              <ul className="space-y-1">
+                {(activeJob.bom || []).map((b: any) => (
+                  <li key={b.sku} className="flex justify-between text-gray-200"><span>{b.product_name}</span><strong>× {b.quantity}</strong></li>
+                ))}
+              </ul>
+              <h4 className="font-bold uppercase tracking-wider text-gray-300 pt-2">Delivered serial numbers</h4>
+              {(activeJob.delivered_serials || []).length === 0 ? (
+                <p className="text-gray-400">No serialised items on this order.</p>
+              ) : (
+                <ul className="space-y-1 font-mono">
+                  {activeJob.delivered_serials.map((d: any) => (
+                    <li key={d.serial_no} className="flex justify-between text-gray-200">
+                      <span>{d.serial_no} <span className="font-sans text-gray-400">{d.product_name}</span></span>
+                      <span className="text-emerald-400">{d.warranty_end ? `to ${d.warranty_end}` : ''}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
             {/* In-Progress Installation Workflow */}
             {activeJob.status === 'IN_PROGRESS' && (
               <form onSubmit={handleCompleteJob} className="space-y-4">
+                <label className="block text-xs text-gray-300 font-semibold bg-slate-800 rounded-2xl p-4 border border-slate-700">
+                  Start time (leave blank to use when you pressed Start)
+                  <input type="datetime-local" value={startTime} onChange={(e) => setStartTime(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white mt-1" />
+                </label>
                 {/* Step 1: Photos */}
                 <div className="bg-slate-800 rounded-2xl p-4 border border-slate-700">
                   <div className="flex justify-between items-center mb-3">
@@ -339,6 +384,7 @@ export const TechnicianPWAPage: React.FC = () => {
                         type="file"
                         accept="image/*"
                         capture="environment"
+                        multiple
                         onChange={handlePhotoCapture}
                         disabled={uploadingPhoto}
                         className="hidden"
@@ -559,7 +605,7 @@ export const TechnicianPWAPage: React.FC = () => {
                       <span>{activeSurvey.site_address || 'Address not provided'}</span>
                     </p>
                     <p className="text-[11px] text-gray-400 mt-0.5">
-                      Target: <strong className="text-white">{activeSurvey.required_capacity || 3.0} kW {activeSurvey.system_type || 'On-Grid'}</strong> • Scheduled: {new Date(activeSurvey.scheduled_date).toLocaleString()}
+                      Target: <strong className="text-white">{activeSurvey.required_capacity} kW {activeSurvey.system_type}</strong> • Scheduled: {new Date(activeSurvey.scheduled_date).toLocaleString()}
                     </p>
                   </div>
                   <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
@@ -575,82 +621,61 @@ export const TechnicianPWAPage: React.FC = () => {
 
                 {activeSurvey.status === 'SCHEDULED' ? (
                   <form onSubmit={handleCompleteSurvey} className="space-y-4 text-xs">
-                    <div>
-                      <label className="block text-gray-300 font-semibold mb-1">Roof Facing Direction *</label>
-                      <select
-                        value={surveyForm.roof_direction}
-                        onChange={(e) => setSurveyForm({ ...surveyForm, roof_direction: e.target.value })}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white"
-                      >
-                        <option value="South">South (Optimal Solar Yield)</option>
-                        <option value="South-West">South-West</option>
-                        <option value="South-East">South-East</option>
-                        <option value="East">East</option>
-                        <option value="West">West</option>
-                        <option value="North">North (High Shadowing)</option>
-                      </select>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-gray-300 font-semibold mb-1">Roof Tilt Angle (deg) *</label>
-                        <input
-                          type="number"
-                          step="1"
-                          required
-                          value={surveyForm.roof_tilt_deg}
-                          onChange={(e) => setSurveyForm({ ...surveyForm, roof_tilt_deg: parseFloat(e.target.value) || 0 })}
-                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-gray-300 font-semibold mb-1">Cable Run Distance (meters) *</label>
-                        <input
-                          type="number"
-                          step="1"
-                          required
-                          value={surveyForm.cable_distance_meters}
-                          onChange={(e) => setSurveyForm({ ...surveyForm, cable_distance_meters: parseFloat(e.target.value) || 0 })}
-                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-gray-300 font-semibold mb-1">Site Feasibility Notes & Structural Assessment</label>
-                      <textarea
-                        rows={3}
-                        required
-                        value={surveyForm.notes}
-                        onChange={(e) => setSurveyForm({ ...surveyForm, notes: e.target.value })}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white"
-                        placeholder="Rooftop parapet wall height, parapet shadow-free clearance, cable entry point..."
-                      ></textarea>
-                    </div>
-
-                    <label className="flex items-center gap-2 text-xs text-amber-300 font-semibold cursor-pointer p-2.5 bg-amber-950/40 rounded-lg border border-amber-800/60">
-                      <input
-                        type="checkbox"
-                        checked={certifyFeasibility}
-                        onChange={(e) => setCertifyFeasibility(e.target.checked)}
-                        className="rounded text-amber-500 focus:ring-amber-400 w-4 h-4"
-                      />
-                      <span>Approve & Certify Feasibility (Unlocks Sales Quotation & Warehouse BOM)</span>
+                    <label className="flex items-center gap-2 text-gray-200">
+                      <input type="checkbox" checked={surveyForm.address_confirmed} onChange={(e) => setSurveyForm({ ...surveyForm, address_confirmed: e.target.checked })} className="w-4 h-4" />
+                      <span>Site address confirmed on location</span>
                     </label>
-
+                    <div className="grid grid-cols-3 gap-2">
+                      <label className="block text-gray-300 font-semibold">Roof length (ft)
+                        <input type="number" min="0" step="0.5" value={surveyForm.roof_length_ft} onChange={(e) => setSurveyForm({ ...surveyForm, roof_length_ft: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white mt-1" />
+                      </label>
+                      <label className="block text-gray-300 font-semibold">Roof width (ft)
+                        <input type="number" min="0" step="0.5" value={surveyForm.roof_width_ft} onChange={(e) => setSurveyForm({ ...surveyForm, roof_width_ft: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white mt-1" />
+                      </label>
+                      <label className="block text-gray-300 font-semibold">Shadow-free (sq ft) *
+                        <input type="number" min="0" required value={surveyForm.shadow_free_area_sqft} onChange={(e) => setSurveyForm({ ...surveyForm, shadow_free_area_sqft: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white mt-1" />
+                      </label>
+                    </div>
+                    <div>
+                      <span className="block text-gray-300 font-semibold mb-1">Panels area out of shade? *</span>
+                      <div className="flex gap-2">
+                        {[true, false].map((v) => (
+                          <button key={String(v)} type="button" onClick={() => setSurveyForm({ ...surveyForm, out_of_shade_zone: v })}
+                            className={`flex-1 py-2 rounded-lg border ${surveyForm.out_of_shade_zone === v ? 'bg-amber-500 text-slate-950 border-amber-500 font-bold' : 'border-slate-700 text-gray-300'}`}>
+                            {v ? 'Yes' : 'No'}
+                          </button>
+                        ))}
+                      </div>
+                      <textarea rows={2} value={surveyForm.shade_notes} onChange={(e) => setSurveyForm({ ...surveyForm, shade_notes: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white mt-2" placeholder="Shade notes (trees, tanks, neighbouring buildings)" />
+                    </div>
+                    <label className="block text-gray-300 font-semibold">Roof facing direction *
+                      <select required value={surveyForm.roof_direction} onChange={(e) => setSurveyForm({ ...surveyForm, roof_direction: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white mt-1">
+                        <option value="">Select…</option>
+                        {['South', 'South-West', 'South-East', 'East', 'West', 'North'].map((d) => <option key={d} value={d}>{d}</option>)}
+                      </select>
+                    </label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <label className="block text-gray-300 font-semibold">Roof tilt (deg) *
+                        <input type="number" step="1" min="0" max="90" required value={surveyForm.roof_tilt_deg} onChange={(e) => setSurveyForm({ ...surveyForm, roof_tilt_deg: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white mt-1 font-mono" />
+                      </label>
+                      <label className="block text-gray-300 font-semibold">Cable distance (m) *
+                        <input type="number" step="1" min="0" required value={surveyForm.cable_distance_meters} onChange={(e) => setSurveyForm({ ...surveyForm, cable_distance_meters: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white mt-1 font-mono" />
+                      </label>
+                    </div>
+                    <label className="block text-gray-300 font-semibold">Notes
+                      <textarea rows={2} value={surveyForm.notes} onChange={(e) => setSurveyForm({ ...surveyForm, notes: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white mt-1" placeholder="Structure, parapet height, cable entry point…" />
+                    </label>
+                    <div>
+                      <label className="block text-gray-300 font-semibold mb-1">Site photos ({activeSurvey.photos?.length || 0})</label>
+                      <input type="file" accept="image/*" capture="environment" multiple onChange={handleSurveyPhoto} disabled={uploadingPhoto} className="text-gray-300" />
+                    </div>
                     <button
                       type="submit"
                       disabled={submitting}
-                      className="w-full bg-amber-500 hover:bg-amber-400 active:scale-98 text-slate-950 font-bold py-3.5 rounded-xl text-sm flex items-center justify-center gap-2 shadow-lg transition-transform disabled:opacity-50"
+                      className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-3.5 rounded-xl text-sm flex items-center justify-center gap-2 shadow-lg disabled:opacity-50"
                     >
                       <FontAwesomeIcon icon={faCheckCircle} />
-                      <span>
-                        {submitting
-                          ? 'Processing...'
-                          : certifyFeasibility
-                          ? 'Submit & Approve Site Survey'
-                          : 'Submit Site Survey Report'}
-                      </span>
+                      <span>{submitting ? 'Submitting…' : 'Submit Survey to Sales'}</span>
                     </button>
                   </form>
                 ) : (
@@ -675,20 +700,9 @@ export const TechnicianPWAPage: React.FC = () => {
                       </p>
                     )}
                     {activeSurvey.status === 'COMPLETED' && (
-                      <div className="space-y-2 pt-2 border-t border-slate-700">
-                        <p className="text-[11px] text-amber-400 font-semibold text-center">
-                          Survey submitted. Ready for site feasibility approval.
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => handleApproveSurvey(activeSurvey.id)}
-                          disabled={submitting}
-                          className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-md transition-colors"
-                        >
-                          <FontAwesomeIcon icon={faCheckCircle} />
-                          <span>Approve Site Feasibility (Unlock Quotations)</span>
-                        </button>
-                      </div>
+                      <p className="text-[11px] text-amber-400 font-semibold text-center pt-2 border-t border-slate-700">
+                        Submitted. Waiting for sales to review and approve.
+                      </p>
                     )}
                     {activeSurvey.status === 'APPROVED' && (
                       <div className="p-3 bg-emerald-950/40 border border-emerald-700/60 rounded-xl text-center space-y-1">
@@ -697,7 +711,7 @@ export const TechnicianPWAPage: React.FC = () => {
                           <span>Site Feasibility Approved!</span>
                         </div>
                         <p className="text-[11px] text-gray-300">
-                          Sales team is authorized to prepare the client quotation and submit the installation BOM checklist to the warehouse.
+                          Sales can now prepare the customer's quotation.
                         </p>
                       </div>
                     )}

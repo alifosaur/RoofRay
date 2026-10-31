@@ -13,10 +13,10 @@ export const SurveysPage: React.FC = () => {
   const [showCompleteModal, setShowCompleteModal] = useState(false);
 
   const [completeData, setCompleteData] = useState({
-    roof_direction: 'South',
-    roof_tilt_deg: 22.5,
-    cable_distance_meters: 18.0,
-    notes: 'Terrace is in pristine condition. Direct South facing with 0 shading.',
+    roof_direction: '',
+    roof_tilt_deg: 0,
+    cable_distance_meters: 0,
+    notes: '',
   });
 
   const fetchSurveys = async () => {
@@ -114,7 +114,7 @@ export const SurveysPage: React.FC = () => {
               Complete Visit
             </button>
           )}
-          {r.status === 'COMPLETED' && (role === 'admin' || role === 'sales' || role === 'technician') && (
+          {r.status === 'COMPLETED' && (role === 'admin' || role === 'sales') && (
             <div className="flex gap-1.5">
               <button
                 onClick={() => handleApprove(r.id)}

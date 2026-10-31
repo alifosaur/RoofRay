@@ -29,6 +29,9 @@ check "hard-coded emails in pages/components" "['\"][a-z0-9._%+-]+@[a-z0-9.-]+\.
 check "hard-coded phone numbers" '\+91[ -]?[6-9][0-9]{4}' "${SCAN[@]}"
 check "hard-coded rupee amounts in pages" '₹ ?[0-9]{1,3}(,[0-9]{2,3})+' frontend/src/pages
 CASE_FLAG=-s check "hard-coded sample records in pages" '^\s*(grossPrice|netPrice|price|amount|email|phone|serial[A-Za-z]*|customer[A-Z][A-Za-z]*|bill[A-Z][a-z]+|revenue|profit): *([0-9]|'"'"'[^'"'"']|"[^"])' frontend/src/pages
+CASE_FLAG=-s check "pre-filled sample text in form state" "^\s+(notes|remarks|shade_notes|resolution_notes|lost_reason): '[^']{3,}',?\s*$" frontend/src/pages
+CASE_FLAG=-s check "pre-filled codes / serials in state" "useState(<[^>]*>)?\('[A-Z]{2,}-[A-Z0-9-]*[0-9]{3,}" frontend/src
+check "fallback demo people / options" "(Amit Verma|Rajesh Singhania|Rohan Sharma|Deepak Kumar|Vikram Malhotra)" "${SCAN[@]}"
 
 if [ $fail -ne 0 ]; then
   echo; echo "Mock/demo data check FAILED"; exit 1

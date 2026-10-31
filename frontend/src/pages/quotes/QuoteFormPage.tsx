@@ -10,6 +10,11 @@ export const QuoteFormPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [quote, setQuote] = useState<any>(null);
+  // Draft BOM edits: null when not editing
+  const [editLines, setEditLines] = useState<{ product_id: number; quantity: number; unit_price: number; name: string }[] | null>(null);
+  const [products, setProducts] = useState<any[]>([]);
+  const [addProductId, setAddProductId] = useState<string>('');
+  const [busy, setBusy] = useState(false);
 
   const fetchQuote = async () => {
     try {
@@ -34,6 +39,39 @@ export const QuoteFormPage: React.FC = () => {
     { key: 'ACCEPTED', label: 'Accepted (Won)' },
     { key: 'REJECTED', label: 'Cancelled' },
   ];
+
+  const startEditing = async () => {
+    setEditLines(quote.lines.map((l: any) => ({ product_id: l.product_id, quantity: l.quantity, unit_price: l.unit_price, name: l.product?.name })));
+    if (!products.length) setProducts(await api.get<any[]>('/products'));
+  };
+
+  const saveLines = async () => {
+    if (!editLines) return;
+    setBusy(true);
+    try {
+      const updated = await api.put<any>(`/quotes/${id}/lines`, {
+        lines: editLines.filter((l) => l.quantity > 0).map(({ product_id, quantity, unit_price }) => ({ product_id, quantity, unit_price })),
+      });
+      setQuote(updated);
+      setEditLines(null);
+    } catch (err: any) {
+      alert(err.message || 'Could not save the BOM');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleSend = async () => {
+    if (!window.confirm('Send this quotation to the customer? It can no longer be edited afterwards.')) return;
+    setBusy(true);
+    try {
+      setQuote(await api.post<any>(`/quotes/${id}/send`));
+    } catch (err: any) {
+      alert(err.message || 'Could not send the quotation');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const handleRecordAcceptance = async () => {
     if (!window.confirm('Record that the customer accepted this quotation? A draft Sales Order will be created for payment and confirmation.')) return;
@@ -68,7 +106,43 @@ export const QuoteFormPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {quote.lines.map((line: any) => (
+              {editLines &&
+                editLines.map((l, idx) => (
+                  <tr key={`${l.product_id}-${idx}`} className="bg-amber-50/40">
+                    <td className="px-3 py-2 border-r font-medium text-gray-900">{l.name}</td>
+                    <td className="px-3 py-2 border-r text-gray-400">—</td>
+                    <td className="px-3 py-2 border-r text-center">
+                      <input
+                        type="number"
+                        min={0}
+                        value={l.quantity}
+                        onChange={(e) => {
+                          const next = [...editLines];
+                          next[idx] = { ...l, quantity: Math.max(0, parseInt(e.target.value || '0', 10)) };
+                          setEditLines(next);
+                        }}
+                        className="w-16 border border-gray-300 rounded px-1 py-0.5 text-center"
+                        aria-label={`Quantity for ${l.name}`}
+                      />
+                    </td>
+                    <td className="px-3 py-2 border-r text-right">
+                      <input
+                        type="number"
+                        min={0}
+                        value={l.unit_price}
+                        onChange={(e) => {
+                          const next = [...editLines];
+                          next[idx] = { ...l, unit_price: Math.max(0, parseFloat(e.target.value || '0')) };
+                          setEditLines(next);
+                        }}
+                        className="w-24 border border-gray-300 rounded px-1 py-0.5 text-right"
+                        aria-label={`Unit price for ${l.name}`}
+                      />
+                    </td>
+                    <td className="px-3 py-2 text-right font-semibold">₹{(l.quantity * l.unit_price).toLocaleString()}</td>
+                  </tr>
+                ))}
+              {!editLines && quote.lines.map((line: any) => (
                 <tr key={line.id} className="hover:bg-gray-50/50">
                   <td className="px-3 py-2 border-r font-medium text-gray-900">
                     {line.product?.name || `Product #${line.product_id}`}
@@ -90,6 +164,36 @@ export const QuoteFormPage: React.FC = () => {
               ))}
             </tbody>
           </table>
+
+          {editLines && (
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+              <select value={addProductId} onChange={(e) => setAddProductId(e.target.value)} className="border border-gray-300 rounded px-2 py-1">
+                <option value="">Add a product…</option>
+                {products.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name} ({p.sku})</option>
+                ))}
+              </select>
+              <button
+                type="button"
+                disabled={!addProductId}
+                onClick={() => {
+                  const p = products.find((x) => String(x.id) === addProductId);
+                  if (p) setEditLines([...editLines, { product_id: p.id, quantity: 1, unit_price: p.sale_price, name: p.name }]);
+                  setAddProductId('');
+                }}
+                className="border border-gray-300 rounded px-2 py-1 disabled:opacity-50"
+              >
+                Add line
+              </button>
+              <span className="text-gray-400">Set quantity to 0 to remove a line.</span>
+              <div className="ml-auto flex gap-2">
+                <button type="button" onClick={() => setEditLines(null)} className="border border-gray-300 rounded px-3 py-1">Cancel</button>
+                <button type="button" onClick={saveLines} disabled={busy} className="bg-odoo-primary text-white rounded px-3 py-1 font-semibold disabled:opacity-60">
+                  Save BOM
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Pricing Calculation Summary */}
           <div className="flex justify-end mt-4">
@@ -120,10 +224,12 @@ export const QuoteFormPage: React.FC = () => {
       label: 'Terms & Warranty',
       content: (
         <div className="text-xs text-gray-700 space-y-2">
-          <p>• <b>Solar Panels:</b> 20-year linear power performance warranty.</p>
-          <p>• <b>Solar Inverter & Battery Bank:</b> 2-year manufacturer replacement warranty.</p>
-          <p>• <b>Installation & Structure:</b> 1-year comprehensive free maintenance.</p>
-          <p>• <b>Subsidy Approval:</b> Subject to National Solar Portal DISCOM inspection.</p>
+          {quote.lines
+            .filter((l: any) => l.product?.warranty_years > 0)
+            .map((l: any) => (
+              <p key={l.id}>• <b>{l.product.name}:</b> {l.product.warranty_years}-year warranty, starting on the delivery date.</p>
+            ))}
+          <p>• <b>Subsidy:</b> subject to scheme rules and DISCOM inspection; confirm current amounts on the official portal.</p>
         </div>
       ),
     },
@@ -157,7 +263,21 @@ export const QuoteFormPage: React.FC = () => {
         currentStage={quote.status}
         headerButtons={
           <>
-            {quote.status !== 'ACCEPTED' && (
+            {quote.status === 'DRAFT' && !editLines && (
+              <>
+                <button onClick={startEditing} className="border border-gray-300 bg-white px-3 py-1 rounded text-xs font-semibold">
+                  Adjust BOM
+                </button>
+                <button
+                  onClick={handleSend}
+                  disabled={busy}
+                  className="bg-[#6B4B63] hover:bg-[#583D51] text-white px-3 py-1 rounded text-xs font-semibold shadow-xs disabled:opacity-60"
+                >
+                  Send to Customer
+                </button>
+              </>
+            )}
+            {quote.status === 'SENT' && (
               <button
                 onClick={handleRecordAcceptance}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded text-xs font-semibold flex items-center gap-1.5 shadow-xs"

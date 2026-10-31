@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth, UserRole, getRoleHomePath } from '../../context/AuthContext';
+import { NotificationBell } from '../common/NotificationBell';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faTh,
@@ -61,6 +62,7 @@ export const Navbar: React.FC<NavbarProps> = ({ appName, onToggleHomeMenu, isHom
 
       {/* Right: Systray */}
       <div className="flex items-center space-x-3">
+        <NotificationBell />
         {/* Quick Links: Website & Tech Mobile PWA */}
         <Link
           to="/"

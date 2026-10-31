@@ -97,7 +97,7 @@ export const PublicWebsitePage: React.FC = () => {
     },
     {
       leadIn: 'Installation',
-      text: 'Our in-house 15-technician crew completes mounting, wiring, earthing, and on-site generation testing.',
+      text: 'Our technicians complete mounting, wiring, earthing, and on-site generation testing.',
     },
     {
       leadIn: 'Subsidy',

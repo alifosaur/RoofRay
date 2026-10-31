@@ -380,7 +380,8 @@ def get_customer_quotes(
     if not cust:
         return []
 
-    quotes = db.query(Quote).filter(Quote.customer_id == cust.id).order_by(Quote.created_at.desc()).all()
+    # Drafts are internal to sales until sent
+    quotes = db.query(Quote).filter(Quote.customer_id == cust.id, Quote.status != QuoteStatus.DRAFT).order_by(Quote.created_at.desc()).all()
     out = []
     for q in quotes:
         out.append({
@@ -742,4 +743,9 @@ def get_customer_subsidy(
         disbursed_date=sub.disbursed_date.strftime("%Y-%m-%d") if sub.disbursed_date else None,
         rejection_notes=sub.rejection_notes,
         remarks=sub.remarks,
+        events=[
+            {"status": e.status.value, "event_date": e.event_date.isoformat(), "reference_no": e.reference_no,
+             "document_url": e.document_url, "notes": e.notes}
+            for e in sub.events
+        ],
     )

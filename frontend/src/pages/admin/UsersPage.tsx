@@ -296,7 +296,7 @@ export const UsersPage: React.FC = () => {
                   required
                   value={newUser.full_name}
                   onChange={(e) => setNewUser({ ...newUser, full_name: e.target.value })}
-                  placeholder="e.g. Deepak Kumar"
+                  placeholder="Full name"
                   className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-1 focus:ring-odoo-primary"
                 />
               </div>

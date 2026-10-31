@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useLiveRefresh } from '../../live/LiveEvents';
 import { useParams, useNavigate } from 'react-router-dom';
-import { api } from '../../api/client';
+import { api, downloadFile } from '../../api/client';
 import { ControlPanel } from '../../components/odoo/ControlPanel';
 import { FormView, FormTab } from '../../components/odoo/FormView';
 import { SmartButton } from '../../components/odoo/SmartButton';
@@ -79,9 +79,8 @@ export const OrderFormPage: React.FC = () => {
       setActionError('');
       await api.post(`/orders/${id}/payments`, {
         amount: Number(paymentAmount),
-        payment_method: paymentMethod,
-        reference_no: paymentRef || undefined,
-        notes: paymentNotes || undefined,
+        method: paymentMethod,
+        transaction_ref: paymentRef || undefined,
       });
       setShowPaymentModal(false);
       fetchOrder();
@@ -127,14 +126,25 @@ export const OrderFormPage: React.FC = () => {
       {order.status === 'DRAFT' && (
         <button
           onClick={handleConfirmOrder}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded text-xs font-semibold flex items-center gap-1 shadow-sm transition-colors"
+          disabled={order.paid_amount <= 0}
+          title={order.paid_amount <= 0 ? 'Record the advance or full payment first' : undefined}
+          className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-3 py-1 rounded text-xs font-semibold flex items-center gap-1 shadow-sm transition-colors"
         >
           <FontAwesomeIcon icon={faCheckCircle} />
-          <span>Submit to Warehouse (Confirm Order)</span>
+          <span>Confirm Order (sends pick list to warehouse)</span>
         </button>
       )}
 
-      {order.payment_status !== 'PAID' && (
+      {order.invoice_id && (
+        <button
+          onClick={() => downloadFile(`/finance/invoices/${order.invoice_id}/pdf`, `Invoice_${order.order_number}.pdf`).catch((e) => alert(e.message))}
+          className="border border-gray-300 bg-white px-3 py-1 rounded text-xs font-semibold"
+        >
+          Invoice PDF
+        </button>
+      )}
+
+      {order.paid_amount < order.total_amount && order.status !== 'CLOSED' && (
         <button
           onClick={() => setShowPaymentModal(true)}
           className="bg-odoo-accent hover:bg-teal-700 text-white px-3 py-1 rounded text-xs font-semibold flex items-center gap-1 shadow-sm transition-colors"
@@ -144,7 +154,7 @@ export const OrderFormPage: React.FC = () => {
         </button>
       )}
 
-      {(order.status === 'CONFIRMED' || order.status === 'PACKED') && (
+      {['CONFIRMED', 'PACKING', 'PACKED', 'DISPATCHED', 'OUT_FOR_DELIVERY'].includes(order.status) && (
         <button
           onClick={() => navigate('/web/dispatch')}
           className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded text-xs font-semibold flex items-center gap-1 shadow-sm transition-colors"
@@ -344,7 +354,7 @@ export const OrderFormPage: React.FC = () => {
                   className="w-full px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:border-odoo-primary"
                 >
                   <option value="UPI">UPI (Google Pay / PhonePe / Paytm)</option>
-                  <option value="BANK_TRANSFER">Bank Transfer (NEFT / RTGS / IMPS)</option>
+                  <option value="BANK">Bank Transfer (NEFT / RTGS / IMPS)</option>
                   <option value="CHEQUE">Cheque</option>
                   <option value="CASH">Cash</option>
                 </select>

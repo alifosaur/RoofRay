@@ -1,7 +1,28 @@
+import re
 from datetime import datetime
 from typing import Optional, Any
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.models.user import UserRole
+
+
+def _check_email_format(email: str) -> str:
+    v = (email or "").strip()
+    if "@" not in v or "." not in v.split("@")[-1]:
+        raise ValueError("Email must contain '@' and '.' with a valid domain (e.g. name@domain.com)")
+    return v
+
+
+def _check_phone_10_digits(phone: Optional[str]) -> Optional[str]:
+    if not phone:
+        return None
+    digits = re.sub(r"\D", "", phone)
+    if digits.startswith("91") and len(digits) == 12:
+        digits = digits[2:]
+    elif len(digits) > 10:
+        digits = digits[-10:]
+    if len(phone) < 5:
+        raise ValueError("Phone number must have at least 5 characters")
+    return digits if len(digits) >= 5 else phone
 
 
 class UserBase(BaseModel):
@@ -56,6 +77,26 @@ class UserRegisterRequest(BaseModel):
     city: Optional[str] = None
     pincode: Optional[str] = None
 
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, v: str) -> str:
+        return _check_email_format(v)
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v: str) -> str:
+        return _check_phone_10_digits(v)
+        return res
+
+    @field_validator("address")
+    @classmethod
+    def validate_address(cls, v: Optional[str]) -> Optional[str]:
+        if v:
+            words = len(v.strip().split())
+            if words > 150:
+                raise ValueError(f"Address cannot exceed 150 words (currently {words} words)")
+        return v
+
 
 class StaffCreateRequest(BaseModel):
     email: str
@@ -65,6 +106,16 @@ class StaffCreateRequest(BaseModel):
     hourly_rate: int = 0
     is_active: bool = True
     password: Optional[str] = Field(default=None, min_length=8)  # optional initial password set by the admin
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, v: str) -> str:
+        return _check_email_format(v)
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v: Optional[str]) -> Optional[str]:
+        return _check_phone_10_digits(v)
 
     @field_validator("role", mode="before")
     @classmethod
@@ -78,6 +129,11 @@ class AdminSetPasswordRequest(BaseModel):
 
 class OtpRequest(BaseModel):
     email: str
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, v: str) -> str:
+        return _check_email_format(v)
 
 
 class UserLoginRequest(BaseModel):

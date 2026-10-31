@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../../api/client';
 import { SiteNavbar } from '../../components/layout/SiteNavbar';
 import { SiteFooter } from '../../components/layout/SiteFooter';
+import { validatePassword } from '../../utils/validators';
 
 // Local auth mode: landing page for admin-issued setup links and password reset links
 export const SetPasswordPage: React.FC = () => {
@@ -16,7 +17,8 @@ export const SetPasswordPage: React.FC = () => {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password.length < 8) return setError('Password must be at least 8 characters');
+    const pwdCheck = validatePassword(password);
+    if (!pwdCheck.isValid) return setError(pwdCheck.message || 'Password must be at least 8 characters long');
     if (password !== confirm) return setError('Passwords do not match');
     setLoading(true);
     setError(null);
@@ -40,9 +42,15 @@ export const SetPasswordPage: React.FC = () => {
           <h1 className="text-xl font-bold text-[#212529]">Set your password</h1>
           {!token && <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded">Missing setup token.</div>}
           {error && <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded">{error}</div>}
-          <input className={input} type="password" placeholder="New password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" required />
-          <input className={input} type="password" placeholder="Repeat password" value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password" required />
-          <button disabled={loading || !token} className="w-full py-2.5 bg-[#6B4B63] text-white font-semibold text-sm rounded disabled:opacity-60">
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">New Password (min. 8 characters)</label>
+            <input className={input} type="password" minLength={8} placeholder="At least 8 characters" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" required />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">Confirm Password</label>
+            <input className={input} type="password" minLength={8} placeholder="Repeat password" value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password" required />
+          </div>
+          <button disabled={loading || !token} className="w-full py-2.5 bg-[#6B4B63] text-white font-semibold text-sm rounded disabled:opacity-60 cursor-pointer">
             {loading ? 'Saving…' : 'Set password and sign in'}
           </button>
         </form>

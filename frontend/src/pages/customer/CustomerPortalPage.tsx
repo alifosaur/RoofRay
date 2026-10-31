@@ -9,6 +9,7 @@ import { SiteNavbar } from '../../components/layout/SiteNavbar';
 import { SiteFooter } from '../../components/layout/SiteFooter';
 import { ScriptHeading } from '../../components/common/ScriptHeading';
 import { SquiggleLink } from '../../components/common/SquiggleLink';
+import { validateEmail, validatePhone, sanitizePhone, validateAddress, countWords, sanitizePincode } from '../../utils/validators';
 
 interface TrackerStage {
   key: string;
@@ -466,11 +467,35 @@ export const CustomerPortalPage: React.FC = () => {
   // Handle Enquiry submission
   const handleSubmitEnquiry = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // 1. Phone number validation (must be 10 digits)
+    const phoneCheck = validatePhone(enquiryForm.phone);
+    if (!phoneCheck.isValid) {
+      alert(phoneCheck.message || 'Phone number must be exactly 10 digits.');
+      return;
+    }
+
+    // 2. Email validation (must contain @ and .)
+    if (enquiryForm.email) {
+      const emailCheck = validateEmail(enquiryForm.email, false);
+      if (!emailCheck.isValid) {
+        alert(emailCheck.message || "Email must contain '@' and '.' (e.g., name@domain.com).");
+        return;
+      }
+    }
+
+    // 3. Address validation (max 150 words)
+    const addressCheck = validateAddress(enquiryForm.address, 150);
+    if (!addressCheck.isValid) {
+      alert(addressCheck.message || 'Installation address cannot exceed 150 words.');
+      return;
+    }
+
     setLoading(true);
     try {
       // Blank / zero measurements mean "not known" and are sent as missing, never as values
       const body = Object.fromEntries(
-        Object.entries({ ...enquiryForm, roof_area_sqft: computedRoofArea }).map(([k, v]) => [k, v === '' || v === 0 ? undefined : v])
+        Object.entries({ ...enquiryForm, phone: sanitizePhone(enquiryForm.phone), roof_area_sqft: computedRoofArea }).map(([k, v]) => [k, v === '' || v === 0 ? undefined : v])
       );
       const res = await api.post<any>('/customer/enquiry', body);
       setNoticeMessage(res.message || 'Thank you! Our sales representative will contact you soon.');
@@ -880,14 +905,16 @@ export const CustomerPortalPage: React.FC = () => {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-gray-700 mb-1">Phone Number *</label>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Phone Number (10 digits) *</label>
                       <input
                         type="tel"
                         required
+                        maxLength={10}
+                        inputMode="numeric"
                         value={enquiryForm.phone}
-                        onChange={(e) => setEnquiryForm({ ...enquiryForm, phone: e.target.value })}
-                        className="w-full px-3 py-2 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-odoo-purple focus:border-odoo-purple"
-                        placeholder="Phone number"
+                        onChange={(e) => setEnquiryForm({ ...enquiryForm, phone: sanitizePhone(e.target.value) })}
+                        className="w-full px-3 py-2 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-odoo-purple focus:border-odoo-purple font-mono"
+                        placeholder="10-digit mobile number"
                       />
                     </div>
                     <div>
@@ -897,18 +924,25 @@ export const CustomerPortalPage: React.FC = () => {
                         value={enquiryForm.email}
                         onChange={(e) => setEnquiryForm({ ...enquiryForm, email: e.target.value })}
                         className="w-full px-3 py-2 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-odoo-purple focus:border-odoo-purple"
-                        placeholder="you@example.com"
+                        placeholder="you@domain.com"
                       />
                     </div>
                     <div className="sm:col-span-2">
-                      <label className="block text-xs font-semibold text-gray-700 mb-1">Installation Address *</label>
-                      <input
-                        type="text"
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="block text-xs font-semibold text-gray-700">Installation Address *</label>
+                        <span className={`text-[10px] ${countWords(enquiryForm.address) > 150 ? 'text-red-600 font-bold' : 'text-gray-400'}`}>
+                          {countWords(enquiryForm.address)} / 150 words {countWords(enquiryForm.address) > 150 && '(exceeds limit)'}
+                        </span>
+                      </div>
+                      <textarea
                         required
+                        rows={2}
                         value={enquiryForm.address}
                         onChange={(e) => setEnquiryForm({ ...enquiryForm, address: e.target.value })}
-                        className="w-full px-3 py-2 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-odoo-purple focus:border-odoo-purple"
-                        placeholder="House / Plot / Building Name & Street"
+                        className={`w-full px-3 py-2 text-xs border rounded focus:ring-1 focus:ring-odoo-purple focus:border-odoo-purple ${
+                          countWords(enquiryForm.address) > 150 ? 'border-red-400 bg-red-50/30' : 'border-gray-300'
+                        }`}
+                        placeholder="House / Plot / Building Name & Street (max 150 words)"
                       />
                     </div>
                     <div>
@@ -930,12 +964,15 @@ export const CustomerPortalPage: React.FC = () => {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-gray-700 mb-1">Postal PIN Code</label>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Postal PIN Code (6 digits)</label>
                       <input
                         type="text"
+                        maxLength={6}
+                        inputMode="numeric"
                         value={enquiryForm.pincode}
-                        onChange={(e) => setEnquiryForm({ ...enquiryForm, pincode: e.target.value })}
-                        className="w-full px-3 py-2 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-odoo-purple"
+                        onChange={(e) => setEnquiryForm({ ...enquiryForm, pincode: sanitizePincode(e.target.value) })}
+                        className="w-full px-3 py-2 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-odoo-purple font-mono"
+                        placeholder="6-digit PIN"
                       />
                     </div>
                     <div>

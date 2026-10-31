@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../../api/client';
 import { ControlPanel } from '../../components/odoo/ControlPanel';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { validateEmail, validatePassword, validatePhone, sanitizePhone } from '../../utils/validators';
 import {
   faUserShield,
   faPlus,
@@ -75,9 +76,36 @@ export const UsersPage: React.FC = () => {
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // 1. Email validation (must have @ and .)
+    const emailCheck = validateEmail(newUser.email);
+    if (!emailCheck.isValid) {
+      alert(emailCheck.message || "Email must contain '@' and '.' (e.g., name@domain.com).");
+      return;
+    }
+
+    // 2. Phone validation if filled (10 digits)
+    if (newUser.phone) {
+      const phoneCheck = validatePhone(newUser.phone);
+      if (!phoneCheck.isValid) {
+        alert(phoneCheck.message || 'Phone number must be exactly 10 digits.');
+        return;
+      }
+    }
+
+    // 3. Password validation if set (min 8 chars)
+    if (newUser.password) {
+      const pwdCheck = validatePassword(newUser.password);
+      if (!pwdCheck.isValid) {
+        alert(pwdCheck.message || 'Password must be at least 8 characters long.');
+        return;
+      }
+    }
+
     try {
       const res = await api.post<any>('/users', {
         ...newUser,
+        phone: newUser.phone ? sanitizePhone(newUser.phone) : undefined,
         role: newUser.role.toLowerCase(),
         hourly_rate: Number(newUser.hourly_rate),
         password: newUser.password || undefined,
@@ -137,11 +165,18 @@ export const UsersPage: React.FC = () => {
   const handleUpdateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedUser) return;
+    if (selectedUser.phone) {
+      const phoneCheck = validatePhone(selectedUser.phone);
+      if (!phoneCheck.isValid) {
+        alert(phoneCheck.message || 'Phone number must be exactly 10 digits.');
+        return;
+      }
+    }
     try {
       await api.put(`/users/${selectedUser.id}`, {
         full_name: selectedUser.full_name,
         role: selectedUser.role.toLowerCase(),
-        phone: selectedUser.phone,
+        phone: selectedUser.phone ? sanitizePhone(selectedUser.phone) : undefined,
         hourly_rate: Number(selectedUser.hourly_rate),
       });
       alert('User updated successfully!');
@@ -383,13 +418,15 @@ export const UsersPage: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-gray-700 font-semibold mb-1">Phone Number</label>
+                  <label className="block text-gray-700 font-semibold mb-1">Phone Number (10 digits)</label>
                   <input
                     type="tel"
+                    maxLength={10}
+                    inputMode="numeric"
                     value={newUser.phone}
-                    onChange={(e) => setNewUser({ ...newUser, phone: e.target.value })}
-                    placeholder="Phone number"
-                    className="w-full border border-gray-300 rounded px-3 py-2"
+                    onChange={(e) => setNewUser({ ...newUser, phone: sanitizePhone(e.target.value) })}
+                    placeholder="10-digit number"
+                    className="w-full border border-gray-300 rounded px-3 py-2 font-mono"
                   />
                 </div>
               </div>
@@ -401,15 +438,15 @@ export const UsersPage: React.FC = () => {
                   required
                   value={newUser.email}
                   onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-                  placeholder="name@company.com"
+                  placeholder="name@domain.com"
                   className="w-full border border-gray-300 rounded px-3 py-2"
                 />
               </div>
 
               <div>
-                <label className="block text-gray-700 font-semibold mb-1">Initial password</label>
+                <label className="block text-gray-700 font-semibold mb-1">Initial password (at least 8 chars)</label>
                 <input
-                  type="text"
+                  type="password"
                   minLength={8}
                   value={newUser.password}
                   onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
@@ -489,12 +526,15 @@ export const UsersPage: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-gray-700 font-semibold mb-1">Phone Number</label>
+                  <label className="block text-gray-700 font-semibold mb-1">Phone Number (10 digits)</label>
                   <input
                     type="tel"
+                    maxLength={10}
+                    inputMode="numeric"
                     value={selectedUser.phone || ''}
-                    onChange={(e) => setSelectedUser({ ...selectedUser, phone: e.target.value })}
-                    className="w-full border border-gray-300 rounded px-3 py-2"
+                    onChange={(e) => setSelectedUser({ ...selectedUser, phone: sanitizePhone(e.target.value) })}
+                    placeholder="10-digit number"
+                    className="w-full border border-gray-300 rounded px-3 py-2 font-mono"
                   />
                 </div>
               </div>

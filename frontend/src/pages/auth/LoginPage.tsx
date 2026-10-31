@@ -6,6 +6,7 @@ import { SiteFooter } from '../../components/layout/SiteFooter';
 import { ScriptHeading } from '../../components/common/ScriptHeading';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSignInAlt, faUserPlus } from '@fortawesome/free-solid-svg-icons';
+import { validateEmail, validatePassword, validatePhone, sanitizePhone } from '../../utils/validators';
 
 type Mode = 'login' | 'register' | 'forgot';
 
@@ -98,7 +99,20 @@ export const LoginPage: React.FC = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validate email
+    const emailCheck = validateEmail(email);
+    if (!emailCheck.isValid) {
+      setError(emailCheck.message || 'Please enter a valid email address with @ and domain dot.');
+      return;
+    }
+
     if (mode === 'login') {
+      const pwdCheck = validatePassword(password);
+      if (!pwdCheck.isValid) {
+        setError(pwdCheck.message || 'Password must be at least 8 characters long.');
+        return;
+      }
       run(async () => {
         signingIn.current = true;
         const u = await login(email.trim(), password);
@@ -110,8 +124,14 @@ export const LoginPage: React.FC = () => {
         navigate(getRoleHomePath(u.role));
       });
     } else if (mode === 'register') {
-      if (password.length < 8) {
-        setError('Password must be at least 8 characters');
+      const phoneCheck = validatePhone(phone);
+      if (!phoneCheck.isValid) {
+        setError(phoneCheck.message || 'Phone number must be exactly 10 digits.');
+        return;
+      }
+      const pwdCheck = validatePassword(password);
+      if (!pwdCheck.isValid) {
+        setError(pwdCheck.message || 'Password must be at least 8 characters long.');
         return;
       }
       run(async () => {
@@ -121,7 +141,7 @@ export const LoginPage: React.FC = () => {
           setNotice(`We emailed a 6-digit code to ${email.trim()}. Enter it below to create your account.`);
           return;
         }
-        const u = await register({ email: email.trim(), password, full_name: fullName, phone, otp: otp.trim() });
+        const u = await register({ email: email.trim(), password, full_name: fullName, phone: sanitizePhone(phone), otp: otp.trim() });
         navigate(getRoleHomePath(u.role));
       });
     } else {
@@ -197,16 +217,34 @@ export const LoginPage: React.FC = () => {
               {mode === 'register' && (
                 <>
                   <Field label="Full name">
-                    <input className={inputClass} value={fullName} onChange={(e) => setFullName(e.target.value)} required autoComplete="name" />
+                    <input className={inputClass} value={fullName} onChange={(e) => setFullName(e.target.value)} required autoComplete="name" placeholder="Your full name" />
                   </Field>
-                  <Field label="Phone">
-                    <input className={inputClass} value={phone} onChange={(e) => setPhone(e.target.value)} required autoComplete="tel" type="tel" />
+                  <Field label="Phone (10 digits)">
+                    <input
+                      className={inputClass}
+                      value={phone}
+                      onChange={(e) => setPhone(sanitizePhone(e.target.value))}
+                      required
+                      autoComplete="tel"
+                      type="tel"
+                      maxLength={10}
+                      inputMode="numeric"
+                      placeholder="10-digit mobile number"
+                    />
                   </Field>
                 </>
               )}
 
               <Field label="Email">
-                <input className={inputClass} value={email} onChange={(e) => setEmail(e.target.value)} required type="email" autoComplete="email" />
+                <input
+                  className={inputClass}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  type="email"
+                  autoComplete="email"
+                  placeholder="name@domain.com"
+                />
               </Field>
 
               {mode === 'register' && otpSent && (
@@ -231,14 +269,15 @@ export const LoginPage: React.FC = () => {
               )}
 
               {mode !== 'forgot' && (
-                <Field label="Password">
+                <Field label="Password (at least 8 characters)">
                   <input
                     className={inputClass}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
                     type="password"
-                    minLength={mode === 'register' ? 8 : undefined}
+                    minLength={8}
+                    placeholder="Min. 8 characters"
                     autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                   />
                 </Field>

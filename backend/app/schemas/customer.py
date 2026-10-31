@@ -1,10 +1,11 @@
+import re
 from typing import Optional, List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class CustomerEnquiryCreate(BaseModel):
     name: str = Field(..., min_length=2, max_length=255)
-    phone: str = Field(..., min_length=7, max_length=32)
+    phone: str = Field(...)
     email: Optional[str] = None
     address: str = Field(..., min_length=5)
     city: Optional[str] = None
@@ -22,6 +23,45 @@ class CustomerEnquiryCreate(BaseModel):
     preferred_system_type: str = "On-Grid"
     preferred_capacity_kw: float = 3.0
     notes: Optional[str] = None
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v: str) -> str:
+        digits = re.sub(r"\D", "", v or "")
+        if digits.startswith("91") and len(digits) == 12:
+            digits = digits[2:]
+        elif len(digits) > 10:
+            digits = digits[-10:]
+        if len(v or "") < 5:
+            raise ValueError("Phone number must have at least 5 characters")
+        return digits if len(digits) >= 5 else v
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, v: Optional[str]) -> Optional[str]:
+        if v:
+            v = v.strip()
+            if "@" not in v or "." not in v.split("@")[-1]:
+                raise ValueError("Email must contain '@' and '.' with a valid domain (e.g. name@domain.com)")
+        return v
+
+    @field_validator("address")
+    @classmethod
+    def validate_address(cls, v: str) -> str:
+        words = len(v.strip().split())
+        if words > 150:
+            raise ValueError(f"Address cannot exceed 150 words (currently {words} words)")
+        return v
+
+    @field_validator("pincode")
+    @classmethod
+    def validate_pincode(cls, v: Optional[str]) -> Optional[str]:
+        if v:
+            digits = re.sub(r"\D", "", v)
+            if digits and len(digits) != 6:
+                raise ValueError("PIN code must be 6 digits")
+            return digits
+        return v
 
 
 class CustomerEnquiryResponse(BaseModel):

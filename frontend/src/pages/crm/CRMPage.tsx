@@ -7,6 +7,7 @@ import { KanbanView, KanbanColumn, KanbanItem } from '../../components/odoo/Kanb
 import { ListView, ColumnDef } from '../../components/odoo/ListView';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faDolly, faCheckCircle, faCalendarCheck } from '@fortawesome/free-solid-svg-icons';
+import { validateEmail, validatePhone, sanitizePhone, validateAddress, countWords } from '../../utils/validators';
 
 export const CRMPage: React.FC = () => {
   const [leads, setLeads] = useState<any[]>([]);
@@ -135,8 +136,35 @@ export const CRMPage: React.FC = () => {
 
   const handleCreateLead = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // 1. Phone number check (10 digits)
+    const phoneCheck = validatePhone(newLead.phone);
+    if (!phoneCheck.isValid) {
+      alert(phoneCheck.message || 'Phone number must be exactly 10 digits.');
+      return;
+    }
+
+    // 2. Email check (must contain @ and .)
+    if (newLead.email) {
+      const emailCheck = validateEmail(newLead.email, false);
+      if (!emailCheck.isValid) {
+        alert(emailCheck.message || "Email must contain '@' and '.' (e.g., name@domain.com).");
+        return;
+      }
+    }
+
+    // 3. Address check (max 150 words)
+    const addressCheck = validateAddress(newLead.address, 150);
+    if (!addressCheck.isValid) {
+      alert(addressCheck.message || 'Address cannot exceed 150 words.');
+      return;
+    }
+
     try {
-      await api.post('/leads/public', newLead);
+      await api.post('/leads/public', {
+        ...newLead,
+        phone: sanitizePhone(newLead.phone),
+      });
       setShowCreateModal(false);
       setNewLead({
         name: '',
@@ -328,14 +356,16 @@ export const CRMPage: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-gray-700 font-semibold mb-1">Phone Number *</label>
+                  <label className="block text-gray-700 font-semibold mb-1">Phone Number (10 digits) *</label>
                   <input
-                    type="text"
+                    type="tel"
                     required
+                    maxLength={10}
+                    inputMode="numeric"
                     value={newLead.phone}
-                    onChange={(e) => setNewLead({ ...newLead, phone: e.target.value })}
-                    placeholder="9876543210"
-                    className="w-full border border-gray-300 rounded px-2.5 py-1.5 focus:border-odoo-primary focus:outline-none"
+                    onChange={(e) => setNewLead({ ...newLead, phone: sanitizePhone(e.target.value) })}
+                    placeholder="10-digit number"
+                    className="w-full border border-gray-300 rounded px-2.5 py-1.5 focus:border-odoo-primary focus:outline-none font-mono"
                   />
                 </div>
                 <div>
@@ -344,21 +374,28 @@ export const CRMPage: React.FC = () => {
                     type="email"
                     value={newLead.email}
                     onChange={(e) => setNewLead({ ...newLead, email: e.target.value })}
-                    placeholder="ramesh@example.com"
+                    placeholder="name@domain.com"
                     className="w-full border border-gray-300 rounded px-2.5 py-1.5 focus:border-odoo-primary focus:outline-none"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-gray-700 font-semibold mb-1">Installation Address *</label>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="block text-gray-700 font-semibold">Installation Address *</label>
+                  <span className={`text-[10px] ${countWords(newLead.address) > 150 ? 'text-red-600 font-bold' : 'text-gray-400'}`}>
+                    {countWords(newLead.address)} / 150 words {countWords(newLead.address) > 150 && '(exceeds limit)'}
+                  </span>
+                </div>
                 <textarea
                   required
                   rows={2}
                   value={newLead.address}
                   onChange={(e) => setNewLead({ ...newLead, address: e.target.value })}
-                  placeholder="House No, Sector, City"
-                  className="w-full border border-gray-300 rounded px-2.5 py-1.5 focus:border-odoo-primary focus:outline-none"
+                  placeholder="House No, Sector, City (max 150 words)"
+                  className={`w-full border rounded px-2.5 py-1.5 focus:border-odoo-primary focus:outline-none ${
+                    countWords(newLead.address) > 150 ? 'border-red-400 bg-red-50/30' : 'border-gray-300'
+                  }`}
                 />
               </div>
 

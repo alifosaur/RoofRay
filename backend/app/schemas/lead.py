@@ -1,6 +1,7 @@
+import re
 from datetime import datetime
 from typing import Optional, List
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 from app.models.lead import LeadStatus
 from app.schemas.survey import SurveyOut
 
@@ -13,6 +14,35 @@ class LeadPublicCreate(BaseModel):
     required_capacity: float = 3.0
     system_type: str = "On-Grid"
     notes: Optional[str] = None
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v: str) -> str:
+        digits = re.sub(r"\D", "", v or "")
+        if digits.startswith("91") and len(digits) == 12:
+            digits = digits[2:]
+        elif len(digits) > 10:
+            digits = digits[-10:]
+        if len(v or "") < 5:
+            raise ValueError("Phone number must have at least 5 characters")
+        return digits if len(digits) >= 5 else v
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, v: Optional[str]) -> Optional[str]:
+        if v:
+            v = v.strip()
+            if "@" not in v or "." not in v.split("@")[-1]:
+                raise ValueError("Email must contain '@' and '.' with a valid domain (e.g. name@domain.com)")
+        return v
+
+    @field_validator("address")
+    @classmethod
+    def validate_address(cls, v: str) -> str:
+        words = len(v.strip().split())
+        if words > 150:
+            raise ValueError(f"Address cannot exceed 150 words (currently {words} words)")
+        return v
 
 
 class LeadUpdate(BaseModel):

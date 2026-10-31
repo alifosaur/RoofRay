@@ -237,7 +237,8 @@ def _compute_director_metrics(db: Session, date_range: str, granularity: str) ->
     for e in expenses:
         add(datetime.combine(e.expense_date, datetime.min.time()), "spent", e.amount)
 
-    profit_series = [{"period": k, **v} for k, v in sorted(series.items())]
+    has_activity = bool(jobs or payments or expenses)
+    profit_series = [{"period": k, **v} for k, v in sorted(series.items())] if has_activity else []
 
     unfinished_by_stage = {
         "new_leads": db.query(Lead).filter(Lead.status == LeadStatus.NEW, Lead.is_deleted == False).count(),

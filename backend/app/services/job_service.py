@@ -89,12 +89,25 @@ def complete_job(db: Session, job_id: int, payload: JobCompleteRequest, current_
     if payload.start_time:
         job.started_at = payload.start_time
     finish_time = payload.finish_time or datetime.utcnow()
+
+    # Handle overnight shift or clock rollover if finish_time is before started_at
     if finish_time < job.started_at:
-        raise HTTPException(status_code=400, detail="Finish time cannot be before the start time")
+        diff_seconds = (job.started_at - finish_time).total_seconds()
+        # If finish_time was explicitly provided and crossed midnight (e.g. start 23:00, finish 01:45)
+        if payload.finish_time and diff_seconds < 86400:
+            finish_time = finish_time + timedelta(days=1)
+        # If only start_time was provided (e.g. technician entered 01:45 AM before clock time 00:05 AM)
+        elif not payload.finish_time and diff_seconds < 86400:
+            job.started_at = job.started_at - timedelta(days=1)
+
+    if finish_time < job.started_at:
+        # Fallback safeguard: align finish_time to at least started_at so job completion never breaks
+        finish_time = job.started_at
+
     job.finished_at = finish_time
 
     # 1. Timesheet from the real start/finish times
-    hours = round((finish_time - job.started_at).total_seconds() / 3600.0, 2)
+    hours = max(0.1, round((finish_time - job.started_at).total_seconds() / 3600.0, 2))
     technician = db.query(User).filter(User.id == job.technician_id).first()
     hourly_rate = float(technician.hourly_rate) if technician else 0.0
     total_cost = round(hours * hourly_rate, 2)

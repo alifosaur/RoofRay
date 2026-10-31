@@ -15,6 +15,7 @@ import {
   faMapMarkerAlt,
   faSignature,
   faHardHat,
+  faClock,
 } from '@fortawesome/free-solid-svg-icons';
 
 export const TechnicianPWAPage: React.FC = () => {
@@ -30,14 +31,73 @@ export const TechnicianPWAPage: React.FC = () => {
   // Form states for installation job completion
   const [powerGenPassed, setPowerGenPassed] = useState(true);
   const [capacityKw, setCapacityKw] = useState<number>(0);
-  // "HH:MM" on the day the job was started; blank = keep the time the Start button was pressed
+
+  // Time handling: Start and Finish times (HH:MM)
+  const pad2 = (n: number) => String(n).padStart(2, '0');
+  const dateToTimeString = (d: Date) => `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+
   const [startTime, setStartTime] = useState('');
-  const startTimeIso = () => {
-    if (!startTime || !activeJob) return undefined;
-    const base = activeJob.started_at ? new Date(activeJob.started_at + 'Z') : new Date();
-    const [h, m] = startTime.split(':').map(Number);
-    base.setHours(h, m, 0, 0);
-    return base.toISOString();
+  const [finishTime, setFinishTime] = useState('');
+
+  // Auto-populate when job is in progress
+  useEffect(() => {
+    if (activeJob?.started_at) {
+      const raw = activeJob.started_at;
+      const sDate = new Date(raw.endsWith('Z') ? raw : raw + 'Z');
+      setStartTime(dateToTimeString(sDate));
+    }
+    setFinishTime(dateToTimeString(new Date()));
+  }, [activeJob?.id, activeJob?.started_at, activeJob?.status]);
+
+  const handleSetFinishNow = () => {
+    setFinishTime(dateToTimeString(new Date()));
+  };
+
+  const timesheetPreview = React.useMemo(() => {
+    if (!startTime || !finishTime) return null;
+    const [sh, sm] = startTime.split(':').map(Number);
+    const [fh, fm] = finishTime.split(':').map(Number);
+    if (isNaN(sh) || isNaN(sm) || isNaN(fh) || isNaN(fm)) return null;
+    let startMins = sh * 60 + sm;
+    let finishMins = fh * 60 + fm;
+    let isOvernight = false;
+    if (finishMins < startMins) {
+      finishMins += 24 * 60;
+      isOvernight = true;
+    }
+    const diff = finishMins - startMins;
+    const hours = Math.floor(diff / 60);
+    const mins = diff % 60;
+    const decimalHours = Math.max(0.1, Math.round((diff / 60) * 100) / 100);
+    return { hours, mins, decimalHours, isOvernight };
+  }, [startTime, finishTime]);
+
+  const buildIsoTimestamps = () => {
+    if (!activeJob) return { start_time: undefined, finish_time: undefined };
+    const rawStarted = activeJob.started_at;
+    const baseDate = rawStarted
+      ? new Date(rawStarted.endsWith('Z') ? rawStarted : rawStarted + 'Z')
+      : new Date();
+
+    const [sh, sm] = (startTime || dateToTimeString(baseDate)).split(':').map(Number);
+    const startDate = new Date(baseDate);
+    if (!isNaN(sh) && !isNaN(sm)) {
+      startDate.setHours(sh, sm, 0, 0);
+    }
+
+    const [fh, fm] = (finishTime || dateToTimeString(new Date())).split(':').map(Number);
+    const finishDate = new Date(startDate);
+    if (!isNaN(fh) && !isNaN(fm)) {
+      finishDate.setHours(fh, fm, 0, 0);
+      if (finishDate.getTime() < startDate.getTime()) {
+        finishDate.setDate(finishDate.getDate() + 1);
+      }
+    }
+
+    return {
+      start_time: startDate.toISOString(),
+      finish_time: finishDate.toISOString(),
+    };
   };
   const [notes, setNotes] = useState('');
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -190,6 +250,7 @@ export const TechnicianPWAPage: React.FC = () => {
     }
 
     const signatureDataUrl = sigPadRef.current?.toDataURL('image/png') || '';
+    const { start_time, finish_time } = buildIsoTimestamps();
 
     try {
       setSubmitting(true);
@@ -198,7 +259,8 @@ export const TechnicianPWAPage: React.FC = () => {
         power_generating: powerGenPassed,
         signature_data: signatureDataUrl,
         customer_name: activeJob.customer_name,
-        start_time: startTimeIso(),
+        start_time,
+        finish_time,
         notes: notes || undefined,
       });
       alert('Installation job marked COMPLETED! Timesheet generated.');
@@ -382,16 +444,65 @@ export const TechnicianPWAPage: React.FC = () => {
             {/* In-Progress Installation Workflow */}
             {activeJob.status === 'IN_PROGRESS' && (
               <form onSubmit={handleCompleteJob} className="space-y-4">
-                <label className="block text-xs text-gray-300 font-semibold bg-slate-800 rounded-2xl p-4 border border-slate-700">
-                  Start time (optional: change only if you started earlier than you pressed Start)
-                  <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white mt-1" />
-                  {activeJob.started_at && (
-                    <span className="block text-[11px] text-gray-400 mt-1 font-normal">
-                      Started at {new Date(activeJob.started_at + 'Z').toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  )}
-                </label>
+                {/* Step 0: Shift Timesheet (Start & Finish times) */}
+                <div className="bg-slate-800 rounded-2xl p-4 border border-slate-700 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-gray-300 flex items-center gap-1.5">
+                      <FontAwesomeIcon icon={faClock} className="text-amber-400" />
+                      <span>Shift Hours & Timesheet</span>
+                    </h4>
+                    {timesheetPreview && (
+                      <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-950/80 text-emerald-400 border border-emerald-500/40">
+                        ⏱️ {timesheetPreview.hours}h {timesheetPreview.mins}m ({timesheetPreview.decimalHours} hrs)
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] text-gray-400 font-semibold mb-1">
+                        Start Time
+                      </label>
+                      <input
+                        type="time"
+                        value={startTime}
+                        onChange={(e) => setStartTime(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-2 text-white text-xs font-bold"
+                      />
+                      {activeJob.started_at && (
+                        <span className="block text-[10px] text-gray-400 mt-1 truncate">
+                          Clocked: {new Date(activeJob.started_at.endsWith('Z') ? activeJob.started_at : activeJob.started_at + 'Z').toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      )}
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="text-[11px] text-gray-400 font-semibold">
+                          Finish Time
+                        </label>
+                        <button
+                          type="button"
+                          onClick={handleSetFinishNow}
+                          className="text-[10px] text-amber-400 hover:text-amber-300 underline font-medium"
+                        >
+                          Now
+                        </button>
+                      </div>
+                      <input
+                        type="time"
+                        value={finishTime}
+                        onChange={(e) => setFinishTime(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-2 text-white text-xs font-bold"
+                      />
+                      {timesheetPreview?.isOvernight && (
+                        <span className="block text-[10px] text-teal-400 mt-1">
+                          🌙 Overnight shift (+1 day)
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
                 {/* Step 1: Photos */}
                 <div className="bg-slate-800 rounded-2xl p-4 border border-slate-700">
                   <div className="flex justify-between items-center mb-3">

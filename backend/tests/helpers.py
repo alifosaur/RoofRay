@@ -25,7 +25,10 @@ def confirm_with_advance(client, order_id, headers=SALES, fraction=0.3):
         "amount": round(order["total_amount"] * fraction, 2), "method": "UPI", "transaction_ref": "ADV-TEST",
     })
     assert pay.status_code == 201, pay.text
-    return client.post(f"/api/orders/{order_id}/confirm", headers=headers)
+    # Orders are confirmed on quote acceptance; confirm only if still a draft
+    if client.get(f"/api/orders/{order_id}", headers=headers).json()["status"] == "DRAFT":
+        return client.post(f"/api/orders/{order_id}/confirm", headers=headers)
+    return client.get(f"/api/orders/{order_id}", headers=headers)
 
 
 def scan_all_serials(client, order_id, headers=WAREHOUSE):

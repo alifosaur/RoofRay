@@ -206,9 +206,19 @@ def accept_quote(db: Session, quote_id: int, current_user_id: int) -> Order:
         link=f"/web/orders/{order.id}",
     )
 
+    # Competing quotes for the same enquiry are closed so only one order reaches the warehouse
+    for other in db.query(Quote).filter(Quote.lead_id == quote.lead_id, Quote.id != quote.id,
+                                        Quote.status.in_([QuoteStatus.DRAFT, QuoteStatus.SENT])).all():
+        other.status = QuoteStatus.REJECTED
+        db.add(AuditLog(record_type="quote", record_id=other.id, action="QUOTE_SUPERSEDED", from_status=QuoteStatus.SENT.value,
+                        to_status=QuoteStatus.REJECTED.value, notes=f"Superseded by accepted {quote.quote_number}.",
+                        user_id=current_user_id))
+
     db.commit()
     db.refresh(order)
-    return order
+    # Acceptance confirms the order: pick list to the warehouse, invoice issued; payments are recorded afterwards
+    from app.services import order_service
+    return order_service.confirm_order(db, order.id, current_user_id, require_payment=False)
 
 
 def _recompute_totals(quote: Quote) -> None:

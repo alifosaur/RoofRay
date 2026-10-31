@@ -30,8 +30,8 @@ Read `README.md` for setup, the role matrix and the workflow diagram.
 | Survey COMPLETED | approve / reject (sales owner, admin) | APPROVED → lead SURVEY_APPROVED / REJECTED → lead LOST | only for surveys the technician did not approve |
 | Survey APPROVED | create quote from BOM template (sales) | Quote DRAFT (lead stays SURVEY_APPROVED) | **no quote before approval** |
 | Quote DRAFT | edit BOM lines; send (sales) | SENT, lead QUOTED (auto) | only drafts are editable |
-| Quote SENT | accept (customer or sales recording it) | ACCEPTED → Order DRAFT, lead WON | one order per lead |
-| Order DRAFT | record payment; confirm (sales) | CONFIRMED + pick list + install job + invoice + subsidy record | **payment > 0 required** |
+| Quote SENT | accept (customer or sales recording it) | ACCEPTED, lead WON, order CONFIRMED + pick list to warehouse + install job + invoice + subsidy record; other open quotes for the lead → REJECTED | one order per lead |
+| Order CONFIRMED+ | record payments (sales) | invoice PAID / order CLOSED when fully paid after install | payment ≤ balance |
 | Order CONFIRMED/PACKING | scan serials (warehouse) | first scan → PACKING | Redis lock + unique serial; serial must be IN_STOCK and in the BOM |
 | PACKING → PACKED → DISPATCHED → OUT_FOR_DELIVERY → DELIVERED | warehouse | next stage only | **PACKED and DELIVERED need every serialised item scanned**; packing deducts stock |
 | Order DELIVERED | — | warranty start/end computed; install job released to technician | never typed by hand |

@@ -146,7 +146,7 @@ def test_quote_survey_approval_gate(setup_catalog):
     accept_res = send_and_accept(client, quote['id'], sales_headers)
     assert accept_res.status_code == 200
     data = accept_res.json()
-    assert data["status"] == "DRAFT"
+    assert data["status"] == "CONFIRMED"  # acceptance confirms the order and releases the pick list
     assert "SO-" in data["order_number"]
 
     # Assert lead marked WON

@@ -14,7 +14,7 @@ from app.schemas.order import PaymentCreate
 from app.core import events
 
 
-def confirm_order(db: Session, order_id: int, current_user_id: int) -> Order:
+def confirm_order(db: Session, order_id: int, current_user_id: int, require_payment: bool = True) -> Order:
     order = db.query(Order).filter(Order.id == order_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
@@ -24,7 +24,7 @@ def confirm_order(db: Session, order_id: int, current_user_id: int) -> Order:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Only DRAFT orders can be confirmed. Current status: {order.status.value}",
         )
-    if order.paid_amount <= 0:
+    if require_payment and order.paid_amount <= 0:
         raise HTTPException(status_code=400, detail="Record the customer's advance or full payment before confirming the order")
 
     order.status = OrderStatus.CONFIRMED

@@ -94,9 +94,8 @@ flowchart TD
   S3 -->|reject| LOST
   S3 -->|approve| Q1
   Q1 --> Q2[Send PDF to customer: lead QUOTED]
-  Q2 --> Q3[Customer accepts: lead WON, DRAFT order]
-  Q3 --> P1[Advance / full payment recorded]
-  P1 --> O1[Order CONFIRMED → pick list + invoice + subsidy record]
+  Q2 --> O1[Customer accepts: lead WON, order CONFIRMED → pick list to warehouse + invoice + subsidy record]
+  O1 -.-> P1[Payments recorded any time]
   O1 --> W1[Warehouse: scan serials → PACKING]
   W1 --> W2[PACKED → DISPATCHED → OUT_FOR_DELIVERY → DELIVERED]
   W2 -->|warranty dates set, job released| T2[Technician: start, photos, signature, complete]
@@ -109,7 +108,7 @@ flowchart TD
 
 1. A quotation cannot be created before the survey is **APPROVED**. The technician approves it on submission by confirming feasibility; otherwise sales reviews it.
 2. A quotation can only be accepted after it was **sent**; one order per lead.
-3. An order cannot be confirmed without a **recorded payment**.
+3. Accepting a quote confirms the order and sends its pick list to the warehouse; other open quotes for that enquiry are rejected.
 4. Serials are scanned while packing; duplicates and serials already assigned to another order are rejected (Redis lock + unique `serial_no`).
 5. **PACKED** and **DELIVERED** require every serialised BOM item to be scanned; stages cannot be skipped.
 6. Warranty start = delivery date, end = start + product warranty years. Never typed.

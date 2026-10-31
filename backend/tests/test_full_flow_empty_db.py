@@ -150,12 +150,11 @@ def test_complete_chain_from_empty_database(client):
     order_id = client.post(f"/api/customer/quotes/{quote['id']}/accept", headers=cust).json()["order_id"]
     assert client.get(f"/api/leads/{lead_id}", headers=sales).json()["status"] == "WON"
 
-    # ---- Payment before confirmation; confirmation sends the pick list to the warehouse
-    assert client.post(f"/api/orders/{order_id}/confirm", headers=sales).status_code == 400
+    # ---- Acceptance confirms the order and sends the pick list to the warehouse; payment follows
     order = client.get(f"/api/orders/{order_id}", headers=sales).json()
+    assert order["status"] == "CONFIRMED" and order["pick_list_id"]
     advance_amt = round(order["total_amount"] * 0.4, 2)
     assert client.post(f"/api/orders/{order_id}/payments", headers=sales, json={"amount": advance_amt, "method": "UPI"}).status_code == 201
-    assert client.post(f"/api/orders/{order_id}/confirm", headers=sales).json()["status"] == "CONFIRMED"
     assert any(n["title"] == "New pick list" for n in client.get("/api/notifications", headers=wh).json()["items"])
     invoice = client.get(f"/api/finance/invoices?order_id={order_id}", headers=admin).json()[0]
     assert invoice["invoice_type"] == "SALES" and invoice["status"] == "ISSUED"

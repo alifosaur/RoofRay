@@ -9,7 +9,7 @@ from app.models.audit import AuditLog
 from app.models.user import User, UserRole
 from app.models.survey import Survey, SurveyStatus
 from app.models.job import InstallationJob, JobStatus
-from app.schemas.user import StaffCreateRequest, StaffCreateResponse, UserUpdate, UserOut
+from app.schemas.user import AdminSetPasswordRequest, StaffCreateRequest, StaffCreateResponse, UserUpdate, UserOut
 from app.services import audit_service
 
 router = APIRouter(prefix="/users", tags=["Users"])
@@ -57,6 +57,8 @@ def create_user(
         hourly_rate=payload.hourly_rate if payload.role == UserRole.TECHNICIAN else 0,
         is_active=payload.is_active,
     )
+    if payload.password:
+        security.set_account_password(user, payload.password)
     db.add(user)
     db.flush()
     db.add(AuditLog(record_type="user", record_id=user.id, action="USER_CREATED", to_status=user.role.value,
@@ -64,9 +66,29 @@ def create_user(
     db.commit()
     db.refresh(user)
     setup_url = None
-    if security.AUTH_MODE == "local":
+    if security.AUTH_MODE == "local" and not payload.password:
         setup_url = f"/set-password?token={security.issue_password_setup_token(user.firebase_uid)}"
     return StaffCreateResponse(user=user, auth_mode=security.AUTH_MODE, password_setup_url=setup_url)
+
+
+@router.post("/{user_id}/password")
+def admin_set_password(
+    user_id: int,
+    payload: AdminSetPasswordRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.ADMIN)),
+):
+    """Admin sets or resets a staff member's password (e.g. when the setup link was not used)."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.role == UserRole.CUSTOMER:
+        raise HTTPException(status_code=400, detail="Customers manage their own password")
+    security.set_account_password(user, payload.password)
+    db.add(AuditLog(record_type="user", record_id=user.id, action="PASSWORD_SET_BY_ADMIN",
+                    notes=f"Password set by {current_user.email}.", user_id=current_user.id))
+    db.commit()
+    return {"ok": True}
 
 
 @router.get("/technicians/availability")

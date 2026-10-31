@@ -97,6 +97,14 @@ def verify_firebase_token(token: str) -> dict:
     return {"uid": decode_local_token(token, "session")}
 
 
+def set_account_password(user, password: str) -> None:
+    """Admin-set password: Firebase account password, or the local password hash."""
+    if AUTH_MODE == "firebase":
+        fb_auth.update_user(user.firebase_uid, password=password)
+    else:
+        user.password_hash = hash_password(password)
+
+
 def create_auth_account(email: str, full_name: str) -> str:
     """Creates (or reuses) the identity-provider account for a staff member and returns its UID."""
     if AUTH_MODE == "firebase":

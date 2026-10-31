@@ -64,7 +64,9 @@ export const LoginPage: React.FC = () => {
   const [pincode, setPincode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(
+    new URLSearchParams(window.location.search).has('password_set') ? 'Password set. Select your role and sign in.' : null
+  );
 
   // Already signed in: go straight to the role's workspace
   useEffect(() => {

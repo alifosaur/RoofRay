@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useAuth, getRoleHomePath } from '../../context/AuthContext';
+import { api } from '../../api/client';
 import { SiteNavbar } from '../../components/layout/SiteNavbar';
 import { SiteFooter } from '../../components/layout/SiteFooter';
 
@@ -9,7 +9,6 @@ export const SetPasswordPage: React.FC = () => {
   const [params] = useSearchParams();
   const token = params.get('token') || '';
   const navigate = useNavigate();
-  const { completePasswordSetup } = useAuth();
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -22,8 +21,9 @@ export const SetPasswordPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const user = await completePasswordSetup(token, password);
-      navigate(getRoleHomePath(user.role), { replace: true });
+      // Only sets the password; does not sign in, so an admin opening the link keeps their own session
+      await api.post('/auth/set-password', { token, password });
+      navigate('/login?password_set=1', { replace: true });
     } catch (err: any) {
       setError(err.message || 'This link is invalid or has expired. Ask an administrator for a new one.');
     } finally {

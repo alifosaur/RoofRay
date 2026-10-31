@@ -210,3 +210,20 @@ def test_warehouse_cannot_view_unconfirmed_draft_orders():
     for o in wh_orders:
         assert o["status"] in ["CONFIRMED", "PACKED", "DISPATCHED", "DELIVERED"]
 
+
+
+def test_admin_can_set_staff_password_directly():
+    email = f"direct_{uuid.uuid4().hex[:6]}@example.com"
+    res = client.post("/api/users", headers=admin_headers, json={
+        "email": email, "full_name": "Direct Sales", "role": "sales", "password": "initial-pass-1"})
+    assert res.status_code == 201 and res.json()["password_setup_url"] is None
+    assert client.post("/api/auth/login", json={"email": email, "password": "initial-pass-1"}).status_code == 200
+
+    uid = res.json()["user"]["id"]
+    assert client.post(f"/api/users/{uid}/password", headers=customer_headers, json={"password": "x" * 8}).status_code == 403
+    assert client.post(f"/api/users/{uid}/password", headers=admin_headers, json={"password": "short"}).status_code == 422
+    assert client.post(f"/api/users/{uid}/password", headers=admin_headers, json={"password": "reset-pass-2"}).status_code == 200
+    assert client.post("/api/auth/login", json={"email": email, "password": "initial-pass-1"}).status_code == 401
+    assert client.post("/api/auth/login", json={"email": email, "password": "reset-pass-2"}).status_code == 200
+    # Leave no extra active sales user behind (leads are round-robined across active sales users)
+    client.put(f"/api/users/{uid}", headers=admin_headers, json={"is_active": False})

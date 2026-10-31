@@ -34,7 +34,6 @@ interface AuthContextType {
   register: (payload: RegisterPayload) => Promise<UserProfile>;
   requestPasswordReset: (email: string) => Promise<void>;
   sendStaffPasswordEmail: (email: string) => Promise<void>;
-  completePasswordSetup: (token: string, password: string) => Promise<UserProfile>;
   logout: () => Promise<void>;
 }
 
@@ -146,13 +145,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (fb.current) await fb.current.sdk.sendPasswordResetEmail(fb.current.auth, email);
   };
 
-  const completePasswordSetup = async (token: string, password: string) => {
-    const res = await api.post<{ access_token: string; user: UserProfile }>('/auth/set-password', { token, password });
-    localStorage.setItem(TOKEN_KEY, res.access_token);
-    setUser(res.user);
-    return res.user;
-  };
-
   const logout = async () => {
     if (fb.current) await fb.current.sdk.signOut(fb.current.auth);
     localStorage.removeItem(TOKEN_KEY);
@@ -170,7 +162,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         register,
         requestPasswordReset,
         sendStaffPasswordEmail,
-        completePasswordSetup,
         logout,
       }}
     >

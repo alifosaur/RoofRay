@@ -63,11 +63,16 @@ class StaffCreateRequest(BaseModel):
     phone: Optional[str] = None
     hourly_rate: int = 0
     is_active: bool = True
+    password: Optional[str] = Field(default=None, min_length=8)  # optional initial password set by the admin
 
     @field_validator("role", mode="before")
     @classmethod
     def parse_role(cls, v: Any) -> Any:
         return v.lower() if isinstance(v, str) else v
+
+
+class AdminSetPasswordRequest(BaseModel):
+    password: str = Field(min_length=8)
 
 
 class UserLoginRequest(BaseModel):

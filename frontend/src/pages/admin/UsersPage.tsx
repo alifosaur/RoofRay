@@ -49,10 +49,11 @@ export const UsersPage: React.FC = () => {
     role: 'sales',
     phone: '',
     hourly_rate: 0,
+    password: '',
   });
   const { sendStaffPasswordEmail } = useAuth();
   const openCreate = (role: string) => {
-    setNewUser({ email: '', full_name: '', role, phone: '', hourly_rate: 0 });
+    setNewUser({ email: '', full_name: '', role, phone: '', hourly_rate: 0, password: '' });
     setShowCreateModal(true);
   };
   const [setupLink, setSetupLink] = useState<string | null>(null);
@@ -81,25 +82,37 @@ export const UsersPage: React.FC = () => {
         ...newUser,
         role: newUser.role.toLowerCase(),
         hourly_rate: Number(newUser.hourly_rate),
+        password: newUser.password || undefined,
         is_active: true,
       });
-      if (res.auth_mode === 'firebase') {
+      if (newUser.password) {
+        alert(`${newUser.full_name} created. They can sign in now with ${newUser.email} and the password you set.`);
+      } else if (res.auth_mode === 'firebase') {
         await sendStaffPasswordEmail(newUser.email);
         alert(`${newUser.full_name} created. A password setup email has been sent to ${newUser.email}.`);
       } else {
         setSetupLink(`${window.location.origin}${res.password_setup_url}`);
       }
       setShowCreateModal(false);
-      setNewUser({
-        email: '',
-        full_name: '',
-        role: 'sales',
-        phone: '',
-        hourly_rate: 0,
-      });
+      setNewUser({ email: '', full_name: '', role: 'sales', phone: '', hourly_rate: 0, password: '' });
       fetchUsers();
     } catch (err: any) {
       alert(err.message || 'Failed to create user');
+    }
+  };
+
+  const handleSetPassword = async (u: UserItem) => {
+    const pwd = window.prompt(`New password for ${u.full_name} (${u.email}), at least 8 characters:`);
+    if (pwd === null) return;
+    if (pwd.length < 8) {
+      alert('Password must be at least 8 characters.');
+      return;
+    }
+    try {
+      await api.post(`/users/${u.id}/password`, { password: pwd });
+      alert(`Password updated. ${u.full_name} can now sign in with ${u.email}.`);
+    } catch (err: any) {
+      alert(err.message || 'Failed to set password');
     }
   };
 
@@ -184,10 +197,13 @@ export const UsersPage: React.FC = () => {
 
       {setupLink && (
         <div className="mx-6 mt-3 p-3 bg-emerald-50 border border-emerald-200 rounded text-xs text-emerald-900">
-          <div className="font-bold mb-1">Staff account created. Share this one-time password setup link (valid 48 hours):</div>
+          <div className="font-bold mb-1">
+            Staff account created. This is a LINK, not a password: the staff member must open it in their browser and choose a password there (valid 48 hours).
+          </div>
           <div className="flex items-center gap-2">
             <code className="flex-1 break-all bg-white border border-emerald-200 rounded px-2 py-1">{setupLink}</code>
-            <button onClick={() => navigator.clipboard.writeText(setupLink)} className="px-2 py-1 bg-emerald-700 text-white rounded">Copy</button>
+            <button onClick={() => navigator.clipboard.writeText(setupLink)} className="px-2 py-1 bg-emerald-700 text-white rounded">Copy link</button>
+            <a href={setupLink} target="_blank" rel="noreferrer" className="px-2 py-1 border border-emerald-300 rounded">Open</a>
             <button onClick={() => setSetupLink(null)} className="px-2 py-1 border border-emerald-300 rounded">Dismiss</button>
           </div>
         </div>
@@ -281,6 +297,15 @@ export const UsersPage: React.FC = () => {
                             >
                               <FontAwesomeIcon icon={faEdit} />
                             </button>
+                            {u.role !== 'customer' && (
+                              <button
+                                onClick={() => handleSetPassword(u)}
+                                className="px-2 py-1 text-gray-600 hover:text-odoo-primary border border-gray-200 rounded hover:bg-gray-50 text-[11px]"
+                                title="Set a new password"
+                              >
+                                <i className="fa-solid fa-key"></i>
+                              </button>
+                            )}
                             <button
                               onClick={() => handleToggleActive(u)}
                               className={`px-2 py-1 border rounded text-[11px] ${
@@ -362,6 +387,20 @@ export const UsersPage: React.FC = () => {
                   placeholder="name@company.com"
                   className="w-full border border-gray-300 rounded px-3 py-2"
                 />
+              </div>
+
+              <div>
+                <label className="block text-gray-700 font-semibold mb-1">Initial password</label>
+                <input
+                  type="text"
+                  minLength={8}
+                  value={newUser.password}
+                  onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                  placeholder="At least 8 characters (leave blank to send a setup link instead)"
+                  className="w-full border border-gray-300 rounded px-3 py-2"
+                  autoComplete="new-password"
+                />
+                <span className="text-[10px] text-gray-400">Share it with the staff member; they sign in with their email and this password.</span>
               </div>
 
               {newUser.role === 'technician' && (

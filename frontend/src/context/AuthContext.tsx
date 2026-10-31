@@ -17,10 +17,12 @@ export interface RegisterPayload {
   email: string;
   full_name: string;
   phone: string;
+  role?: UserRole;
   password?: string;
   address?: string;
   city?: string;
   pincode?: string;
+  department?: string;
 }
 
 interface AuthContextType {
@@ -148,12 +150,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const register = async (payload: RegisterPayload): Promise<UserProfile> => {
     setIsLoading(true);
     try {
-      const res = await api.post<{ access_token: string; user: UserProfile }>('/auth/register', payload);
+      const endpoint = payload.role && payload.role !== 'customer' ? '/auth/staff-register' : '/auth/register';
+      const res = await api.post<{ access_token: string; user: UserProfile }>(endpoint, payload);
       localStorage.setItem('roofray_token', res.access_token);
-      localStorage.setItem('roofray_role', 'customer');
+      localStorage.setItem('roofray_role', res.user.role);
       localStorage.setItem('roofray_user_explicit', 'true');
       setUser(res.user);
-      setRole('customer');
+      setRole(res.user.role);
       return res.user;
     } finally {
       setIsLoading(false);

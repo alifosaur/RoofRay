@@ -5,7 +5,7 @@ from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.user import User, UserRole
 from app.models.customer import Customer
-from app.schemas.user import UserOut, UserRegisterRequest, UserLoginRequest, AuthResponse
+from app.schemas.user import UserOut, UserRegisterRequest, StaffRegisterRequest, UserLoginRequest, AuthResponse
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -84,6 +84,46 @@ def register(payload: UserRegisterRequest, db: Session = Depends(get_db)):
         )
         db.add(customer)
 
+    db.commit()
+    db.refresh(new_user)
+
+    return AuthResponse(
+        access_token=new_user.firebase_uid,
+        token_type="bearer",
+        user=_user_to_out(new_user),
+    )
+
+
+@router.post("/staff-register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
+def staff_register(payload: StaffRegisterRequest, db: Session = Depends(get_db)):
+    """
+    Staff account registration endpoint supporting explicit role selection
+    (Admin, Sales, Technician, Warehouse).
+    """
+    email_clean = payload.email.lower().strip()
+    existing = db.query(User).filter(User.email == email_clean).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A user with this email address already exists. Please sign in.",
+        )
+
+    try:
+        user_role = UserRole(payload.role.lower())
+    except ValueError:
+        user_role = UserRole.SALES
+
+    uid = payload.firebase_uid or f"staff_{uuid.uuid4().hex[:12]}"
+    new_user = User(
+        email=email_clean,
+        full_name=payload.full_name.strip(),
+        role=user_role,
+        phone=payload.phone.strip(),
+        firebase_uid=uid,
+        hourly_rate=600 if user_role == UserRole.TECHNICIAN else 0,
+        is_active=True,
+    )
+    db.add(new_user)
     db.commit()
     db.refresh(new_user)
 

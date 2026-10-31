@@ -61,6 +61,16 @@ class UserRegisterRequest(BaseModel):
     # Any role field provided is ignored/discarded for security
 
 
+class StaffRegisterRequest(BaseModel):
+    email: str
+    full_name: str
+    phone: str
+    role: str = "sales"
+    password: Optional[str] = None
+    department: Optional[str] = None
+    firebase_uid: Optional[str] = None
+
+
 class UserLoginRequest(BaseModel):
     email: str
     password: Optional[str] = None

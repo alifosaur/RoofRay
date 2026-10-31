@@ -6,6 +6,7 @@ export interface ColumnDef<T> {
   key: string;
   header: string;
   render?: (row: T) => React.ReactNode;
+  accessor?: (row: T) => React.ReactNode;
   sortable?: boolean;
 }
 
@@ -138,7 +139,11 @@ export function ListView<T extends { id: number | string }>({
                     key={col.key}
                     className="px-3 py-2 border-r border-gray-100 last:border-r-0 text-gray-800"
                   >
-                    {col.render ? col.render(row) : (row as any)[col.key] || '-'}
+                    {col.render
+                      ? col.render(row)
+                      : col.accessor
+                      ? col.accessor(row)
+                      : (row as any)[col.key] || '-'}
                   </td>
                 ))}
               </tr>

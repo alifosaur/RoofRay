@@ -229,12 +229,12 @@ export const InventoryPage: React.FC = () => {
     {
       key: 'sku',
       header: 'SKU',
-      accessor: (row: any) => <span className="font-mono font-medium text-gray-700">{row.sku}</span>,
+      render: (row: any) => <span className="font-mono font-medium text-gray-700">{row.sku}</span>,
     },
     {
       key: 'name',
       header: 'Product Name',
-      accessor: (row: any) => (
+      render: (row: any) => (
         <div>
           <span className="font-semibold text-gray-900">{row.name}</span>
           {row.is_serialised && (
@@ -248,12 +248,12 @@ export const InventoryPage: React.FC = () => {
     {
       key: 'category',
       header: 'Category',
-      accessor: (row: any) => row.category,
+      render: (row: any) => row.category,
     },
     {
       key: 'stock_quantity',
       header: 'On Hand',
-      accessor: (row: any) => {
+      render: (row: any) => {
         const isLow = row.stock_quantity <= row.min_stock_alert;
         return (
           <div className="flex items-center space-x-1.5">
@@ -274,22 +274,22 @@ export const InventoryPage: React.FC = () => {
     {
       key: 'min_stock_alert',
       header: 'Min Alert',
-      accessor: (row: any) => `${row.min_stock_alert} ${row.uom || 'units'}`,
+      render: (row: any) => `${row.min_stock_alert} ${row.uom || 'units'}`,
     },
     {
       key: 'cost_price',
       header: 'Cost Price',
-      accessor: (row: any) => `₹${row.cost_price?.toLocaleString()}`,
+      render: (row: any) => `₹${row.cost_price?.toLocaleString()}`,
     },
     {
       key: 'sale_price',
       header: 'Sale Price',
-      accessor: (row: any) => `₹${row.sale_price?.toLocaleString()}`,
+      render: (row: any) => `₹${row.sale_price?.toLocaleString()}`,
     },
     {
       key: 'warranty_years',
       header: 'Warranty',
-      accessor: (row: any) => `${row.warranty_years} yrs`,
+      render: (row: any) => `${row.warranty_years} yrs`,
     },
   ];
 
@@ -297,7 +297,7 @@ export const InventoryPage: React.FC = () => {
     {
       key: 'pick_list_number',
       header: 'Pick List #',
-      accessor: (row: any) => (
+      render: (row: any) => (
         <span className="font-mono font-bold text-odoo-primary">
           PL-{String(row.id).padStart(4, '0')}
         </span>
@@ -305,20 +305,48 @@ export const InventoryPage: React.FC = () => {
     },
     {
       key: 'order_id',
-      header: 'Order Reference',
-      accessor: (row: any) => (
+      header: 'Order & Customer',
+      render: (row: any) => (
         <div>
           <span className="font-bold text-gray-900">{row.order_number || `Order #${row.order_id}`}</span>
           {row.customer_name && (
-            <span className="block text-[11px] text-gray-500">{row.customer_name}</span>
+            <span className="block text-[11px] text-gray-600 font-medium">{row.customer_name}</span>
           )}
         </div>
       ),
     },
     {
+      key: 'items_list',
+      header: 'Required Installation Items Sent by Sales',
+      render: (row: any) => {
+        const lines = row.lines || row.items || [];
+        if (lines.length === 0) {
+          return <span className="text-gray-400 italic">No hardware items</span>;
+        }
+        return (
+          <div className="space-y-1 py-1 max-w-md">
+            <span className="inline-block bg-purple-100 text-[#6B4B63] px-1.5 py-0.5 rounded text-[10px] font-bold">
+              {lines.length} Installation Items
+            </span>
+            <ul className="space-y-0.5 text-[11px] text-gray-700">
+              {lines.map((l: any, idx: number) => (
+                <li key={l.id || idx} className="flex items-center gap-1.5">
+                  <span className="font-bold text-[#6B4B63] shrink-0">{l.required_qty}x</span>
+                  <span className="truncate">{l.product?.name || `Product #${l.product_id}`}</span>
+                  {l.product?.sku && (
+                    <span className="text-[10px] text-gray-400 font-mono shrink-0">[{l.product.sku}]</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        );
+      },
+    },
+    {
       key: 'status',
       header: 'Status',
-      accessor: (row: any) => (
+      render: (row: any) => (
         <span
           className={`px-2 py-0.5 rounded text-[11px] font-semibold ${
             row.status === 'PACKED'
@@ -331,19 +359,19 @@ export const InventoryPage: React.FC = () => {
       ),
     },
     {
-      key: 'items',
-      header: 'Installation Checklist Progress',
-      accessor: (row: any) => {
+      key: 'progress',
+      header: 'Checklist Progress',
+      render: (row: any) => {
         const lines = row.lines || row.items || [];
         const completedLines = lines.filter((l: any) => (l.picked_qty || 0) >= (l.required_qty || 1)).length;
         const totalLines = lines.length;
         const pct = totalLines > 0 ? Math.round((completedLines / totalLines) * 100) : 0;
 
         return (
-          <div className="space-y-1.5 min-w-[200px]">
+          <div className="space-y-1.5 min-w-[160px]">
             <div className="flex justify-between text-[11px]">
               <span className="text-gray-600 font-medium">
-                {completedLines} of {totalLines} items verified
+                {completedLines}/{totalLines} verified
               </span>
               <span className="font-bold text-odoo-primary">{pct}%</span>
             </div>
@@ -353,10 +381,6 @@ export const InventoryPage: React.FC = () => {
                 style={{ width: `${pct}%` }}
               ></div>
             </div>
-            <div className="text-[10px] text-gray-400 truncate">
-              {lines.slice(0, 2).map((l: any) => l.product?.name || `Product #${l.product_id}`).join(', ')}
-              {lines.length > 2 && ` +${lines.length - 2} more`}
-            </div>
           </div>
         );
       },
@@ -364,7 +388,7 @@ export const InventoryPage: React.FC = () => {
     {
       key: 'action',
       header: 'Action',
-      accessor: (row: any) => (
+      render: (row: any) => (
         <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
           <button
             type="button"

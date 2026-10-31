@@ -59,11 +59,12 @@ def test_dispatch_gate_and_auto_warranty():
 
     inv_prod_id = inverter_line["product_id"]
     panel_prod_id = panel_line["product_id"]
+    panel_qty = panel_line["quantity"]
 
     import uuid
     test_run_id = uuid.uuid4().hex[:6].upper()
     inv_serial = f"INV-GRW-{test_run_id}-001"
-    panel_serials = [f"PNL-SP540-{test_run_id}-{i:04d}" for i in range(1, 7)]
+    panel_serials = [f"PNL-SP540-{test_run_id}-{i:04d}" for i in range(1, panel_qty + 1)]
 
     client.post("/api/dispatch/serials/register", headers=warehouse_headers, json={
         "product_id": inv_prod_id,
@@ -81,7 +82,7 @@ def test_dispatch_gate_and_auto_warranty():
     })
     partial_deliv = client.post(f"/api/dispatch/orders/{order_id}/deliver", headers=warehouse_headers)
     assert partial_deliv.status_code == 400
-    assert "SunPower 540W Mono PERC Solar Panel" in partial_deliv.json()["detail"]
+    assert panel_line["product"]["name"] in partial_deliv.json()["detail"]
 
     # 5. Scan all 6 panels
     for p_serial in panel_serials:
@@ -131,7 +132,7 @@ def test_dispatch_gate_and_auto_warranty():
     today = date.today()
     serials_res = client.get(f"/api/dispatch/serials?order_id={order_id}", headers=warehouse_headers)
     serials = serials_res.json()
-    assert len(serials) == 7
+    assert len(serials) == 1 + panel_qty
 
     inv_item = next(s for s in serials if s["serial_no"] == inv_serial)
     assert inv_item["status"] == "DELIVERED"

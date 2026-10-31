@@ -20,3 +20,4 @@ A comprehensive, end-to-end Solar Installation Management System for "SunPower S
 4. **Ticket Auto-Billing**: Support tickets linked to serialized items automatically determine `billable = not in_warranty`. Out-of-warranty repairs auto-generate repair invoices on resolution. Cannot close without customer confirmation.
 5. **Soft-Delete Only**: Leads must never be permanently deleted.
 6. **Immutable Audit Trail**: All status transitions generate `audit_log` records to power the Odoo-style chatter.
+

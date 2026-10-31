@@ -23,7 +23,7 @@ import {
 export const PublicWebsitePage: React.FC = () => {
   const navigate = useNavigate();
 
-  // Quote Form state
+  // Consultation Call Form state
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
@@ -48,7 +48,8 @@ export const PublicWebsitePage: React.FC = () => {
         address,
         required_capacity: Number(capacityKw),
         system_type: systemType,
-        notes: notes || undefined,
+        source: 'book_a_call',
+        notes: notes ? `Booked Call: ${notes}` : 'Client Booked Consultation Call to Get Quotation',
       });
       setSubmittedLead(lead);
       setName('');
@@ -57,7 +58,7 @@ export const PublicWebsitePage: React.FC = () => {
       setAddress('');
       setNotes('');
     } catch (err: any) {
-      setErrorMessage(err.message || 'Failed to submit quote request. Please try again.');
+      setErrorMessage(err.message || 'Failed to book consultation call. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -99,15 +100,15 @@ export const PublicWebsitePage: React.FC = () => {
   const infoBullets: InfoBulletItem[] = [
     {
       leadIn: 'Enquire',
-      text: 'Submit your roof area and monthly electricity bill in under 2 minutes.',
+      text: 'Book a consultation call and submit your roof area and electricity bill in under 2 minutes.',
     },
     {
       leadIn: 'Survey',
       text: 'Certified technician visits your roof to measure tilt, orientation, and shadow-free zones.',
     },
     {
-      leadIn: 'Quote',
-      text: 'Receive an instant transparent Bill of Materials quote with automated MNRE subsidy deductions.',
+      leadIn: 'Consultation & Quotation',
+      text: 'Our technical advisor calls you, evaluates requirements, and prepares a customized quotation according to your roof.',
     },
     {
       leadIn: 'Delivery',
@@ -192,10 +193,10 @@ export const PublicWebsitePage: React.FC = () => {
               {/* Action Buttons */}
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 mt-10">
                 <a
-                  href="#quote-section"
+                  href="#book-call"
                   className="bg-[#6B4B63] hover:bg-[#583D51] text-white text-[15px] font-medium px-7 py-3 rounded text-center transition-colors shadow-xs"
                 >
-                  Get a Free Quote
+                  Book a Call to Get Quotation
                 </a>
                 <Link
                   to="/packages"
@@ -326,21 +327,22 @@ export const PublicWebsitePage: React.FC = () => {
           sideIllustrationCaption="Power from your own roof!"
         />
 
-        {/* 6. Embedded Quick Quote Form Section matching Design System */}
-        <section id="quote-section" className="py-20 sm:py-24 bg-[#F8F4F7]/40 border-t border-gray-100">
+        {/* 6. Embedded Book a Call Form Section matching Design System */}
+        <section id="book-call" className="py-20 sm:py-24 bg-[#F8F4F7]/40 border-t border-gray-100">
+          <div id="quote-section" className="-mt-20 pt-20"></div>
           <div className="max-w-[1320px] mx-auto px-6">
             <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-subtle border border-gray-200 p-8 sm:p-10">
               <div className="text-center mb-8">
                 <span className="text-xs uppercase tracking-widest text-[#6B4B63] font-bold">
-                  Zero Commitment
+                  Free Rooftop Consultation
                 </span>
                 <div className="mt-1 flex justify-center">
                   <ScriptHeading as="h2" align="center">
-                    Get a Rooftop Solar Quote
+                    Book a Call to Get the Quotation
                   </ScriptHeading>
                 </div>
                 <p className="mt-3 text-sm text-[#6C757D]">
-                  Our sales engineers will contact you within 24 hours with an initial sizing assessment.
+                  Schedule a free consultation call with our solar engineers. We will call you, assess your roof capacity, and prepare a customized quotation according to your roof.
                 </p>
               </div>
 
@@ -349,14 +351,14 @@ export const PublicWebsitePage: React.FC = () => {
                   <FontAwesomeIcon icon={faCheckCircle} className="text-4xl text-[#5CC9B0] mb-3" />
                   <h4 className="text-lg font-bold text-[#212529]">Thank you, {submittedLead.name}!</h4>
                   <p className="text-sm text-[#495057] mt-2">
-                    Our sales representative has been auto-assigned and will reach out to you shortly at{' '}
-                    <strong>{submittedLead.phone}</strong>.
+                    Your consultation call has been booked. Our sales representative will call you soon at{' '}
+                    <strong>{submittedLead.phone}</strong> to discuss your requirements and prepare your customized quotation.
                   </p>
                   <button
                     onClick={() => setSubmittedLead(null)}
                     className="mt-5 text-sm text-[#6B4B63] hover:underline font-bold"
                   >
-                    Submit another enquiry
+                    Book another consultation call
                   </button>
                 </div>
               ) : (
@@ -476,7 +478,7 @@ export const PublicWebsitePage: React.FC = () => {
                     disabled={submitting}
                     className="w-full bg-[#6B4B63] hover:bg-[#583D51] text-white font-bold py-3 rounded text-sm transition-colors shadow-xs disabled:opacity-50"
                   >
-                    {submitting ? 'Submitting...' : 'Submit Quote Request'}
+                    {submitting ? 'Booking Call...' : 'Book a Call to Get Quotation'}
                   </button>
                 </form>
               )}

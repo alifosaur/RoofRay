@@ -604,7 +604,7 @@ export const CustomerPortalPage: React.FC = () => {
                   Customer Rooftop Portal
                 </span>
                 <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">
-                  Solar Feasibility & Quotation Request Form
+                  Book a Call & Rooftop Feasibility Form
                 </h2>
                 <p className="text-xs text-gray-500 mt-1">
                   Enter your address and roof dimensions. Our live helper will estimate your ideal capacity (kW) and monthly bill savings.
@@ -909,8 +909,8 @@ export const CustomerPortalPage: React.FC = () => {
                     disabled={loading}
                     className="px-6 py-2.5 bg-odoo-purple hover:bg-odoo-purple/90 text-white font-bold text-xs rounded-lg shadow transition-colors flex items-center gap-2"
                   >
-                    <i className="fa-solid fa-paper-plane"></i>
-                    <span>Submit Feasibility Request</span>
+                    <i className="fa-solid fa-phone"></i>
+                    <span>Book Consultation Call & Submit Details</span>
                   </button>
                 </div>
               </form>

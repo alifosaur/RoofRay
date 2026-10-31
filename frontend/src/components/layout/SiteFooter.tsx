@@ -84,8 +84,8 @@ export const SiteFooter: React.FC = () => {
             <div className="space-y-3 text-[14.5px] text-[#495057] mb-6">
               <div className="flex items-center space-x-2.5">
                 <FontAwesomeIcon icon={faComments} className="text-[#6B4B63] text-sm w-4" />
-                <Link to="/#quote-section" className="text-[#6B4B63] hover:underline font-medium">
-                  Contact our solar advisors
+                <Link to="/#book-call" className="text-[#6B4B63] hover:underline font-medium">
+                  Book a Consultation Call
                 </Link>
               </div>
               <div className="flex items-center space-x-2.5">

@@ -137,6 +137,18 @@ export const CRMPage: React.FC = () => {
         availableViews={['kanban', 'list', 'graph']}
       />
 
+      {/* Salesman Directive Banner */}
+      <div className="bg-gradient-to-r from-purple-50 via-purple-50/50 to-white border-b border-purple-200/80 px-6 py-2.5 flex items-center justify-between text-xs text-[#6B4B63]">
+        <div className="flex items-center gap-2.5">
+          <span className="font-bold bg-[#6B4B63] text-white px-2 py-0.5 rounded text-[10px] uppercase tracking-wide">
+            Sales Directive
+          </span>
+          <span className="font-medium text-[#212529]">
+            Clients book consultation calls online. Conduct the requirements call, <strong>create quotation according to the client</strong>, and <strong>submit it to warehouse</strong> for pick list & dispatch.
+          </span>
+        </div>
+      </div>
+
       {view === 'kanban' ? (
         <KanbanView
           columns={columns}

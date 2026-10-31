@@ -161,10 +161,10 @@ export const SiteNavbar: React.FC = () => {
                 Login / Register
               </Link>
               <Link
-                to="/#quote-section"
+                to="/#book-call"
                 className="hidden sm:inline-flex items-center justify-center bg-[#6B4B63] hover:bg-[#583D51] text-white text-[14px] font-medium px-4 py-2 rounded transition-colors shadow-xs"
               >
-                Get a Quote
+                Book a Call
               </Link>
             </div>
           )}
@@ -213,9 +213,16 @@ export const SiteNavbar: React.FC = () => {
           ) : (
             <div className="pt-3 border-t border-gray-100 flex flex-col space-y-2">
               <Link
-                to="/login"
+                to="/#book-call"
                 onClick={() => setMobileMenuOpen(false)}
                 className="w-full text-center bg-plum hover:bg-plum-dark text-white font-medium py-2 rounded"
+              >
+                Book a Call
+              </Link>
+              <Link
+                to="/login"
+                onClick={() => setMobileMenuOpen(false)}
+                className="w-full text-center border border-gray-300 text-gray-700 hover:text-plum font-medium py-2 rounded"
               >
                 Login / Register
               </Link>

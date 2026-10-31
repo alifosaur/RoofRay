@@ -84,7 +84,7 @@ export const LeadFormPage: React.FC = () => {
 
   const handleCreateQuoteClick = () => {
     if (lead.status !== 'SURVEY_APPROVED') {
-      alert('GATE ENFORCED: Site survey must be APPROVED before creating a quotation.');
+      alert('GATE ENFORCED: Site survey must be APPROVED before creating a quotation according to the client and submitting to warehouse.');
       return;
     }
     navigate(`/web/quotes?lead_id=${lead.id}`);
@@ -193,6 +193,18 @@ export const LeadFormPage: React.FC = () => {
         ]}
       />
 
+      {/* Salesman Directive Banner for this Lead */}
+      <div className="bg-gradient-to-r from-purple-50 via-purple-50/50 to-white border-b border-purple-200 px-6 py-2.5 flex items-center justify-between text-xs text-[#6B4B63]">
+        <div className="flex items-center gap-2.5">
+          <span className="font-bold bg-[#6B4B63] text-white px-2 py-0.5 rounded text-[10px] uppercase tracking-wide">
+            Sales Directive
+          </span>
+          <span className="text-[#212529]">
+            Client booked a consultation call. Conduct the call checklist, verify roof measurements, <strong>create quotation according to the client</strong>, and <strong>submit it to warehouse</strong>.
+          </span>
+        </div>
+      </div>
+
       <FormView
         title={lead.name}
         subtitle={`Lead #${lead.id} • ${lead.system_type}`}
@@ -219,13 +231,16 @@ export const LeadFormPage: React.FC = () => {
             )}
             <button
               onClick={handleCreateQuoteClick}
-              className={`px-2.5 py-1 rounded text-xs font-medium ${
+              className={`px-3 py-1 rounded text-xs font-medium flex items-center gap-1.5 ${
                 lead.status === 'SURVEY_APPROVED'
-                  ? 'bg-purple-700 hover:bg-purple-800 text-white shadow-xs'
+                  ? 'bg-[#6B4B63] hover:bg-[#583D51] text-white shadow-xs'
                   : 'bg-gray-200 text-gray-500 cursor-not-allowed'
               }`}
             >
-              Generate Quote {lead.status !== 'SURVEY_APPROVED' && '(Requires Approved Survey)'}
+              <span>Create Quotation According to Client</span>
+              {lead.status !== 'SURVEY_APPROVED' && (
+                <span className="text-[10px] opacity-75">(Requires Approved Survey)</span>
+              )}
             </button>
           </>
         }

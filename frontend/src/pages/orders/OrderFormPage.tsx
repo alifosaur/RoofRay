@@ -123,10 +123,10 @@ export const OrderFormPage: React.FC = () => {
       {order.status === 'DRAFT' && (
         <button
           onClick={handleConfirmOrder}
-          className="bg-odoo-primary hover:bg-odoo-primary-dark text-white px-3 py-1 rounded text-xs font-semibold flex items-center gap-1 shadow-sm transition-colors"
+          className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded text-xs font-semibold flex items-center gap-1 shadow-sm transition-colors"
         >
           <FontAwesomeIcon icon={faCheckCircle} />
-          <span>Confirm Order</span>
+          <span>Submit to Warehouse (Confirm Order)</span>
         </button>
       )}
 

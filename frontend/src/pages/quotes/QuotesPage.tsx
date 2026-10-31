@@ -86,6 +86,18 @@ export const QuotesPage: React.FC = () => {
         availableViews={['list']}
       />
 
+      {/* Salesman Directive Banner */}
+      <div className="bg-gradient-to-r from-purple-50 via-purple-50/50 to-white border-b border-purple-200/80 px-6 py-2.5 flex items-center justify-between text-xs text-[#6B4B63]">
+        <div className="flex items-center gap-2.5">
+          <span className="font-bold bg-[#6B4B63] text-white px-2 py-0.5 rounded text-[10px] uppercase tracking-wide">
+            Sales Directive
+          </span>
+          <span className="font-medium text-[#212529]">
+            Create quotation according to client specifications and roof survey, then review and <strong>submit it to warehouse</strong> for pick list fulfillment.
+          </span>
+        </div>
+      </div>
+
       <ListView
         columns={columns}
         data={quotes.filter((q) => q.quote_number.toLowerCase().includes(search.toLowerCase()))}
@@ -97,7 +109,7 @@ export const QuotesPage: React.FC = () => {
         <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded shadow-xl border border-odoo-border w-full max-w-md overflow-hidden text-xs">
             <div className="bg-odoo-primary text-white px-4 py-2.5 flex items-center justify-between font-semibold">
-              <span>Generate Quotation with BOM Explosion</span>
+              <span>Create Quotation According to Client</span>
               <button onClick={() => setShowCreateModal(false)}>✕</button>
             </div>
             <form onSubmit={handleCreateQuote} className="p-4 space-y-3">
@@ -157,9 +169,9 @@ export const QuotesPage: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 bg-odoo-primary hover:bg-odoo-primary-dark text-white rounded font-medium shadow-sm"
+                  className="px-4 py-1.5 bg-[#6B4B63] hover:bg-[#583D51] text-white rounded font-medium shadow-sm"
                 >
-                  Explode BOM & Create
+                  Create Quotation for Client
                 </button>
               </div>
             </form>

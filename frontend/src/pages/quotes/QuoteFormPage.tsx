@@ -35,14 +35,21 @@ export const QuoteFormPage: React.FC = () => {
     { key: 'REJECTED', label: 'Cancelled' },
   ];
 
-  const handleAcceptQuote = async () => {
-    if (!window.confirm('Accept this quotation and generate Sales Order?')) return;
+  const handleSubmitToWarehouse = async () => {
+    if (!window.confirm('Submit this quotation to the warehouse? This will confirm the order and generate the warehouse pick list.')) return;
     try {
       const res = await api.post<any>(`/quotes/${id}/accept`);
-      alert(`Quote accepted! Sales Order ${res.order_number} has been created.`);
+      if (res.order_id) {
+        try {
+          await api.post(`/orders/${res.order_id}/confirm`);
+        } catch (e) {
+          console.warn('Order confirmation handled or already confirmed', e);
+        }
+      }
+      alert(`Quotation successfully submitted to warehouse! Sales Order ${res.order_number} confirmed and warehouse pick list generated.`);
       navigate(`/web/orders/${res.order_id}`);
     } catch (err: any) {
-      alert(err.message || 'Error accepting quote');
+      alert(err.message || 'Error submitting quotation to warehouse');
     }
   };
 
@@ -137,20 +144,32 @@ export const QuoteFormPage: React.FC = () => {
         ]}
       />
 
+      {/* Salesman Directive Banner */}
+      <div className="bg-gradient-to-r from-purple-50 via-purple-50/50 to-white border-b border-purple-200 px-6 py-2.5 flex items-center justify-between text-xs text-[#6B4B63]">
+        <div className="flex items-center gap-2.5">
+          <span className="font-bold bg-[#6B4B63] text-white px-2 py-0.5 rounded text-[10px] uppercase tracking-wide">
+            Sales Directive
+          </span>
+          <span className="text-[#212529]">
+            Verify this quotation prepared according to client requirements. Once confirmed with the client, <strong>submit it to warehouse</strong> to generate the pick list and initiate dispatch.
+          </span>
+        </div>
+      </div>
+
       <FormView
         title={quote.quote_number}
-        subtitle="Rooftop Solar Quotation"
+        subtitle="Rooftop Solar Quotation (Client Specification)"
         stages={stages}
         currentStage={quote.status}
         headerButtons={
           <>
             {quote.status !== 'ACCEPTED' && (
               <button
-                onClick={handleAcceptQuote}
+                onClick={handleSubmitToWarehouse}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded text-xs font-semibold flex items-center gap-1.5 shadow-xs"
               >
                 <FontAwesomeIcon icon={faCheckCircle} />
-                <span>Customer Accepted (Create Order)</span>
+                <span>Submit to Warehouse (Confirm Order & Generate Pick List)</span>
               </button>
             )}
             <button

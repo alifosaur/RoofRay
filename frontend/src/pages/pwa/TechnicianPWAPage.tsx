@@ -42,6 +42,7 @@ export const TechnicianPWAPage: React.FC = () => {
     roof_width_ft: '',
     shadow_free_area_sqft: '',
     out_of_shade_zone: true,
+    feasible: null as boolean | null,
     shade_notes: '',
     roof_direction: '',
     roof_tilt_deg: '',
@@ -108,9 +109,14 @@ export const TechnicianPWAPage: React.FC = () => {
         roof_tilt_deg: Number(surveyForm.roof_tilt_deg),
         cable_distance_meters: Number(surveyForm.cable_distance_meters),
         notes: surveyForm.notes || undefined,
+        feasible: surveyForm.feasible,
       });
       setSurveyForm(emptySurvey);
-      alert('Survey submitted. Sales has been notified to review and approve it.');
+      alert(
+        surveyForm.feasible
+          ? 'Survey approved. The lead has moved to Survey Approved and sales can prepare the quotation.'
+          : 'Survey submitted as not feasible. Sales will review it.'
+      );
       fetchSchedule();
     } catch (err: any) {
       alert(err.message || 'Failed to submit survey');
@@ -666,6 +672,17 @@ export const TechnicianPWAPage: React.FC = () => {
                         <input type="number" step="1" min="0" required value={surveyForm.cable_distance_meters} onChange={(e) => setSurveyForm({ ...surveyForm, cable_distance_meters: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white mt-1 font-mono" />
                       </label>
                     </div>
+                    <div>
+                      <span className="block text-gray-300 font-semibold mb-1">Site feasible for installation? *</span>
+                      <div className="flex gap-2">
+                        {[true, false].map((v) => (
+                          <button key={String(v)} type="button" onClick={() => setSurveyForm({ ...surveyForm, feasible: v })}
+                            className={`flex-1 py-2 rounded-lg border ${surveyForm.feasible === v ? (v ? 'bg-emerald-500 text-slate-950 border-emerald-500 font-bold' : 'bg-rose-500 text-white border-rose-500 font-bold') : 'border-slate-700 text-gray-300'}`}>
+                            {v ? 'Yes, approve survey' : 'No, send to sales'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                     <label className="block text-gray-300 font-semibold">Notes
                       <textarea rows={2} value={surveyForm.notes} onChange={(e) => setSurveyForm({ ...surveyForm, notes: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white mt-1" placeholder="Structure, parapet height, cable entry point…" />
                     </label>
@@ -675,11 +692,11 @@ export const TechnicianPWAPage: React.FC = () => {
                     </div>
                     <button
                       type="submit"
-                      disabled={submitting}
+                      disabled={submitting || surveyForm.feasible === null}
                       className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-3.5 rounded-xl text-sm flex items-center justify-center gap-2 shadow-lg disabled:opacity-50"
                     >
                       <FontAwesomeIcon icon={faCheckCircle} />
-                      <span>{submitting ? 'Submitting…' : 'Submit Survey to Sales'}</span>
+                      <span>{submitting ? 'Submitting…' : surveyForm.feasible ? 'Submit & Approve Survey' : 'Submit Survey'}</span>
                     </button>
                   </form>
                 ) : (
@@ -705,7 +722,7 @@ export const TechnicianPWAPage: React.FC = () => {
                     )}
                     {activeSurvey.status === 'COMPLETED' && (
                       <p className="text-[11px] text-amber-400 font-semibold text-center pt-2 border-t border-slate-700">
-                        Submitted. Waiting for sales to review and approve.
+                        Marked not feasible. Waiting for sales to review.
                       </p>
                     )}
                     {activeSurvey.status === 'APPROVED' && (

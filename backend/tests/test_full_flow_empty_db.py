@@ -126,15 +126,16 @@ def test_complete_chain_from_empty_database(client):
     sub = client.put(f"/api/surveys/{survey['id']}/complete", headers=tech, json={
         "address_confirmed": True, "roof_length_ft": 30, "roof_width_ft": 20, "shadow_free_area_sqft": 440,
         "out_of_shade_zone": True, "shade_notes": "Water tank on north side", "roof_direction": "South",
-        "roof_tilt_deg": 18, "cable_distance_meters": 14})
-    assert sub.status_code == 200 and sub.json()["status"] == "COMPLETED"
-    assert any("survey submitted" in n["title"].lower() for n in client.get("/api/notifications", headers=sales).json()["items"])
-    assert client.post(f"/api/surveys/{survey['id']}/approve", headers=tech).status_code == 403
-    assert client.post(f"/api/surveys/{survey['id']}/approve", headers=sales).status_code == 200
+        "roof_tilt_deg": 18, "cable_distance_meters": 14, "feasible": True})
+    # Technician confirms feasibility → survey approved, lead moves to SURVEY_APPROVED automatically, sales notified
+    assert sub.status_code == 200 and sub.json()["status"] == "APPROVED"
+    assert client.get(f"/api/leads/{lead_id}", headers=sales).json()["status"] == "SURVEY_APPROVED"
+    assert any(n["title"] == "Site survey approved" for n in client.get("/api/notifications", headers=sales).json()["items"])
 
     # ---- Quote from template, BOM adjusted, sent, accepted by the customer
     quote = client.post("/api/quotes", headers=sales, json={"lead_id": lead_id, "template_id": template["id"]}).json()
     assert quote["subsidy_amount"] == 78000.0  # from the schemes table (3 kW On-Grid)
+    assert client.get(f"/api/leads/{lead_id}", headers=sales).json()["status"] == "SURVEY_APPROVED"  # drafting is not quoting
     assert client.post(f"/api/customer/quotes/{quote['id']}/accept", headers=cust).status_code == 400  # not sent yet
     lines = [{"product_id": l["product_id"], "quantity": l["quantity"]} for l in quote["lines"]]
     mc4 = next(l for l in lines if l["quantity"] and any(q["product"]["sku"] == "SP-CON-MC4" and q["product_id"] == l["product_id"] for q in quote["lines"]))
@@ -142,8 +143,10 @@ def test_complete_chain_from_empty_database(client):
     edited = client.put(f"/api/quotes/{quote['id']}/lines", headers=sales, json={"lines": lines})
     assert edited.status_code == 200 and edited.json()["total_amount"] > quote["total_amount"]
     assert client.post(f"/api/quotes/{quote['id']}/send", headers=sales).status_code == 200
+    assert client.get(f"/api/leads/{lead_id}", headers=sales).json()["status"] == "QUOTED"
     assert client.get("/api/customer/tracker", headers=cust).json()["current_stage_key"] == "order_confirmed"
     order_id = client.post(f"/api/customer/quotes/{quote['id']}/accept", headers=cust).json()["order_id"]
+    assert client.get(f"/api/leads/{lead_id}", headers=sales).json()["status"] == "WON"
 
     # ---- Payment before confirmation; confirmation sends the pick list to the warehouse
     assert client.post(f"/api/orders/{order_id}/confirm", headers=sales).status_code == 400

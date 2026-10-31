@@ -26,10 +26,10 @@ Read `README.md` for setup, the role matrix and the workflow diagram.
 | — | enquiry (customer/public) | Lead NEW, auto-assigned to sales | — |
 | Lead NEW/CONTACTED | call checklist (sales) | QUALIFIED or LOST (reason required) | — |
 | Lead NEW/CONTACTED/QUALIFIED | schedule survey + technician (sales) | Survey SCHEDULED, lead SURVEY_SCHEDULED | one survey per lead, active technician |
-| Survey SCHEDULED | submit measurements + photos (assigned technician) | COMPLETED | — |
-| Survey COMPLETED | approve / reject (sales owner, admin) | APPROVED → lead SURVEY_APPROVED / REJECTED → lead LOST | technicians cannot approve |
-| Survey APPROVED | create quote from BOM template (sales) | Quote DRAFT, lead QUOTED | **no quote before approval** |
-| Quote DRAFT | edit BOM lines; send (sales) | SENT | only drafts are editable |
+| Survey SCHEDULED | submit measurements + photos + feasibility (assigned technician) | feasible → APPROVED, lead SURVEY_APPROVED (auto); not feasible → COMPLETED | — |
+| Survey COMPLETED | approve / reject (sales owner, admin) | APPROVED → lead SURVEY_APPROVED / REJECTED → lead LOST | only for surveys the technician did not approve |
+| Survey APPROVED | create quote from BOM template (sales) | Quote DRAFT (lead stays SURVEY_APPROVED) | **no quote before approval** |
+| Quote DRAFT | edit BOM lines; send (sales) | SENT, lead QUOTED (auto) | only drafts are editable |
 | Quote SENT | accept (customer or sales recording it) | ACCEPTED → Order DRAFT, lead WON | one order per lead |
 | Order DRAFT | record payment; confirm (sales) | CONFIRMED + pick list + install job + invoice + subsidy record | **payment > 0 required** |
 | Order CONFIRMED/PACKING | scan serials (warehouse) | first scan → PACKING | Redis lock + unique serial; serial must be IN_STOCK and in the BOM |

@@ -89,12 +89,16 @@ def complete_survey(db: Session, survey_id: int, payload: SurveyComplete, curren
     )
     db.add(audit)
     lead = survey.lead
+    if payload.feasible:
+        # Technician confirmed feasibility on site: the survey is approved and the lead moves on automatically
+        db.flush()
+        return approve_survey(db, survey.id, current_user_id)
     events.emit(
         db, "survey.submitted", {"survey_id": survey.id, "lead_id": survey.lead_id},
         user_ids=[lead.assigned_to_id, lead.customer.user_id if lead.customer else None],
         roles=[UserRole.ADMIN],
-        title="Site survey submitted for review",
-        message=f"Survey for {lead.name} is ready for your approval.",
+        title="Site survey needs review",
+        message=f"Technician did not confirm feasibility for {lead.name}. Review and approve or reject.",
         link=f"/web/crm/{lead.id}",
     )
 
@@ -146,7 +150,7 @@ def approve_survey(db: Session, survey_id: int, approved_by_id: int) -> Survey:
     db.add(audit)
     events.emit(
         db, "survey.approved", {"survey_id": survey.id, "lead_id": survey.lead_id},
-        user_ids=[survey.technician_id, lead.customer.user_id if (lead and lead.customer) else None],
+        user_ids=[survey.technician_id, lead.assigned_to_id if lead else None, lead.customer.user_id if (lead and lead.customer) else None],
         roles=[UserRole.ADMIN],
         title="Site survey approved",
         message="Your site survey has been approved. A quotation will follow.",

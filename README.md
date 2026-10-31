@@ -88,12 +88,13 @@ flowchart TD
   C1[Customer: browse packages → enquiry form] -->|lead auto-assigned| S1[Sales: call checklist]
   S1 -->|unsuitable| LOST[(Lead LOST + reason)]
   S1 --> S2[Sales: schedule survey, assign technician]
-  S2 --> T1[Technician: submit survey + photos]
-  T1 --> S3{Sales approves survey?}
+  S2 --> T1{Technician: survey + photos, feasible?}
+  T1 -->|yes: lead SURVEY_APPROVED| Q1[Quotation from BOM template, adjust BOM]
+  T1 -->|no| S3{Sales reviews}
   S3 -->|reject| LOST
-  S3 -->|approve| Q1[Quotation from BOM template, adjust BOM]
-  Q1 --> Q2[Send PDF to customer]
-  Q2 --> Q3[Customer accepts → DRAFT order]
+  S3 -->|approve| Q1
+  Q1 --> Q2[Send PDF to customer: lead QUOTED]
+  Q2 --> Q3[Customer accepts: lead WON, DRAFT order]
   Q3 --> P1[Advance / full payment recorded]
   P1 --> O1[Order CONFIRMED → pick list + invoice + subsidy record]
   O1 --> W1[Warehouse: scan serials → PACKING]
@@ -106,7 +107,7 @@ flowchart TD
 
 **Gates** (HTTP 400 when violated):
 
-1. A quotation cannot be created before the survey is **APPROVED**; a survey can only be approved after the technician **submits** it.
+1. A quotation cannot be created before the survey is **APPROVED**. The technician approves it on submission by confirming feasibility; otherwise sales reviews it.
 2. A quotation can only be accepted after it was **sent**; one order per lead.
 3. An order cannot be confirmed without a **recorded payment**.
 4. Serials are scanned while packing; duplicates and serials already assigned to another order are rejected (Redis lock + unique `serial_no`).

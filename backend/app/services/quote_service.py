@@ -90,9 +90,6 @@ def create_quote_from_bom(db: Session, payload: QuoteCreate, current_user_id: in
     quote.tax_amount = tax
     quote.total_amount = total
 
-    # Update Lead status to QUOTED
-    old_lead_status = lead.status.value
-    lead.status = LeadStatus.QUOTED
 
     db.flush()
     db.refresh(quote)
@@ -117,16 +114,6 @@ def create_quote_from_bom(db: Session, payload: QuoteCreate, current_user_id: in
     )
     db.add(audit)
 
-    audit_lead = AuditLog(
-        record_type="lead",
-        record_id=lead.id,
-        action="LEAD_QUOTED",
-        from_status=old_lead_status,
-        to_status=LeadStatus.QUOTED.value,
-        notes=f"Quotation {quote.quote_number} prepared.",
-        user_id=current_user_id,
-    )
-    db.add(audit_lead)
 
     db.commit()
     db.refresh(quote)
@@ -261,6 +248,12 @@ def send_quote(db: Session, quote: Quote, current_user_id: int) -> Quote:
         raise HTTPException(status_code=400, detail=f"Only draft quotations can be sent (current: {quote.status.value})")
     _regenerate_pdf(db, quote)
     quote.status = QuoteStatus.SENT
+    lead = quote.lead
+    if lead and lead.status == LeadStatus.SURVEY_APPROVED:
+        db.add(AuditLog(record_type="lead", record_id=lead.id, action="LEAD_QUOTED", from_status=lead.status.value,
+                        to_status=LeadStatus.QUOTED.value, notes=f"Quotation {quote.quote_number} sent to the customer.",
+                        user_id=current_user_id))
+        lead.status = LeadStatus.QUOTED
     db.add(AuditLog(record_type="quote", record_id=quote.id, action="QUOTE_SENT", from_status=QuoteStatus.DRAFT.value,
                     to_status=QuoteStatus.SENT.value, notes="Quotation PDF shared with the customer.", user_id=current_user_id))
     events.emit(

@@ -22,6 +22,7 @@ class SurveyComplete(BaseModel):
     shadow_free_area_sqft: Optional[float] = None
     out_of_shade_zone: Optional[bool] = None
     shade_notes: Optional[str] = None
+    feasible: Optional[bool] = None  # technician's verdict: True approves the survey; False/None leaves it for sales to review
 
     @model_validator(mode="before")
     @classmethod

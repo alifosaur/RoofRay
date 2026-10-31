@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+backend/venv/
+backend/.env
+*.db
+*.sqlite3
+
+# Firebase & Secrets
+*firebase-service-account*.json
+*.pem
+*.key
+
+# Uploads
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Node & Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+*.local
+
+# macOS
+.DS_Store

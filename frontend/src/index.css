@@ -1,0 +1,67 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply text-odoo-text bg-odoo-bg text-base;
+  }
+}
+
+/* Odoo Status Bar Arrow Stage Pills */
+.odoo-statusbar-arrow {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 14px 4px 18px;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  background-color: #ECEFF1;
+  color: #495057;
+  transition: all 0.15s ease-in-out;
+}
+
+.odoo-statusbar-arrow:first-child {
+  padding-left: 12px;
+  border-top-left-radius: 3px;
+  border-bottom-left-radius: 3px;
+}
+
+.odoo-statusbar-arrow:last-child {
+  border-top-right-radius: 3px;
+  border-bottom-right-radius: 3px;
+}
+
+.odoo-statusbar-arrow::after {
+  content: "";
+  position: absolute;
+  right: -9px;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  height: 0;
+  border-top: 13px solid transparent;
+  border-bottom: 13px solid transparent;
+  border-left: 9px solid #ECEFF1;
+  z-index: 2;
+  transition: border-left-color 0.15s ease-in-out;
+}
+
+.odoo-statusbar-arrow.active {
+  background-color: #714B67;
+  color: #FFFFFF;
+}
+
+.odoo-statusbar-arrow.active::after {
+  border-left-color: #714B67;
+}
+
+.odoo-statusbar-arrow.past {
+  background-color: #DDE2E6;
+  color: #212529;
+}
+
+.odoo-statusbar-arrow.past::after {
+  border-left-color: #DDE2E6;
+}

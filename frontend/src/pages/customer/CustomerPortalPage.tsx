@@ -70,6 +70,11 @@ interface OrderData {
   total_amount: number;
   paid_amount: number;
   balance_amount: number;
+  advance_amount?: number;
+  is_advance_paid?: boolean;
+  is_fully_paid?: boolean;
+  installation_status?: string;
+  can_pay_balance?: boolean;
   created_at: string;
   delivery_date?: string | null;
   payments: Array<{
@@ -265,17 +270,34 @@ export const CustomerPortalPage: React.FC = () => {
 
   // Handle Quote Acceptance
   const handleAcceptQuote = async (quoteId: number) => {
-    if (!window.confirm('Accept this quotation? This will confirm your solar order and initiate warehouse dispatch.')) {
+    if (!window.confirm('Accept this quotation? This will confirm your solar order with a 50% advance booking payment and initiate warehouse dispatch.')) {
       return;
     }
     setLoading(true);
     try {
       const res = await api.post<any>(`/customer/quotes/${quoteId}/accept`);
-      setNoticeMessage(res.message || 'Quote accepted successfully!');
+      setNoticeMessage(res.message || 'Quote accepted and 50% advance recorded!');
       await loadData();
       setActiveTab('tracker');
     } catch (err: any) {
       alert(err.message || 'Failed to accept quote');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle Pay Final 50% Balance
+  const handlePayBalance = async (orderId: number, balanceAmount: number) => {
+    if (!window.confirm(`Pay final balance of ₹${balanceAmount.toLocaleString()}? This will settle your solar project in full.`)) {
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await api.post<any>(`/customer/orders/${orderId}/pay-balance`);
+      setNoticeMessage(res.message || 'Final balance payment settled successfully!');
+      await loadData();
+    } catch (err: any) {
+      alert(err.message || 'Failed to settle final balance');
     } finally {
       setLoading(false);
     }
@@ -1110,7 +1132,7 @@ export const CustomerPortalPage: React.FC = () => {
                           className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded flex items-center gap-1.5 shadow-sm"
                         >
                           <i className="fa-solid fa-check"></i>
-                          <span>Accept & Confirm Order</span>
+                          <span>Accept & Pay 50% Advance (₹{Math.round(q.total_amount * 0.5).toLocaleString()})</span>
                         </button>
                       )}
                     </div>
@@ -1144,14 +1166,23 @@ export const CustomerPortalPage: React.FC = () => {
 
                   {/* Quote Totals */}
                   <div className="bg-gray-50 p-4 rounded-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                    <span className="text-xs text-gray-500">
-                      * Includes turnkey on-site mounting, wiring, DISCOM net-meter liaison, and 20-year warranty.
-                    </span>
+                    <div className="space-y-1">
+                      <span className="text-xs text-gray-500 block">
+                        * Includes turnkey mounting, wiring, net-metering liaison, and 20-year warranty.
+                      </span>
+                      <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-amber-50 border border-amber-200 text-[11px] text-amber-800 font-medium">
+                        <i className="fa-solid fa-shield-halved text-amber-600"></i>
+                        <span>Payment Terms: <strong>50% advance</strong> on acceptance • <strong>50% final balance</strong> post-installation</span>
+                      </div>
+                    </div>
                     <div className="text-right text-xs space-y-1">
                       <div className="text-gray-500">Subtotal: <span className="font-semibold text-gray-800">₹{q.subtotal.toLocaleString()}</span></div>
                       <div className="text-gray-500">GST (13.8% blended): <span className="font-semibold text-gray-800">₹{q.tax_amount.toLocaleString()}</span></div>
                       <div className="text-base font-bold text-odoo-purple pt-1 border-t border-gray-200">
                         Total Amount: ₹{q.total_amount.toLocaleString()}
+                      </div>
+                      <div className="text-xs font-semibold text-emerald-700">
+                        50% Advance Booking: ₹{Math.round(q.total_amount * 0.5).toLocaleString()}
                       </div>
                     </div>
                   </div>
@@ -1162,38 +1193,92 @@ export const CustomerPortalPage: React.FC = () => {
             {/* Confirmed Orders Card */}
             {orders.length > 0 && (
               <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4">Confirmed Sales Orders</h3>
+                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4">Confirmed Sales Orders & Milestone Payments</h3>
                 <div className="space-y-4">
                   {orders.map((o) => (
-                    <div key={o.id} className="p-4 border border-gray-100 rounded-lg bg-gray-50/60 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-xs">
-                      <div>
+                    <div key={o.id} className="p-4 border border-gray-200 rounded-xl bg-gray-50/70 space-y-3">
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                         <div className="flex items-center gap-2">
-                          <span className="font-bold text-gray-900">{o.order_number}</span>
+                          <span className="font-bold text-gray-900 text-sm">{o.order_number}</span>
                           <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-800">
                             {o.status}
                           </span>
+                          {o.is_fully_paid ? (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                              ✓ 100% Fully Settled
+                            </span>
+                          ) : o.is_advance_paid ? (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-300">
+                              ✓ 50% Advance Paid
+                            </span>
+                          ) : null}
                         </div>
-                        <p className="text-gray-500 mt-0.5">Created: {o.created_at}</p>
+                        <p className="text-gray-500 text-xs">Created: {o.created_at}</p>
                       </div>
 
-                      <div className="flex items-center gap-6">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-white p-3 rounded-lg border border-gray-100 text-xs">
                         <div>
-                          <span className="text-gray-400 block text-[10px]">Total Amount:</span>
-                          <strong className="text-gray-800">₹{o.total_amount.toLocaleString()}</strong>
+                          <span className="text-gray-400 block text-[10px]">Total Order Amount</span>
+                          <strong className="text-gray-900 text-sm">₹{o.total_amount.toLocaleString()}</strong>
                         </div>
                         <div>
-                          <span className="text-gray-400 block text-[10px]">Paid:</span>
-                          <strong className="text-emerald-700">₹{o.paid_amount.toLocaleString()}</strong>
+                          <span className="text-gray-400 block text-[10px]">Paid Amount</span>
+                          <strong className="text-emerald-700 text-sm">₹{o.paid_amount.toLocaleString()}</strong>
                         </div>
                         <div>
-                          <span className="text-gray-400 block text-[10px]">Balance:</span>
-                          <strong className="text-gray-800">₹{o.balance_amount.toLocaleString()}</strong>
+                          <span className="text-gray-400 block text-[10px]">Remaining Balance</span>
+                          <strong className="text-amber-800 text-sm">₹{o.balance_amount.toLocaleString()}</strong>
                         </div>
-                        {o.invoice && (
-                          <span className="px-2.5 py-1 bg-white border border-gray-200 rounded font-semibold text-gray-700">
-                            Inv: {o.invoice.invoice_number}
+                        <div>
+                          <span className="text-gray-400 block text-[10px]">Installation Job</span>
+                          <span className={`font-semibold ${o.installation_status === 'COMPLETED' ? 'text-emerald-700' : 'text-gray-700'}`}>
+                            {o.installation_status || 'SCHEDULED'}
                           </span>
-                        )}
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pt-1">
+                        <div className="text-xs">
+                          {o.is_fully_paid ? (
+                            <span className="text-emerald-700 font-semibold flex items-center gap-1.5">
+                              <i className="fa-solid fa-circle-check"></i>
+                              <span>All payments cleared (100%). Warranty & net-metering active.</span>
+                            </span>
+                          ) : o.can_pay_balance ? (
+                            <span className="text-emerald-700 font-semibold flex items-center gap-1.5">
+                              <i className="fa-solid fa-bell text-emerald-600"></i>
+                              <span>Installation completed by technician! Final 50% balance is now payable.</span>
+                            </span>
+                          ) : (
+                            <span className="text-gray-600 text-[11px] flex items-center gap-1.5 bg-gray-100 px-2.5 py-1 rounded">
+                              <i className="fa-solid fa-lock text-gray-400"></i>
+                              <span>Final 50% balance (₹{o.balance_amount.toLocaleString()}) unlocks once technician completes installation.</span>
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          {o.invoice && (
+                            <button
+                              type="button"
+                              onClick={() => downloadFile(`/finance/invoices/${o.invoice.id}/pdf`, `${o.invoice.invoice_number}.pdf`).catch((err) => alert(err.message))}
+                              className="px-3 py-1.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded text-xs font-semibold flex items-center gap-1"
+                            >
+                              <i className="fa-solid fa-file-invoice text-odoo-purple"></i>
+                              <span>Invoice</span>
+                            </button>
+                          )}
+                          {o.can_pay_balance && (
+                            <button
+                              type="button"
+                              onClick={() => handlePayBalance(o.id, o.balance_amount)}
+                              className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-bold shadow-sm flex items-center gap-1.5"
+                            >
+                              <i className="fa-solid fa-credit-card"></i>
+                              <span>Pay Final 50% Balance (₹{o.balance_amount.toLocaleString()})</span>
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}

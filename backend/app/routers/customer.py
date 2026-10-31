@@ -31,7 +31,10 @@ from app.schemas.customer import (
     GovernmentSchemeOut,
     CustomerSubsidyOut,
 )
-from app.services import lead_service, quote_service, ticket_service, subsidy_service, audit_service
+from app.models.product import Product
+from app.models.payment import PaymentMethod
+from app.schemas.order import PaymentCreate
+from app.services import lead_service, quote_service, ticket_service, subsidy_service, audit_service, order_service
 from app.core import events
 from pydantic import BaseModel
 
@@ -447,7 +450,7 @@ def accept_customer_quote(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role(UserRole.CUSTOMER, UserRole.ADMIN)),
 ):
-    """Customer accepts the quote and auto-creates sales order."""
+    """Customer accepts the quote, auto-creates sales order, and books with 50% advance payment."""
     quote = db.query(Quote).filter(Quote.id == quote_id).first()
     if not quote:
         raise HTTPException(status_code=404, detail="Quotation not found")
@@ -457,11 +460,77 @@ def accept_customer_quote(
         raise HTTPException(status_code=403, detail="Forbidden: You cannot accept another customer's quote")
 
     order = quote_service.accept_quote(db, quote_id, current_user.id)
+
+    # 50% Advance booking payment
+    advance_amount = round(order.total_amount * 0.5, 2)
+    if advance_amount > 0 and order.paid_amount < advance_amount:
+        order_service.record_payment(
+            db=db,
+            order_id=order.id,
+            payload=PaymentCreate(
+                amount=advance_amount,
+                method=PaymentMethod.UPI,
+                transaction_ref=f"ADV-50-Q{quote.quote_number}",
+            ),
+            current_user_id=current_user.id,
+        )
+        db.refresh(order)
+
     return {
-        "message": f"Quote {quote.quote_number} accepted successfully!",
+        "message": f"Quote {quote.quote_number} accepted! 50% Advance Booking of ₹{advance_amount:,.2f} recorded.",
         "order_id": order.id,
         "order_number": order.order_number,
         "status": order.status.value,
+        "advance_paid": advance_amount,
+        "remaining_balance": round(order.total_amount - order.paid_amount, 2),
+    }
+
+
+@router.post("/orders/{order_id}/pay-balance")
+def pay_order_balance(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.CUSTOMER, UserRole.ADMIN)),
+):
+    """Pay the remaining 50% balance after installation completion by technician."""
+    order = db.query(Order).filter(Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    cust = _get_customer_profile(db, current_user)
+    if current_user.role == UserRole.CUSTOMER and (not cust or order.customer_id != cust.id):
+        raise HTTPException(status_code=403, detail="Forbidden: You cannot pay for another customer's order")
+
+    # Gate: Installation job must be COMPLETED
+    if not order.installation_job or order.installation_job.status != JobStatus.COMPLETED:
+        raise HTTPException(
+            status_code=400,
+            detail="The final balance can only be paid after the installation job is marked COMPLETED by the technician.",
+        )
+
+    outstanding = round(order.total_amount - order.paid_amount, 2)
+    if outstanding <= 0.01:
+        raise HTTPException(status_code=400, detail="This order is already fully paid!")
+
+    payment = order_service.record_payment(
+        db=db,
+        order_id=order.id,
+        payload=PaymentCreate(
+            amount=outstanding,
+            method=PaymentMethod.UPI,
+            transaction_ref=f"FIN-50-ORD{order.order_number}",
+        ),
+        current_user_id=current_user.id,
+    )
+    db.refresh(order)
+
+    return {
+        "message": f"Final 50% balance of ₹{outstanding:,.2f} settled successfully! Order #{order.order_number} is fully paid.",
+        "order_id": order.id,
+        "order_number": order.order_number,
+        "status": order.status.value,
+        "amount_paid": outstanding,
+        "is_fully_paid": True,
     }
 
 
@@ -485,18 +554,27 @@ def get_customer_orders(
                 "id": p.id,
                 "amount": p.amount,
                 "payment_method": p.payment_method.value,
-                "reference": p.reference_number,
+                "reference": p.transaction_ref or f"PAY-{p.id}",
                 "date": p.created_at.strftime("%Y-%m-%d"),
             }
             for p in o.payments
         ]
+        advance_target = round(o.total_amount * 0.5, 2)
+        balance = round(max(0.0, o.total_amount - o.paid_amount), 2)
+        job_completed = bool(o.installation_job and o.installation_job.status == JobStatus.COMPLETED)
+
         out.append({
             "id": o.id,
             "order_number": o.order_number,
             "status": o.status.value,
             "total_amount": o.total_amount,
             "paid_amount": o.paid_amount,
-            "balance_amount": o.total_amount - o.paid_amount,
+            "balance_amount": balance,
+            "advance_amount": advance_target,
+            "is_advance_paid": o.paid_amount >= advance_target - 0.01,
+            "is_fully_paid": balance <= 0.01,
+            "installation_status": o.installation_job.status.value if o.installation_job else "NOT_SCHEDULED",
+            "can_pay_balance": job_completed and balance > 0.01,
             "created_at": o.created_at.strftime("%Y-%m-%d"),
             "delivery_date": o.delivered_at.strftime("%Y-%m-%d") if o.delivered_at else None,
             "payments": payments,

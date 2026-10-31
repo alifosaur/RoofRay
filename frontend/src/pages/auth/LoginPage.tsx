@@ -13,15 +13,10 @@ import {
   faMapMarkerAlt,
   faCheck,
   faSignInAlt,
-  faUserShield,
-  faHeadset,
-  faTools,
-  faWarehouse,
-  faSolarPanel,
 } from '@fortawesome/free-solid-svg-icons';
 
 export const LoginPage: React.FC = () => {
-  const { login, register, switchRole } = useAuth();
+  const { login, register } = useAuth();
   const navigate = useNavigate();
 
   const [mode, setMode] = useState<'login' | 'register'>('login');
@@ -75,19 +70,6 @@ export const LoginPage: React.FC = () => {
       navigate(getRoleHomePath(newUser.role)); // Redirects to /customer
     } catch (err: any) {
       setError(err.message || 'Registration failed. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleQuickDemoLogin = async (roleKey: UserRole) => {
-    setLoading(true);
-    setError(null);
-    try {
-      await switchRole(roleKey);
-      navigate(getRoleHomePath(roleKey));
-    } catch (err: any) {
-      setError(err.message || 'Demo sign-in failed');
     } finally {
       setLoading(false);
     }
@@ -295,55 +277,6 @@ export const LoginPage: React.FC = () => {
                 </button>
               </form>
             )}
-
-            {/* 1-Click Demo Persona Switcher */}
-            <div className="mt-8 pt-6 border-t border-gray-200">
-              <span className="block text-center text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
-                1-Click Quick Demo Sign-in
-              </span>
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleQuickDemoLogin('customer')}
-                  className="py-2 px-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded text-xs font-bold text-center col-span-3 transition-colors"
-                >
-                  <FontAwesomeIcon icon={faSolarPanel} className="mr-1 text-emerald-600" />
-                  Customer Persona (Vikram Malhotra)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleQuickDemoLogin('sales')}
-                  className="py-1.5 px-2 bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 rounded text-xs font-medium text-center transition-colors"
-                >
-                  <FontAwesomeIcon icon={faHeadset} className="mr-1 text-purple-600" />
-                  Sales
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleQuickDemoLogin('technician')}
-                  className="py-1.5 px-2 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded text-xs font-medium text-center transition-colors"
-                >
-                  <FontAwesomeIcon icon={faTools} className="mr-1 text-amber-600" />
-                  Technician
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleQuickDemoLogin('warehouse')}
-                  className="py-1.5 px-2 bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 rounded text-xs font-medium text-center transition-colors"
-                >
-                  <FontAwesomeIcon icon={faWarehouse} className="mr-1 text-teal-600" />
-                  Warehouse
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleQuickDemoLogin('admin')}
-                  className="py-1.5 px-2 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 rounded text-xs font-bold text-center col-span-3 transition-colors"
-                >
-                  <FontAwesomeIcon icon={faUserShield} className="mr-1 text-slate-700" />
-                  Director & Admin (Rajesh Singhania)
-                </button>
-              </div>
-            </div>
           </div>
         </div>
       </main>

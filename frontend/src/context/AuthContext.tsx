@@ -63,41 +63,51 @@ export function getRoleHomePath(role: UserRole): string {
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [role, setRole] = useState<UserRole>(
-    (localStorage.getItem('sunpower_role') as UserRole) || 'admin'
+    (localStorage.getItem('roofray_role') as UserRole) ||
+    (localStorage.getItem('sunpower_role') as UserRole) ||
+    'customer'
   );
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchProfile = async (): Promise<UserProfile | null> => {
+    const token = localStorage.getItem('roofray_token') || localStorage.getItem('sunpower_token');
+    if (!token) {
+      setUser(null);
+      setRole('customer');
+      setIsLoading(false);
+      return null;
+    }
+
     try {
       const profile = await api.get<UserProfile>('/auth/me');
       setUser(profile);
       setRole(profile.role);
-      localStorage.setItem('sunpower_role', profile.role);
+      localStorage.setItem('roofray_role', profile.role);
       return profile;
     } catch (err) {
-      console.warn('Could not fetch user profile from server:', err);
-      // Fallback in case auth token expired or backend offline
-      const storedRole = (localStorage.getItem('sunpower_role') as UserRole) || 'admin';
-      const demo = DEMO_TOKENS[storedRole] || DEMO_TOKENS.admin;
-      const fallback: UserProfile = {
-        id: 1,
-        email: demo.email,
-        full_name: demo.name,
-        role: storedRole,
-      };
-      setUser(fallback);
-      return fallback;
+      console.warn('Session not active or token expired:', err);
+      // Clean up invalid/expired session
+      localStorage.removeItem('roofray_token');
+      localStorage.removeItem('roofray_role');
+      localStorage.removeItem('sunpower_token');
+      localStorage.removeItem('sunpower_role');
+      setUser(null);
+      setRole('customer');
+      return null;
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    // If no token stored, default to admin token for smooth dev experience
-    if (!localStorage.getItem('sunpower_token')) {
-      localStorage.setItem('sunpower_token', 'admin_uid');
-      localStorage.setItem('sunpower_role', 'admin');
+    // Clear any legacy auto-injected admin session so users start unauthenticated on the landing page
+    const token = localStorage.getItem('roofray_token') || localStorage.getItem('sunpower_token');
+    if (token === 'admin_uid' && !localStorage.getItem('roofray_user_explicit')) {
+      localStorage.removeItem('roofray_token');
+      localStorage.removeItem('roofray_role');
+      localStorage.removeItem('sunpower_token');
+      localStorage.removeItem('sunpower_role');
     }
     fetchProfile();
   }, []);
@@ -109,8 +119,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email,
         password: password || 'demo123',
       });
-      localStorage.setItem('sunpower_token', res.access_token);
-      localStorage.setItem('sunpower_role', res.user.role);
+      localStorage.setItem('roofray_token', res.access_token);
+      localStorage.setItem('roofray_role', res.user.role);
+      localStorage.setItem('roofray_user_explicit', 'true');
       setUser(res.user);
       setRole(res.user.role);
       return res.user;
@@ -122,8 +133,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loginWithToken = async (token: string, targetRole: UserRole): Promise<UserProfile> => {
     setIsLoading(true);
     try {
-      localStorage.setItem('sunpower_token', token);
-      localStorage.setItem('sunpower_role', targetRole);
+      localStorage.setItem('roofray_token', token);
+      localStorage.setItem('roofray_role', targetRole);
+      localStorage.setItem('roofray_user_explicit', 'true');
       const profile = await api.get<UserProfile>('/auth/me');
       setUser(profile);
       setRole(profile.role);
@@ -137,8 +149,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(true);
     try {
       const res = await api.post<{ access_token: string; user: UserProfile }>('/auth/register', payload);
-      localStorage.setItem('sunpower_token', res.access_token);
-      localStorage.setItem('sunpower_role', 'customer');
+      localStorage.setItem('roofray_token', res.access_token);
+      localStorage.setItem('roofray_role', 'customer');
+      localStorage.setItem('roofray_user_explicit', 'true');
       setUser(res.user);
       setRole('customer');
       return res.user;
@@ -148,9 +161,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = () => {
+    localStorage.removeItem('roofray_token');
+    localStorage.removeItem('roofray_role');
+    localStorage.removeItem('roofray_user_explicit');
     localStorage.removeItem('sunpower_token');
     localStorage.removeItem('sunpower_role');
     setUser(null);
+    setRole('customer');
   };
 
   const switchRole = async (newRole: UserRole) => {

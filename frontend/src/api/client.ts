@@ -4,7 +4,7 @@ export async function apiRequest<T = any>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const token = localStorage.getItem('roofray_token') || localStorage.getItem('sunpower_token') || 'admin_uid';
+  const token = localStorage.getItem('roofray_token') || localStorage.getItem('sunpower_token');
   
   const headers = new Headers(options.headers || {});
   if (!headers.has('Authorization') && token) {

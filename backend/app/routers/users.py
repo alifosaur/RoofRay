@@ -1,7 +1,9 @@
 from datetime import date, datetime, timedelta
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
+from app.core.database import Base
 from app.core.database import get_db
 from app.core import security
 from app.core.security import require_role
@@ -150,3 +152,63 @@ def update_user(
     db.refresh(user)
     return user
 
+
+
+# Rows that only point *at* the user and carry no business history; removed together with the user
+_DISPOSABLE = {"notifications", "outbox_events"}
+
+
+@router.delete("/{user_id}")
+def remove_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.ADMIN)),
+):
+    """
+    Removes a staff account. With no work history it is deleted (and its login removed);
+    otherwise it is deactivated so past leads, jobs, payments and audit entries stay intact.
+    """
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.id == current_user.id:
+        raise HTTPException(status_code=400, detail="You cannot remove your own account")
+    if user.role == UserRole.CUSTOMER:
+        raise HTTPException(status_code=400, detail="Customer accounts cannot be removed here; deactivate them instead")
+    if user.role == UserRole.ADMIN and db.query(User).filter(User.role == UserRole.ADMIN, User.is_active == True, User.id != user.id).count() == 0:
+        raise HTTPException(status_code=400, detail="Cannot remove the last active admin")
+
+    history = []
+    for table in Base.metadata.sorted_tables:
+        if table.name in _DISPOSABLE:
+            continue
+        for col in table.columns:
+            if any(fk.column.table.name == "users" for fk in col.foreign_keys):
+                n = db.execute(select(func.count()).select_from(table).where(col == user.id)).scalar()
+                if n:
+                    history.append(f"{n} {table.name.replace('_', ' ')}")
+
+    if history:
+        user.is_active = False
+        db.add(AuditLog(record_type="user", record_id=user.id, action="USER_DEACTIVATED",
+                        notes=f"Removal requested; kept for history ({', '.join(history)}).", user_id=current_user.id))
+        db.commit()
+        return {"removed": False, "deactivated": True,
+                "message": f"{user.full_name} has work history ({', '.join(history)}), so the account was deactivated instead of deleted. They can no longer sign in."}
+
+    for name in _DISPOSABLE:
+        table = Base.metadata.tables[name]
+        for col in table.columns:
+            if any(fk.column.table.name == "users" for fk in col.foreign_keys):
+                db.execute(table.delete().where(col == user.id))
+    db.add(AuditLog(record_type="user", record_id=user.id, action="USER_DELETED",
+                    notes=f"{user.email} ({user.role.value}) deleted.", user_id=current_user.id))
+    if security.AUTH_MODE == "firebase":
+        try:
+            from firebase_admin import auth as fb_auth
+            fb_auth.delete_user(user.firebase_uid)
+        except Exception as e:
+            print(f"[WARN] Could not delete Firebase user {user.email}: {e}")
+    db.delete(user)
+    db.commit()
+    return {"removed": True, "deactivated": False, "message": "User removed."}

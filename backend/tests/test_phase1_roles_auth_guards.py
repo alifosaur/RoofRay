@@ -227,3 +227,26 @@ def test_admin_can_set_staff_password_directly():
     assert client.post("/api/auth/login", json={"email": email, "password": "reset-pass-2"}).status_code == 200
     # Leave no extra active sales user behind (leads are round-robined across active sales users)
     client.put(f"/api/users/{uid}", headers=admin_headers, json={"is_active": False})
+
+
+def test_admin_removes_staff_or_deactivates_when_history_exists():
+    fresh = client.post("/api/users", headers=admin_headers, json={
+        "email": f"rm_{uuid.uuid4().hex[:6]}@example.com", "full_name": "Temp Warehouse", "role": "warehouse", "password": "temp-pass-1"}).json()["user"]
+    assert client.delete(f"/api/users/{fresh['id']}", headers=customer_headers).status_code == 403
+    res = client.delete(f"/api/users/{fresh['id']}", headers=admin_headers)
+    assert res.status_code == 200 and res.json()["removed"] is True
+    assert client.get(f"/api/users/{fresh['id']}", headers=admin_headers).status_code == 404
+
+    # A technician with assigned work is deactivated, not deleted
+    tech = client.post("/api/users", headers=admin_headers, json={
+        "email": f"rmt_{uuid.uuid4().hex[:6]}@example.com", "full_name": "Busy Tech", "role": "technician", "password": "temp-pass-1"}).json()["user"]
+    lead = client.post("/api/leads/public", json={"name": "Hist Lead", "phone": f"93{uuid.uuid4().int % 10**8:08d}", "address": "1 Road"}).json()
+    hdr = sales_headers if lead["assigned_to_id"] else admin_headers
+    call_checklist(client, lead["id"], hdr)
+    assert client.post("/api/surveys", headers=hdr, json={"lead_id": lead["id"], "technician_id": tech["id"], "scheduled_date": "2030-02-01T10:00:00"}).status_code == 201
+    res = client.delete(f"/api/users/{tech['id']}", headers=admin_headers)
+    assert res.status_code == 200 and res.json()["deactivated"] is True
+    assert client.get(f"/api/users/{tech['id']}", headers=admin_headers).json()["is_active"] is False
+
+    me = client.get("/api/auth/me", headers=admin_headers).json()
+    assert client.delete(f"/api/users/{me['id']}", headers=admin_headers).status_code == 400

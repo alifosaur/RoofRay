@@ -116,6 +116,17 @@ export const UsersPage: React.FC = () => {
     }
   };
 
+  const handleRemove = async (u: UserItem) => {
+    if (!window.confirm(`Remove ${u.full_name} (${u.email})?\n\nIf they already have work history (leads, surveys, jobs, payments), the account is deactivated instead so those records stay intact.`)) return;
+    try {
+      const res = await api.delete<any>(`/users/${u.id}`);
+      alert(res.message);
+      fetchUsers();
+    } catch (err: any) {
+      alert(err.message || 'Failed to remove user');
+    }
+  };
+
   const handleToggleActive = async (u: UserItem) => {
     const action = u.is_active ? 'deactivate' : 'activate';
     if (!window.confirm(`Are you sure you want to ${action} ${u.full_name}?`)) return;
@@ -317,6 +328,16 @@ export const UsersPage: React.FC = () => {
                             >
                               <FontAwesomeIcon icon={u.is_active ? faUserSlash : faUserCheck} />
                             </button>
+                            {u.role !== 'customer' && (
+                              <button
+                                onClick={() => handleRemove(u)}
+                                className="px-2 py-1 border border-red-200 rounded text-[11px] text-red-600 hover:bg-red-50"
+                                title="Remove user"
+                                aria-label={`Remove ${u.full_name}`}
+                              >
+                                <i className="fa-solid fa-trash"></i>
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>

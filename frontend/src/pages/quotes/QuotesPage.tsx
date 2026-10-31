@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLiveRefresh } from '../../live/LiveEvents';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../../api/client';
 import { ControlPanel } from '../../components/odoo/ControlPanel';
@@ -36,6 +37,9 @@ export const QuotesPage: React.FC = () => {
       console.error(err);
     }
   };
+
+  // Live: refetch when another role hands work over (SSE)
+  useLiveRefresh(['quote.'], fetchData);
 
   useEffect(() => {
     fetchData();

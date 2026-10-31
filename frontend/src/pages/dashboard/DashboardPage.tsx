@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { api, downloadFile } from '../../api/client';
+import { useLiveConnection, useLiveRefresh } from '../../live/LiveEvents';
 import { ControlPanel } from '../../components/odoo/ControlPanel';
 import {
   LineChart,
@@ -29,45 +30,69 @@ import {
   faBoxes,
   faCheckCircle,
   faExternalLinkAlt,
+  faSyncAlt,
+  faFilePdf,
 } from '@fortawesome/free-solid-svg-icons';
 
 const PIE_COLORS = ['#714B67', '#017E84', '#F59E0B', '#EF4444', '#3B82F6', '#10B981'];
+
+type Range = 'today' | 'this_week' | 'this_month' | 'all';
+type Granularity = 'day' | 'week' | 'month';
+
+const inr = (n: number | undefined | null) => `₹${Math.round(n ?? 0).toLocaleString('en-IN')}`;
+
+const Kpi: React.FC<{ label: string; value: React.ReactNode; tone?: string; sub?: React.ReactNode }> = ({ label, value, tone = 'text-gray-900', sub }) => (
+  <div className="bg-white rounded border border-odoo-border shadow-xs p-3.5">
+    <span className="text-[10px] font-bold text-gray-500 uppercase">{label}</span>
+    <div className={`text-lg font-bold mt-1 ${tone}`}>{value}</div>
+    {sub && <div className="text-[10px] text-gray-400 mt-0.5 font-medium">{sub}</div>}
+  </div>
+);
+
+const STAGE_LABELS: Record<string, string> = {
+  new_leads: 'New leads',
+  contacted_leads: 'Leads in contact',
+  surveys_scheduled: 'Surveys scheduled',
+  surveys_awaiting_approval: 'Surveys awaiting approval',
+  quotes_open: 'Open quotations',
+  orders_awaiting_confirmation: 'Orders awaiting confirmation',
+  orders_confirmed: 'Confirmed (to pick)',
+  orders_packing: 'Packing',
+  orders_packed: 'Packed',
+  orders_dispatched: 'Dispatched',
+  orders_out_for_delivery: 'Out for delivery',
+  orders_delivered: 'Delivered (awaiting install)',
+  installs_in_progress: 'Installs in progress',
+};
 
 export const DashboardPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const shareToken = searchParams.get('token');
   const navigate = useNavigate();
+  const live = useLiveConnection();
 
-  const [range, setRange] = useState<'today' | 'this_week' | 'this_month' | 'all'>('this_month');
+  const [range, setRange] = useState<Range>('this_month');
+  const [granularity, setGranularity] = useState<Granularity>('day');
   const [dashboard, setDashboard] = useState<any | null>(null);
-  const [profitJobs, setProfitJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Selected job for detailed admin modal
   const [selectedJob, setSelectedJob] = useState<any | null>(null);
-
-  // Share modal
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareableUrl, setShareableUrl] = useState('');
   const [copied, setCopied] = useState(false);
 
   const fetchDashboardData = async () => {
+    setLoading(true);
     try {
-      if (!dashboard) setLoading(true);
-      if (shareToken) {
-        // Read-only public share view
-        const data = await api.get<any>(`/reports/shared/${shareToken}?range=${range}`);
-        setDashboard(data);
-      } else {
-        const [dashData, profitData] = await Promise.all([
-          api.get<any>(`/reports/dashboard?range=${range}`),
-          api.get<any[]>(`/reports/profit-per-job?range=${range}`),
-        ]);
-        setDashboard(dashData);
-        setProfitJobs(profitData || []);
-      }
-    } catch (err) {
-      console.error('Failed to load dashboard', err);
+      const qs = `range=${range}&granularity=${granularity}`;
+      const data = shareToken
+        ? await api.get<any>(`/reports/shared/${shareToken}?${qs}`)
+        : await api.get<any>(`/reports/dashboard?${qs}`);
+      setDashboard(data);
+      setError(null);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load dashboard');
     } finally {
       setLoading(false);
     }
@@ -75,14 +100,12 @@ export const DashboardPage: React.FC = () => {
 
   useEffect(() => {
     fetchDashboardData();
-    // Live view: poll every 30s and refresh when the tab regains focus
-    const interval = setInterval(fetchDashboardData, 30000);
-    window.addEventListener('focus', fetchDashboardData);
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener('focus', fetchDashboardData);
-    };
-  }, [range, shareToken]);
+  }, [range, granularity, shareToken]);
+
+  // Live: any hand-off (payment, delivery, job completion, invoice, ticket…) refreshes the numbers
+  useLiveRefresh('*', fetchDashboardData);
+
+  const profitJobs: any[] = dashboard?.profit_per_job || [];
 
   const handleExportExcel = () => {
     downloadFile('/reports/export.xlsx', 'RoofRay_Executive_Report.xlsx').catch((err) =>
@@ -93,8 +116,7 @@ export const DashboardPage: React.FC = () => {
   const handleGenerateShareLink = async () => {
     try {
       const res = await api.post<any>('/reports/share-link', { expires_days: 7 });
-      const fullUrl = `${window.location.origin}${res.shareable_url}`;
-      setShareableUrl(fullUrl);
+      setShareableUrl(`${window.location.origin}${res.shareable_url}`);
       setShowShareModal(true);
       setCopied(false);
     } catch (err: any) {
@@ -108,53 +130,52 @@ export const DashboardPage: React.FC = () => {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  if (loading && !dashboard) {
-    return (
-      <div className="flex-1 p-8 text-center text-gray-500 text-sm">
-        Calculating executive metrics...
-      </div>
-    );
-  }
-
-  // Financial Trend Line Chart Data
-  const financialTrendData = (dashboard?.trend_points || []).map((tp: any) => ({
-    name: tp.date || tp.name,
-    Billed: tp.revenue,
-    Collected: tp.collected,
-    Costs: tp.costs,
-    NetProfit: tp.net_profit,
+  const series = (dashboard?.profit_series || []).map((p: any) => ({
+    name: p.period,
+    Revenue: p.revenue,
+    Received: p.received,
+    Spent: p.spent,
+    Profit: p.profit,
   }));
 
-  const stageBreakdown = dashboard?.unfinished_jobs_by_stage
-    ? Object.entries(dashboard.unfinished_jobs_by_stage).map(([stage, count]) => ({
-        name: stage,
-        value: count,
-      }))
-    : [];
+  const stageRows = Object.entries(dashboard?.unfinished_jobs_by_stage || {}).filter(([, v]) => (v as number) > 0);
+  const stageBreakdown = stageRows.map(([k, v]) => ({ name: STAGE_LABELS[k] || k, value: v as number }));
+  const subsidyRows = Object.entries(dashboard?.subsidy_pipeline || {}).filter(([, v]) => (v as number) > 0);
+
+  const toggle = (opts: string[], value: string, set: (v: any) => void) => (
+    <div className="flex items-center bg-gray-100 p-0.5 rounded border border-odoo-border">
+      {opts.map((r) => (
+        <button
+          key={r}
+          onClick={() => set(r)}
+          className={`px-2.5 py-1 rounded text-xs capitalize transition-colors ${
+            value === r ? 'bg-white text-odoo-primary shadow-xs font-bold' : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          {r.replace('_', ' ')}
+        </button>
+      ))}
+    </div>
+  );
 
   return (
     <div className="flex-1 flex flex-col bg-odoo-bg">
       <ControlPanel
-        breadcrumbs={[{ label: shareToken ? 'Director Dashboard (Executive View)' : 'Director Dashboard' }]}
+        breadcrumbs={[{ label: shareToken ? 'Dashboard (Shared View)' : 'Admin Dashboard' }]}
         actions={
           <div className="flex items-center space-x-2">
-            {/* Range filters */}
-            <div className="flex items-center bg-gray-100 p-0.5 rounded border border-odoo-border">
-              {(['today', 'this_week', 'this_month', 'all'] as const).map((r) => (
-                <button
-                  key={r}
-                  onClick={() => setRange(r)}
-                  className={`px-2.5 py-1 rounded text-xs capitalize transition-colors ${
-                    range === r
-                      ? 'bg-white text-odoo-primary shadow-xs font-bold'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  {r.replace('_', ' ')}
-                </button>
-              ))}
-            </div>
-
+            <span className={`text-[10px] font-semibold ${live ? 'text-emerald-600' : 'text-gray-400'}`} title="Live updates">
+              ● {live ? 'Live' : 'Offline'}
+            </span>
+            {toggle(['today', 'this_week', 'this_month', 'all'], range, setRange)}
+            {toggle(['day', 'week', 'month'], granularity, setGranularity)}
+            <button
+              onClick={fetchDashboardData}
+              className="border border-odoo-border bg-white px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1"
+              title="Refresh"
+            >
+              <FontAwesomeIcon icon={faSyncAlt} className={loading ? 'animate-spin' : ''} />
+            </button>
             {!shareToken && (
               <>
                 <button
@@ -162,15 +183,21 @@ export const DashboardPage: React.FC = () => {
                   className="bg-emerald-700 hover:bg-emerald-800 text-white px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1 shadow-xs"
                 >
                   <FontAwesomeIcon icon={faFileExcel} />
-                  <span>Excel Export</span>
+                  <span>Excel</span>
                 </button>
-
+                <button
+                  onClick={() => downloadFile(`/reports/export.pdf?range=${range}`, 'RoofRay_Report.pdf').catch((e) => alert(e.message))}
+                  className="bg-gray-700 hover:bg-gray-800 text-white px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1 shadow-xs"
+                >
+                  <FontAwesomeIcon icon={faFilePdf} />
+                  <span>PDF</span>
+                </button>
                 <button
                   onClick={handleGenerateShareLink}
                   className="bg-odoo-primary hover:bg-odoo-primary-dark text-white px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1 shadow-xs"
                 >
                   <FontAwesomeIcon icon={faShareAlt} />
-                  <span>Share View</span>
+                  <span>Share</span>
                 </button>
               </>
             )}
@@ -179,168 +206,151 @@ export const DashboardPage: React.FC = () => {
       />
 
       <div className="flex-1 p-6 space-y-6">
-        {/* KPI Cards Row */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-4">
-          <div className="bg-white rounded border border-odoo-border shadow-xs p-3.5">
-            <span className="text-[10px] font-bold text-gray-500 uppercase">Total Revenue</span>
-            <div className="text-lg font-bold text-odoo-primary mt-1">
-              ₹{(dashboard?.total_revenue ?? dashboard?.revenue)?.toLocaleString()}
-            </div>
+        {error && (
+          <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded flex justify-between items-center">
+            <span>{error}</span>
+            <button onClick={fetchDashboardData} className="font-semibold underline">Retry</button>
           </div>
+        )}
 
-          <div className="bg-white rounded border border-odoo-border shadow-xs p-3.5">
-            <span className="text-[10px] font-bold text-gray-500 uppercase">Collected</span>
-            <div className="text-lg font-bold text-emerald-700 mt-1">
-              ₹{(dashboard?.collected_revenue ?? dashboard?.collected_payments)?.toLocaleString()}
-            </div>
+        {!dashboard && loading && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="h-20 bg-white rounded border border-odoo-border animate-pulse" />
+            ))}
           </div>
+        )}
 
-          <div className="bg-white rounded border border-odoo-border shadow-xs p-3.5">
-            <span className="text-[10px] font-bold text-gray-500 uppercase">Pending Due</span>
-            <div className="text-lg font-bold text-amber-600 mt-1">
-              ₹{(dashboard?.pending_revenue ?? dashboard?.pending_payments)?.toLocaleString()}
+        {dashboard && (
+          <>
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4">
+              <Kpi label="Revenue (sales)" value={inr(dashboard.total_revenue)} tone="text-odoo-primary" />
+              <Kpi label="Money received" value={inr(dashboard.money_received)} tone="text-emerald-700" />
+              <Kpi
+                label="Money spent"
+                value={inr(dashboard.money_spent)}
+                tone="text-rose-700"
+                sub={`Stock ${inr(dashboard.spend_breakdown?.stock_purchases)} · Pay ${inr(dashboard.spend_breakdown?.technician_pay)} · Other ${inr(dashboard.spend_breakdown?.other_costs)}`}
+              />
+              <Kpi label="Pending payments" value={inr(dashboard.pending_payments)} tone="text-amber-600" sub="All open orders" />
+              <Kpi label="Net profit (jobs)" value={inr(dashboard.net_profit)} tone="text-teal-800" sub={`Margin ${dashboard.profit_margin_percent ?? 0}%`} />
+              <Kpi
+                label="Technician payouts"
+                value={inr(dashboard.technician_payouts?.unpaid)}
+                sub={`unpaid · paid ${inr(dashboard.technician_payouts?.paid_in_period)}`}
+              />
+              <Kpi label="Open tickets" value={dashboard.open_tickets_count ?? 0} tone="text-rose-600" />
+              <Kpi
+                label="Low stock SKUs"
+                value={
+                  <span className="flex items-center gap-1.5">
+                    {dashboard.low_stock_products_count ?? 0}
+                    {(dashboard.low_stock_products_count ?? 0) > 0 && <FontAwesomeIcon icon={faExclamationTriangle} className="text-xs text-amber-500" />}
+                  </span>
+                }
+                tone="text-amber-600"
+              />
             </div>
-          </div>
 
-          <div className="bg-white rounded border border-odoo-border shadow-xs p-3.5">
-            <span className="text-[10px] font-bold text-gray-500 uppercase">Net Profit</span>
-            <div className="text-lg font-bold text-teal-800 mt-1">
-              ₹{dashboard?.net_profit?.toLocaleString()}
-            </div>
-            <div className="text-[10px] text-gray-400 mt-0.5 font-medium">
-              Margin: {dashboard?.profit_margin_percent}%
-            </div>
-          </div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="bg-white rounded border border-odoo-border shadow-xs p-5 lg:col-span-2">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-gray-700 mb-4 flex items-center gap-2">
+                  <FontAwesomeIcon icon={faChartLine} className="text-[#6B4B63]" />
+                  <span>Revenue, cash and profit per {granularity}</span>
+                </h3>
+                <div className="h-64">
+                  {series.length === 0 ? (
+                    <div className="h-full flex items-center justify-center text-xs text-gray-400 border border-dashed rounded">
+                      No financial activity in this period yet.
+                    </div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={series}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F3F5" />
+                        <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#6C757D' }} />
+                        <YAxis tick={{ fontSize: 11, fill: '#6C757D' }} tickFormatter={(val) => `₹${(val / 1000).toFixed(0)}k`} />
+                        <Tooltip formatter={(value: any) => inr(Number(value))} contentStyle={{ borderRadius: '8px', fontSize: '12px' }} />
+                        <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
+                        <Line type="monotone" dataKey="Revenue" stroke="#6B4B63" strokeWidth={2.5} dot={{ r: 3 }} />
+                        <Line type="monotone" dataKey="Received" stroke="#017E84" strokeWidth={2} dot={{ r: 3 }} />
+                        <Line type="monotone" dataKey="Spent" stroke="#F59E0B" strokeWidth={1.8} strokeDasharray="4 4" dot={{ r: 3 }} />
+                        <Line type="monotone" dataKey="Profit" stroke="#10B981" strokeWidth={2.5} dot={{ r: 3 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  )}
+                </div>
+              </div>
 
-          <div className="bg-white rounded border border-odoo-border shadow-xs p-3.5">
-            <span className="text-[10px] font-bold text-gray-500 uppercase">Jobs P / L</span>
-            <div className="text-sm font-bold text-gray-800 mt-1 flex items-center gap-1">
-              <span className="text-emerald-600">{dashboard?.profitable_jobs_count} Prof</span>
-              <span className="text-gray-400">/</span>
-              <span className="text-red-500">{dashboard?.loss_making_jobs_count} Loss</span>
-            </div>
-          </div>
-
-          <div className="bg-white rounded border border-odoo-border shadow-xs p-3.5">
-            <span className="text-[10px] font-bold text-gray-500 uppercase">Open Tickets</span>
-            <div className="text-lg font-bold text-rose-600 mt-1">
-              {dashboard?.open_tickets_count}
-            </div>
-          </div>
-
-          <div className="bg-white rounded border border-odoo-border shadow-xs p-3.5">
-            <span className="text-[10px] font-bold text-gray-500 uppercase">Low Stock SKUs</span>
-            <div className="text-lg font-bold text-amber-600 mt-1 flex items-center gap-1.5">
-              <span>{dashboard?.low_stock_products_count ?? dashboard?.low_stock_count}</span>
-              {(dashboard?.low_stock_products_count ?? dashboard?.low_stock_count) > 0 && (
-                <FontAwesomeIcon icon={faExclamationTriangle} className="text-xs text-amber-500" />
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Visual Charts Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Revenue vs Costs vs Profit - LINE GRAPH */}
-          <div className="bg-white rounded border border-odoo-border shadow-xs p-5 lg:col-span-2">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-gray-700 mb-4 flex items-center gap-2">
-              <FontAwesomeIcon icon={faChartLine} className="text-[#6B4B63]" />
-              <span>Financial Performance Trend Line (Revenue, Cash, Costs & Profit)</span>
-            </h3>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={financialTrendData}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F3F5" />
-                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#6C757D' }} />
-                  <YAxis
-                    tick={{ fontSize: 11, fill: '#6C757D' }}
-                    tickFormatter={(val) => `₹${(val / 1000).toFixed(0)}k`}
-                  />
-                  <Tooltip
-                    formatter={(value: any) => `₹${Number(value).toLocaleString()}`}
-                    contentStyle={{ borderRadius: '8px', border: '1px solid #E5E7EB', fontSize: '12px' }}
-                  />
-                  <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
-                  <Line
-                    type="monotone"
-                    dataKey="Billed"
-                    name="Billed Revenue"
-                    stroke="#6B4B63"
-                    strokeWidth={2.5}
-                    dot={{ r: 4, fill: '#6B4B63' }}
-                    activeDot={{ r: 6 }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="Collected"
-                    name="Collected Cash"
-                    stroke="#017E84"
-                    strokeWidth={2}
-                    dot={{ r: 3, fill: '#017E84' }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="Costs"
-                    name="Direct Costs"
-                    stroke="#F59E0B"
-                    strokeWidth={1.8}
-                    strokeDasharray="4 4"
-                    dot={{ r: 3, fill: '#F59E0B' }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="NetProfit"
-                    name="Net Profit"
-                    stroke="#10B981"
-                    strokeWidth={2.5}
-                    dot={{ r: 4, fill: '#10B981' }}
-                    activeDot={{ r: 6 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          {/* Job Pipeline Stages Pie */}
-          <div className="bg-white rounded border border-odoo-border shadow-xs p-5">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-gray-700 mb-4 flex items-center gap-2">
-              <FontAwesomeIcon icon={faTools} className="text-teal-600" />
-              <span>Unfinished Job Stages</span>
-            </h3>
-            <div className="h-64 flex items-center justify-center">
-              {stageBreakdown.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={stageBreakdown}
-                      dataKey="value"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={75}
-                      label={({ name, percent }: any) => `${name} ${(percent * 100).toFixed(0)}%`}
-                    >
-                      {stageBreakdown.map((_, index) => (
-                        <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+              <div className="bg-white rounded border border-odoo-border shadow-xs p-5">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-gray-700 mb-4 flex items-center gap-2">
+                  <FontAwesomeIcon icon={faTools} className="text-teal-600" />
+                  <span>Unfinished work by stage</span>
+                </h3>
+                {stageBreakdown.length === 0 ? (
+                  <div className="h-56 flex items-center justify-center text-xs text-gray-400">Nothing in progress.</div>
+                ) : (
+                  <>
+                    <div className="h-44">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie data={stageBreakdown} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70}>
+                            {stageBreakdown.map((_, index) => (
+                              <Cell key={index} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <ul className="mt-2 space-y-1 text-xs">
+                      {stageBreakdown.map((s) => (
+                        <li key={s.name} className="flex justify-between"><span className="text-gray-600">{s.name}</span><strong>{s.value}</strong></li>
                       ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="text-xs text-gray-400">All scheduled jobs completed!</div>
-              )}
+                    </ul>
+                  </>
+                )}
+              </div>
             </div>
-          </div>
-        </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="bg-white rounded border border-odoo-border shadow-xs p-5">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-gray-700 mb-3">Subsidy status</h3>
+                {subsidyRows.length === 0 ? (
+                  <div className="text-xs text-gray-400">No subsidy applications yet.</div>
+                ) : (
+                  <ul className="space-y-1 text-xs">
+                    {subsidyRows.map(([k, v]) => (
+                      <li key={k} className="flex justify-between"><span className="text-gray-600">{k.replace(/_/g, ' ').toLowerCase()}</span><strong>{v as number}</strong></li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <div className="bg-white rounded border border-odoo-border shadow-xs p-5">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-gray-700 mb-3">Low stock</h3>
+                {(dashboard.low_stock_items || []).length === 0 ? (
+                  <div className="text-xs text-gray-400">All stock above minimum levels.</div>
+                ) : (
+                  <ul className="space-y-1 text-xs">
+                    {dashboard.low_stock_items.map((p: any) => (
+                      <li key={p.sku} className="flex justify-between">
+                        <span className="text-gray-600">{p.name}</span>
+                        <strong className="text-amber-700">{p.stock} / min {p.min}</strong>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </>
+        )}
 
         {/* Detailed Profit Per Job Table matching Screenshot */}
-        {!shareToken && (
+        {!shareToken && dashboard && (
           <div className="bg-white rounded border border-odoo-border shadow-xs p-5">
             <div className="flex justify-between items-center mb-3">
               <h3 className="text-xs font-bold uppercase tracking-wider text-gray-700 flex items-center gap-2">
                 <FontAwesomeIcon icon={faChartPie} className="text-odoo-primary" />
-                <span>Profit Per Job Analysis (Revenue − BOM Stock Costs − Crew Wages)</span>
+                <span>Profit per job (revenue − stock cost − technician pay − other costs)</span>
               </h3>
               <span className="text-[11px] text-gray-500">
                 Click any row or tap <strong>Details</strong> to view complete order breakdown
@@ -349,7 +359,7 @@ export const DashboardPage: React.FC = () => {
 
             {profitJobs.length === 0 ? (
               <div className="text-center py-6 text-gray-400 text-xs">
-                No orders completed within this time range.
+                No confirmed orders in this period yet.
               </div>
             ) : (
               <div className="overflow-x-auto border border-gray-200 rounded">

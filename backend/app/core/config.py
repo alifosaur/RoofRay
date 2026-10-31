@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     FIREBASE_WEB_APP_ID: str = ""
 
     UPLOAD_DIR: str = "./uploads"
+    REDIS_URL: str = ""  # empty = no cache/locks (DB only)
     SECRET_KEY: str = "sunpower-secret-key-change-in-production"
     COMPANY_CONTACT_LINE: str = "Rooftop Solar Engineering & EPC"
 

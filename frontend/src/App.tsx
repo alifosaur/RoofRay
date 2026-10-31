@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { LiveEventsProvider } from './live/LiveEvents';
 import { RoleRouteGuard } from './routes/RoleRouteGuard';
 import { AppLayout } from './components/odoo/AppLayout';
 
@@ -33,6 +34,7 @@ export const App: React.FC = () => {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <LiveEventsProvider>
         <Routes>
           {/* Public customer-facing website & portal pages */}
           <Route path="/" element={<PublicWebsitePage />} />
@@ -229,6 +231,7 @@ export const App: React.FC = () => {
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </LiveEventsProvider>
       </AuthProvider>
     </BrowserRouter>
   );

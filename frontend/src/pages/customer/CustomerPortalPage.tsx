@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLiveRefresh } from '../../live/LiveEvents';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { api, downloadFile } from '../../api/client';
@@ -196,6 +197,9 @@ export const CustomerPortalPage: React.FC = () => {
       setLoading(false);
     }
   };
+
+  // Live: refetch when another role hands work over (SSE)
+  useLiveRefresh('*', loadData);
 
   useEffect(() => {
     loadData();

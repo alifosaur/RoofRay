@@ -16,6 +16,8 @@ from app.models.finance import Invoice, InvoiceType, InvoiceStatus, InvoiceLine,
 from app.models.audit import AuditLog
 from app.models.notification import Notification
 from app.models.scheme import GovernmentScheme
+from app.models.outbox import OutboxEvent
+from app.models.expense import Expense
 
 __all__ = [
     "Base",
@@ -61,5 +63,7 @@ __all__ = [
     "AuditLog",
     "Notification",
     "GovernmentScheme",
+    "OutboxEvent",
+    "Expense",
 ]
 

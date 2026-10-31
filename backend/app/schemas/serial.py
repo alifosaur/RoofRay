@@ -22,7 +22,8 @@ class SerialItemOut(BaseModel):
     order_id: Optional[int] = None
     customer_id: Optional[int] = None
     status: SerialStatus
-    delivered_on: Optional[date] = None
+    scanned_at: Optional[datetime] = None
+    delivered_on: Optional[date] = None  # warranty start
     warranty_end: Optional[date] = None
     created_at: datetime
     product: ProductOut

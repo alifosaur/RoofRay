@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLiveRefresh } from '../../live/LiveEvents';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
 import { ControlPanel, ViewType } from '../../components/odoo/ControlPanel';
@@ -33,6 +34,9 @@ export const CRMPage: React.FC = () => {
     }
   };
 
+  // Live: refetch when another role hands work over (SSE)
+  useLiveRefresh(['lead.', 'survey.', 'quote.', 'order.'], () => { fetchLeads(); fetchSalesMetrics(); });
+
   const fetchSalesMetrics = async () => {
     try {
       const data = await api.get<any>('/reports/sales-metrics');
@@ -45,9 +49,6 @@ export const CRMPage: React.FC = () => {
   useEffect(() => {
     fetchLeads();
     fetchSalesMetrics();
-    // Auto-refresh CRM pipeline every 15 seconds for incoming customer portal leads
-    const interval = setInterval(fetchLeads, 15000);
-    return () => clearInterval(interval);
   }, []);
 
   const columns: KanbanColumn[] = [

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useLiveRefresh } from '../../live/LiveEvents';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
 import { ControlPanel } from '../../components/odoo/ControlPanel';
@@ -47,6 +48,9 @@ export const OrdersPage: React.FC = () => {
       setLoading(false);
     }
   };
+
+  // Live: refetch when another role hands work over (SSE)
+  useLiveRefresh(['order.', 'job.', 'serial.'], fetchOrders);
 
   useEffect(() => {
     fetchOrders();

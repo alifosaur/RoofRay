@@ -6,6 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from app.core.config import settings
 from app.core.database import engine, Base
 import app.models  # Ensure all models are registered with Base.metadata
+import app.core.events  # noqa: F401  (registers cache invalidation after commits)
 
 from app.routers import (
     auth,
@@ -23,6 +24,8 @@ from app.routers import (
     finance,
     reports,
     customer,
+    events,
+    notifications,
 )
 
 from sqlalchemy import text
@@ -48,6 +51,7 @@ with engine.connect() as conn:
         "ALTER TABLE subsidy_records ADD COLUMN sanctioned_amount FLOAT DEFAULT 0.0",
         "ALTER TABLE subsidy_records ADD COLUMN rejection_notes TEXT",
         "ALTER TABLE users ADD COLUMN password_hash VARCHAR(255)",
+        "ALTER TABLE serial_items ADD COLUMN scanned_at TIMESTAMP",
         "ALTER TABLE government_schemes ADD COLUMN cfa_per_kw_first_2kw FLOAT DEFAULT 0 NOT NULL",
         "ALTER TABLE government_schemes ADD COLUMN cfa_per_kw_3rd_kw FLOAT DEFAULT 0 NOT NULL",
         "ALTER TABLE government_schemes ADD COLUMN cfa_max FLOAT DEFAULT 0 NOT NULL",
@@ -103,6 +107,8 @@ app.include_router(tickets.router, prefix=settings.API_V1_PREFIX)
 app.include_router(finance.router, prefix=settings.API_V1_PREFIX)
 app.include_router(reports.router, prefix=settings.API_V1_PREFIX)
 app.include_router(customer.router, prefix=settings.API_V1_PREFIX)
+app.include_router(events.router, prefix=settings.API_V1_PREFIX)
+app.include_router(notifications.router, prefix=settings.API_V1_PREFIX)
 
 
 @app.get("/")

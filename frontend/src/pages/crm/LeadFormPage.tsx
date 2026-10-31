@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLiveRefresh } from '../../live/LiveEvents';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { api } from '../../api/client';
 import { FormView, FormTab } from '../../components/odoo/FormView';
@@ -94,6 +95,9 @@ export const LeadFormPage: React.FC = () => {
       console.error(err);
     }
   };
+
+  // Live: refetch when another role hands work over (SSE)
+  useLiveRefresh(['lead.', 'survey.', 'quote.'], fetchLeadData);
 
   useEffect(() => {
     fetchLeadData();

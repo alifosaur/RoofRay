@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { useLiveRefresh } from '../../live/LiveEvents';
 import { api } from '../../api/client';
 import { ControlPanel } from '../../components/odoo/ControlPanel';
 import { Html5QrcodeScanner } from 'html5-qrcode';
@@ -58,6 +59,9 @@ export const DispatchPage: React.FC = () => {
       setLoading(false);
     }
   };
+
+  // Live: refetch when another role hands work over (SSE)
+  useLiveRefresh(['order.', 'serial.'], fetchOrdersAndProducts);
 
   const handleUpdateStage = async (newStage: string) => {
     if (!selectedOrderId) return;

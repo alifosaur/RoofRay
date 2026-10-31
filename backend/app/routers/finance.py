@@ -1,4 +1,7 @@
+from datetime import date
 from typing import List, Optional
+
+from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -8,6 +11,8 @@ from app.models.user import User, UserRole
 from app.models.finance import Invoice, SubsidyRecord, TechnicianPayout
 from app.schemas.finance import InvoiceOut, SubsidyRecordOut, SubsidyRecordUpdate, TechnicianPayoutOut
 from app.services import finance_service
+from app.core import events
+from app.models.expense import Expense
 
 router = APIRouter(prefix="/finance", tags=["Finance & Billing"])
 
@@ -116,3 +121,34 @@ def disburse_payout(
     """Marks technician timesheet payout as disbursed."""
     return finance_service.mark_payout_paid(db, payout_id, current_user.id)
 
+
+
+class ExpenseIn(BaseModel):
+    category: str = Field(min_length=2)
+    amount: float = Field(gt=0)
+    expense_date: Optional[date] = None
+    description: Optional[str] = None
+    order_id: Optional[int] = None
+
+
+@router.get("/expenses")
+def list_expenses(db: Session = Depends(get_db), current_user: User = Depends(require_role(UserRole.ADMIN))):
+    rows = db.query(Expense).order_by(Expense.expense_date.desc(), Expense.id.desc()).all()
+    return [
+        {"id": e.id, "expense_date": e.expense_date, "category": e.category, "amount": e.amount,
+         "description": e.description, "order_id": e.order_id}
+        for e in rows
+    ]
+
+
+@router.post("/expenses", status_code=status.HTTP_201_CREATED)
+def record_expense(payload: ExpenseIn, db: Session = Depends(get_db), current_user: User = Depends(require_role(UserRole.ADMIN))):
+    """Other costs (transport, permits, etc.); job-linked costs reduce that job's profit."""
+    if payload.order_id and not db.query(Order).filter(Order.id == payload.order_id).first():
+        raise HTTPException(status_code=404, detail="Order not found")
+    exp = Expense(**payload.model_dump(exclude_none=True), created_by_id=current_user.id)
+    db.add(exp)
+    db.flush()
+    events.emit(db, "finance.expense_recorded", {"expense_id": exp.id, "amount": exp.amount}, roles=[UserRole.ADMIN])
+    db.commit()
+    return {"id": exp.id}

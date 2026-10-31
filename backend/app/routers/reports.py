@@ -1,7 +1,7 @@
 import os
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -15,15 +15,16 @@ router = APIRouter(prefix="/reports", tags=["Executive Reports & Dashboard"])
 @router.get("/dashboard")
 def get_dashboard(
     range: str = Query("this_month", pattern="^(today|this_week|this_month|all)$"),
+    granularity: str = Query("day", pattern="^(day|week|month)$"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.ADMIN, UserRole.SALES)),
+    current_user: User = Depends(require_role(UserRole.ADMIN)),
 ):
     """
-    Director executive dashboard:
-    Revenue, collected vs pending, net profit, profitable vs loss-making jobs,
-    open tickets, low stock, and subsidy pipeline.
+    Admin finance & operations dashboard, computed from the database (cached ≤45 s, invalidated by events):
+    money received / spent / pending, payouts, profit per job, profit series by day/week/month,
+    unfinished work by stage, open tickets, low stock and subsidy pipeline.
     """
-    return report_service.get_director_dashboard_metrics(db, range)
+    return report_service.get_director_dashboard_metrics(db, range, granularity)
 
 
 @router.get("/profit-per-job")
@@ -53,6 +54,17 @@ def export_excel(
     )
 
 
+@router.get("/export.pdf")
+def export_pdf(
+    range: str = Query("this_month", pattern="^(today|this_week|this_month|all)$"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.ADMIN)),
+):
+    pdf = report_service.export_dashboard_to_pdf(db, range)
+    return Response(pdf, media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="report_{range}.pdf"'})
+
+
 @router.post("/share-link")
 def create_dashboard_share_link(
     expires_days: int = 7,
@@ -71,6 +83,7 @@ def create_dashboard_share_link(
 def get_shared_dashboard(
     token: str,
     range: str = Query("this_month", pattern="^(today|this_week|this_month|all)$"),
+    granularity: str = Query("day", pattern="^(day|week|month)$"),
     db: Session = Depends(get_db),
 ):
     """Public read-only dashboard accessible via expiring share token."""
@@ -79,7 +92,10 @@ def get_shared_dashboard(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired shareable dashboard token.",
         )
-    return report_service.get_director_dashboard_metrics(db, range)
+    metrics = dict(report_service.get_director_dashboard_metrics(db, range, granularity))
+    # Shared (investor) view: aggregates only, no customer-level records
+    metrics.pop("profit_per_job", None)
+    return metrics
 
 
 @router.get("/sales-metrics")

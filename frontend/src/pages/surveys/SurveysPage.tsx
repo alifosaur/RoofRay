@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLiveRefresh } from '../../live/LiveEvents';
 import { api } from '../../api/client';
 import { ControlPanel } from '../../components/odoo/ControlPanel';
 import { ListView, ColumnDef } from '../../components/odoo/ListView';
@@ -26,6 +27,9 @@ export const SurveysPage: React.FC = () => {
       console.error(err);
     }
   };
+
+  // Live: refetch when another role hands work over (SSE)
+  useLiveRefresh(['survey.'], fetchSurveys);
 
   useEffect(() => {
     fetchSurveys();

@@ -23,7 +23,8 @@ class SerialItem(Base):
     customer_id = Column(Integer, ForeignKey("customers.id"), nullable=True)
 
     status = Column(Enum(SerialStatus), default=SerialStatus.IN_STOCK, nullable=False)
-    delivered_on = Column(Date, nullable=True)
+    scanned_at = Column(DateTime, nullable=True)     # when the warehouse scanned it against an order
+    delivered_on = Column(Date, nullable=True)       # warranty start (set automatically on delivery)
     warranty_end = Column(Date, nullable=True)
 
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

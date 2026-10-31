@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { useLiveRefresh } from '../../live/LiveEvents';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../../api/client';
 import { ControlPanel } from '../../components/odoo/ControlPanel';
@@ -75,11 +76,11 @@ export const InventoryPage: React.FC = () => {
     }
   };
 
+  // Live: refetch when another role hands work over (SSE)
+  useLiveRefresh(['order.', 'serial.', 'stock.'], fetchData);
+
   useEffect(() => {
     fetchData();
-    // Auto-poll every 10 seconds for real-time incoming items from sales
-    const interval = setInterval(fetchData, 10000);
-    return () => clearInterval(interval);
   }, [lowStockOnly, searchParams]);
 
   // Camera scanner effect for PickList modal

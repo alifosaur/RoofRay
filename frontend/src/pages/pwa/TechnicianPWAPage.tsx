@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { useLiveRefresh } from '../../live/LiveEvents';
 import { api } from '../../api/client';
 import { useNavigate } from 'react-router-dom';
 import SignatureCanvas from 'react-signature-canvas';
@@ -74,10 +75,11 @@ export const TechnicianPWAPage: React.FC = () => {
     }
   };
 
+  // Live: refetch when another role hands work over (SSE)
+  useLiveRefresh(['survey.', 'job.'], fetchSchedule);
+
   useEffect(() => {
     fetchSchedule();
-    const interval = setInterval(fetchSchedule, 10000);
-    return () => clearInterval(interval);
   }, []);
 
   const handleCompleteSurvey = async (e: React.FormEvent) => {

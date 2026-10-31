@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useLiveRefresh } from '../../live/LiveEvents';
 import { api } from '../../api/client';
 import { ControlPanel } from '../../components/odoo/ControlPanel';
 import { KanbanView, KanbanColumn, KanbanItem } from '../../components/odoo/KanbanView';
@@ -65,6 +66,9 @@ export const HelpdeskPage: React.FC = () => {
       setLoading(false);
     }
   };
+
+  // Live: refetch when another role hands work over (SSE)
+  useLiveRefresh(['ticket.'], fetchTickets);
 
   useEffect(() => {
     fetchTickets();

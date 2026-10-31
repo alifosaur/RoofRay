@@ -144,6 +144,8 @@ def test_complete_chain_from_empty_database(client):
     assert edited.status_code == 200 and edited.json()["total_amount"] > quote["total_amount"]
     assert client.post(f"/api/quotes/{quote['id']}/send", headers=sales).status_code == 200
     assert client.get(f"/api/leads/{lead_id}", headers=sales).json()["status"] == "QUOTED"
+    portal_quotes = client.get("/api/customer/quotes", headers=cust)
+    assert portal_quotes.status_code == 200 and [q["status"] for q in portal_quotes.json()] == ["SENT"]
     assert client.get("/api/customer/tracker", headers=cust).json()["current_stage_key"] == "order_confirmed"
     order_id = client.post(f"/api/customer/quotes/{quote['id']}/accept", headers=cust).json()["order_id"]
     assert client.get(f"/api/leads/{lead_id}", headers=sales).json()["status"] == "WON"

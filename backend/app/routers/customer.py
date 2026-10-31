@@ -396,7 +396,7 @@ def get_customer_quotes(
             "subtotal": q.subtotal,
             "tax_amount": q.tax_amount,
             "created_at": q.created_at.strftime("%Y-%m-%d"),
-            "valid_until": q.valid_until.strftime("%Y-%m-%d") if q.valid_until else None,
+            "valid_until": None,  # quotes carry no validity date
             "has_pdf": bool(q.pdf_path),
             "lines": [
                 {

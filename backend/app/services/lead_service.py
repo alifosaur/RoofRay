@@ -36,8 +36,8 @@ def get_next_sales_user(db: Session) -> Optional[User]:
     """Round-robin assignment to active sales agents based on least assigned leads."""
     sales_users = db.query(User).filter(User.role == UserRole.SALES, User.is_active == True).all()
     if not sales_users:
-        # Fallback to admin if no sales user
-        return db.query(User).filter(User.role == UserRole.ADMIN).first()
+        # Leave unassigned (admins see every lead); assign_unassigned_leads hands it out when a sales user exists
+        return None
 
     # Find the sales user with fewest active leads
     counts = []
@@ -182,3 +182,27 @@ def notify_new_lead(db: Session, lead: Lead) -> None:
         message=f"New lead from {lead.name} for {lead.required_capacity} kW {lead.system_type}.",
         link=f"/web/crm/{lead.id}",
     )
+
+
+def assign_unassigned_leads(db: Session, actor_id: Optional[int] = None) -> int:
+    """Shares open leads with no active sales owner out to active sales users (least-loaded first)."""
+    active_sales = {u.id for u in db.query(User).filter(User.role == UserRole.SALES, User.is_active == True).all()}
+    if not active_sales:
+        return 0
+    open_leads = db.query(Lead).filter(
+        Lead.is_deleted == False,
+        Lead.status.notin_([LeadStatus.WON, LeadStatus.LOST]),
+    ).order_by(Lead.created_at).all()
+    moved = 0
+    for lead in open_leads:
+        if lead.assigned_to_id in active_sales:
+            continue
+        owner = get_next_sales_user(db)
+        old = lead.assigned_to_id
+        lead.assigned_to_id = owner.id
+        db.add(AuditLog(record_type="lead", record_id=lead.id, action="LEAD_REASSIGNED",
+                        notes=f"assigned_to_id: {old} → {owner.id} (no active sales owner)", user_id=actor_id))
+        notify_new_lead(db, lead)
+        db.flush()
+        moved += 1
+    return moved

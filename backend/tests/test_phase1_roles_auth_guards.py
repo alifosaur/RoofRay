@@ -250,3 +250,22 @@ def test_admin_removes_staff_or_deactivates_when_history_exists():
 
     me = client.get("/api/auth/me", headers=admin_headers).json()
     assert client.delete(f"/api/users/{me['id']}", headers=admin_headers).status_code == 400
+
+
+def test_leads_without_active_sales_owner_are_reassigned():
+    from app.core.database import SessionLocal
+    from app.models.lead import Lead
+    lead = client.post("/api/leads/public", json={"name": "Orphan Lead", "phone": f"94{uuid.uuid4().int % 10**8:08d}", "address": "2 Road"}).json()
+    db = SessionLocal()
+    db.query(Lead).filter(Lead.id == lead["id"]).update({"assigned_to_id": None})
+    db.commit()
+    db.close()
+    # Creating / reactivating a sales user hands out ownerless open leads
+    temp = client.post("/api/users", headers=admin_headers, json={
+        "email": f"rr_{uuid.uuid4().hex[:6]}@example.com", "full_name": "New Sales", "role": "sales", "password": "temp-pass-1"}).json()["user"]
+    owner = client.get(f"/api/leads/{lead['id']}", headers=admin_headers).json()["assigned_to_id"]
+    assert owner is not None
+    client.put(f"/api/users/{temp['id']}", headers=admin_headers, json={"is_active": False})
+    # Deactivating the owner moves its open leads to a remaining active sales user
+    owner_after = client.get(f"/api/leads/{lead['id']}", headers=admin_headers).json()["assigned_to_id"]
+    assert owner_after is not None and owner_after != temp["id"]

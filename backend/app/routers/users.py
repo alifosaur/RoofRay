@@ -12,7 +12,7 @@ from app.models.user import User, UserRole
 from app.models.survey import Survey, SurveyStatus
 from app.models.job import InstallationJob, JobStatus
 from app.schemas.user import AdminSetPasswordRequest, StaffCreateRequest, StaffCreateResponse, UserUpdate, UserOut
-from app.services import audit_service
+from app.services import audit_service, lead_service
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -65,6 +65,8 @@ def create_user(
     db.flush()
     db.add(AuditLog(record_type="user", record_id=user.id, action="USER_CREATED", to_status=user.role.value,
                     notes=f"Staff account {email} created with role {user.role.value}.", user_id=current_user.id))
+    if user.role == UserRole.SALES and user.is_active:
+        lead_service.assign_unassigned_leads(db, current_user.id)
     db.commit()
     db.refresh(user)
     setup_url = None
@@ -147,6 +149,10 @@ def update_user(
     if user.id == current_user.id and (update_data.get("is_active") is False or update_data.get("role", UserRole.ADMIN) != UserRole.ADMIN):
         raise HTTPException(status_code=400, detail="You cannot deactivate or demote your own admin account")
     audit_service.apply_changes(db, "user", user, update_data, current_user.id)
+    db.flush()
+    # A sales user became available, or one left: re-home leads that have no active sales owner
+    if "is_active" in update_data or "role" in update_data:
+        lead_service.assign_unassigned_leads(db, current_user.id)
 
     db.commit()
     db.refresh(user)
@@ -190,6 +196,8 @@ def remove_user(
 
     if history:
         user.is_active = False
+        db.flush()
+        lead_service.assign_unassigned_leads(db, current_user.id)
         db.add(AuditLog(record_type="user", record_id=user.id, action="USER_DEACTIVATED",
                         notes=f"Removal requested; kept for history ({', '.join(history)}).", user_id=current_user.id))
         db.commit()

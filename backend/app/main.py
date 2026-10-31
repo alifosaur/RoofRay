@@ -7,7 +7,7 @@ from app.core.config import settings
 from app.core.database import engine, Base
 import app.models  # Ensure all models are registered with Base.metadata
 
-from app.routers import auth, users
+from app.routers import auth, users, leads, surveys
 
 # Create all tables on startup (works with both SQLite and PostgreSQL)
 Base.metadata.create_all(bind=engine)
@@ -36,6 +36,8 @@ app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads"
 # Include Routers
 app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
 app.include_router(users.router, prefix=settings.API_V1_PREFIX)
+app.include_router(leads.router, prefix=settings.API_V1_PREFIX)
+app.include_router(surveys.router, prefix=settings.API_V1_PREFIX)
 
 
 @app.get("/")

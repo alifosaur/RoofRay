@@ -193,6 +193,13 @@ export const DashboardPage: React.FC = () => {
                   <span>PDF</span>
                 </button>
                 <button
+                  onClick={() => navigate('/web/users')}
+                  className="bg-white border border-odoo-border hover:bg-gray-50 text-gray-800 px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1 shadow-xs"
+                >
+                  <i className="fa-solid fa-user-plus"></i>
+                  <span>Add Staff</span>
+                </button>
+                <button
                   onClick={handleGenerateShareLink}
                   className="bg-odoo-primary hover:bg-odoo-primary-dark text-white px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1 shadow-xs"
                 >

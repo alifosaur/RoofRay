@@ -28,6 +28,12 @@ interface UserItem {
   created_at: string;
 }
 
+const STAFF_ROLES = [
+  { role: 'sales', label: 'Sales Officer', icon: 'fa-handshake' },
+  { role: 'technician', label: 'Technician', icon: 'fa-helmet-safety' },
+  { role: 'warehouse', label: 'Warehouse Staff', icon: 'fa-warehouse' },
+];
+
 export const UsersPage: React.FC = () => {
   const [users, setUsers] = useState<UserItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,6 +51,10 @@ export const UsersPage: React.FC = () => {
     hourly_rate: 0,
   });
   const { sendStaffPasswordEmail } = useAuth();
+  const openCreate = (role: string) => {
+    setNewUser({ email: '', full_name: '', role, phone: '', hourly_rate: 0 });
+    setShowCreateModal(true);
+  };
   const [setupLink, setSetupLink] = useState<string | null>(null);
 
   const fetchUsers = async () => {
@@ -151,11 +161,26 @@ export const UsersPage: React.FC = () => {
     <div className="flex-1 flex flex-col font-sans">
       <ControlPanel
         breadcrumbs={[{ label: 'Admin Settings' }, { label: 'User & Staff Management' }]}
-        onNew={() => setShowCreateModal(true)}
+        onNew={() => openCreate('sales')}
         newButtonLabel="Create Staff User"
         searchTerm={search}
         onSearchChange={setSearch}
       />
+
+      {/* Quick add: one button per staff role, opens the form with the role preset */}
+      <div className="bg-white border-b border-gray-200 px-6 py-3 flex flex-wrap items-center gap-2 text-xs">
+        <span className="font-semibold text-gray-600 mr-1">Add staff:</span>
+        {STAFF_ROLES.map((r) => (
+          <button
+            key={r.role}
+            onClick={() => openCreate(r.role)}
+            className="px-3 py-1.5 rounded bg-odoo-primary hover:bg-odoo-primary-dark text-white font-semibold flex items-center gap-1.5 shadow-xs"
+          >
+            <i className={`fa-solid ${r.icon}`}></i>
+            <span>Add {r.label}</span>
+          </button>
+        ))}
+      </div>
 
       {setupLink && (
         <div className="mx-6 mt-3 p-3 bg-emerald-50 border border-emerald-200 rounded text-xs text-emerald-900">

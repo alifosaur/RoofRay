@@ -5,7 +5,6 @@ import { NotificationBell } from '../common/NotificationBell';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faTh,
-  faBell,
   faSun,
   faMobileAlt,
   faGlobe,
@@ -62,7 +61,6 @@ export const Navbar: React.FC<NavbarProps> = ({ appName, onToggleHomeMenu, isHom
 
       {/* Right: Systray */}
       <div className="flex items-center space-x-3">
-        <NotificationBell />
         {/* Quick Links: Website & Tech Mobile PWA */}
         <Link
           to="/"
@@ -82,11 +80,8 @@ export const Navbar: React.FC<NavbarProps> = ({ appName, onToggleHomeMenu, isHom
           <span className="hidden sm:inline">Tech PWA</span>
         </Link>
 
-        {/* Notifications Icon */}
-        <button className="p-1.5 rounded hover:bg-white/10 text-white/80 hover:text-white relative" title="Notifications">
-          <FontAwesomeIcon icon={faBell} />
-          <span className="absolute top-1 right-1 w-2 h-2 bg-odoo-accent rounded-full"></span>
-        </button>
+
+        <NotificationBell />
 
         {/* User Avatar & Logged-in User Profile Dropdown */}
         <div className="relative">

@@ -35,7 +35,7 @@ export const CRMPage: React.FC = () => {
   };
 
   // Live: refetch when another role hands work over (SSE)
-  useLiveRefresh(['lead.', 'survey.', 'quote.', 'order.'], () => { fetchLeads(); fetchSalesMetrics(); });
+  useLiveRefresh(['lead.', 'survey.', 'quote.', 'order.', 'job.'], () => { fetchLeads(); fetchSalesMetrics(); });
 
   const fetchSalesMetrics = async () => {
     try {

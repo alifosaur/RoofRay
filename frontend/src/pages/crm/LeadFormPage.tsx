@@ -99,7 +99,7 @@ export const LeadFormPage: React.FC = () => {
   };
 
   // Live: refetch when another role hands work over (SSE)
-  useLiveRefresh(['lead.', 'survey.', 'quote.'], fetchLeadData);
+  useLiveRefresh(['lead.', 'survey.', 'quote.', 'order.', 'job.'], fetchLeadData);
 
   useEffect(() => {
     fetchLeadData();

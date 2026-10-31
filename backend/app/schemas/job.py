@@ -1,6 +1,6 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional, Any
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import field_validator, BaseModel, ConfigDict, model_validator
 from app.models.job import JobStatus
 from app.schemas.user import UserOut
 
@@ -46,6 +46,12 @@ class JobCompleteRequest(BaseModel):
     signature_data: str             # Base64 canvas data of the customer's signature
     start_time: Optional[datetime] = None   # defaults to when the job was started
     finish_time: Optional[datetime] = None
+
+    @field_validator("start_time", "finish_time")
+    @classmethod
+    def to_naive_utc(cls, v: Optional[datetime]) -> Optional[datetime]:
+        # DB timestamps are naive UTC; browsers send ISO strings with "Z"
+        return v.astimezone(timezone.utc).replace(tzinfo=None) if v and v.tzinfo else v
     generation_reading_kw: Optional[float] = None
     inverter_serial: Optional[str] = None
     notes: Optional[str] = None

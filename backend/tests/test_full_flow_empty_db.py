@@ -191,7 +191,7 @@ def test_complete_chain_from_empty_database(client):
     done = client.post(f"/api/jobs/{job['id']}/complete", headers=tech, json={
         "confirmed_capacity_kw": 3.24, "power_generating": True, "customer_name": "Asha Rao",
         "signature_data": "data:image/png;base64,iVBORw0KGgo=",
-        "start_time": (datetime.utcnow() - timedelta(hours=3)).isoformat()})
+        "start_time": (datetime.utcnow() - timedelta(hours=3)).isoformat() + "Z"})  # browsers send UTC with "Z"
     assert done.status_code == 200, done.text
     ts = done.json()["timesheet"]
     assert ts["hourly_rate"] == 600 and abs(ts["hours"] - 3) < 0.05 and abs(ts["total_cost"] - 1800) < 30

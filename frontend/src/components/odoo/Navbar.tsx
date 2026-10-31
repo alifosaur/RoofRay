@@ -5,10 +5,11 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faTh,
   faBell,
-  faUserCircle,
   faSun,
   faMobileAlt,
   faGlobe,
+  faTachometerAlt,
+  faSignOutAlt,
 } from '@fortawesome/free-solid-svg-icons';
 
 interface NavbarProps {
@@ -17,18 +18,24 @@ interface NavbarProps {
   isHomeMenuOpen: boolean;
 }
 
+const ROLE_LABELS: Record<UserRole, string> = {
+  admin: 'Admin (Director)',
+  sales: 'Sales Officer',
+  technician: 'Technician (Field)',
+  warehouse: 'Warehouse Manager',
+  customer: 'Customer Portal',
+};
+
 export const Navbar: React.FC<NavbarProps> = ({ appName, onToggleHomeMenu, isHomeMenuOpen }) => {
-  const { user, role, switchRole } = useAuth();
+  const { user, role, logout } = useAuth();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const navigate = useNavigate();
 
-  const roles: { id: UserRole; label: string }[] = [
-    { id: 'admin', label: 'Admin (Director)' },
-    { id: 'sales', label: 'Sales Officer' },
-    { id: 'technician', label: 'Technician (Field)' },
-    { id: 'warehouse', label: 'Warehouse Manager' },
-    { id: 'customer', label: 'Customer Portal' },
-  ];
+  const handleSignOut = () => {
+    logout();
+    setShowUserMenu(false);
+    navigate('/login');
+  };
 
   return (
     <nav className="bg-odoo-primary text-white h-11 px-3 flex items-center justify-between text-sm select-none z-40 relative shadow-sm">
@@ -79,7 +86,7 @@ export const Navbar: React.FC<NavbarProps> = ({ appName, onToggleHomeMenu, isHom
           <span className="absolute top-1 right-1 w-2 h-2 bg-odoo-accent rounded-full"></span>
         </button>
 
-        {/* User Avatar & Fast Role Switcher */}
+        {/* User Avatar & Logged-in User Profile Dropdown */}
         <div className="relative">
           <button
             onClick={() => setShowUserMenu(!showUserMenu)}
@@ -88,51 +95,84 @@ export const Navbar: React.FC<NavbarProps> = ({ appName, onToggleHomeMenu, isHom
             <div className="w-6 h-6 rounded-full bg-odoo-accent text-white flex items-center justify-center text-xs font-bold uppercase">
               {user?.full_name ? user.full_name[0] : 'U'}
             </div>
-            <span className="text-xs font-medium hidden md:inline">{user?.full_name || 'Admin'}</span>
+            <span className="text-xs font-medium hidden md:inline">{user?.full_name || 'User'}</span>
             <span className="text-[10px] uppercase bg-white/20 px-1.5 py-0.5 rounded text-white/90">
               {role}
             </span>
           </button>
 
           {showUserMenu && (
-            <div className="absolute right-0 mt-1 w-56 bg-white text-odoo-text rounded shadow-xl border border-odoo-border py-1 text-xs z-50">
-              <div className="px-3 py-2 border-b border-odoo-border bg-gray-50">
-                <div className="font-semibold text-gray-800">{user?.full_name}</div>
-                <div className="text-gray-500 text-[11px]">{user?.email}</div>
-              </div>
+            <>
+              {/* Click-outside backdrop */}
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setShowUserMenu(false)}
+              />
 
-              <div className="px-3 py-1.5 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
-                Switch Staff Role (Demo)
-              </div>
-              {roles.map((r) => (
-                <button
-                  key={r.id}
-                  onClick={async () => {
-                    await switchRole(r.id);
-                    setShowUserMenu(false);
-                    navigate(getRoleHomePath(r.id));
-                  }}
-                  className={`w-full text-left px-3 py-1.5 flex items-center justify-between hover:bg-odoo-bg transition-colors ${
-                    role === r.id ? 'font-bold text-odoo-primary bg-purple-50' : 'text-gray-700'
-                  }`}
-                >
-                  <span>{r.label}</span>
-                  {role === r.id && <span className="w-1.5 h-1.5 rounded-full bg-odoo-primary"></span>}
-                </button>
-              ))}
+              <div className="absolute right-0 mt-1 w-64 bg-white text-odoo-text rounded shadow-xl border border-odoo-border py-1 text-xs z-50 animate-in fade-in slide-in-from-top-1 duration-150">
+                {/* Logged in User Information & Single Assigned Role */}
+                <div className="px-3.5 py-2.5 border-b border-odoo-border bg-gray-50/80">
+                  <div className="font-semibold text-gray-800 text-sm leading-tight">
+                    {user?.full_name || 'Logged-in User'}
+                  </div>
+                  <div className="text-gray-500 text-[11px] truncate mt-0.5">
+                    {user?.email}
+                  </div>
+                  <div className="mt-2 flex items-center gap-1.5">
+                    <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-purple-100 text-purple-900 border border-purple-200">
+                      {ROLE_LABELS[role] || role}
+                    </span>
+                  </div>
+                </div>
 
-              <div className="border-t border-odoo-border mt-1 pt-1">
-                <button
-                  onClick={() => {
-                    navigate('/login');
-                    setShowUserMenu(false);
-                  }}
-                  className="w-full text-left px-3 py-1.5 text-red-600 hover:bg-red-50"
-                >
-                  Sign Out
-                </button>
+                <div className="py-1">
+                  <button
+                    onClick={() => {
+                      setShowUserMenu(false);
+                      navigate(getRoleHomePath(role));
+                    }}
+                    className="w-full text-left px-3.5 py-2 flex items-center gap-2.5 hover:bg-gray-50 text-gray-700 transition-colors"
+                  >
+                    <FontAwesomeIcon icon={faTachometerAlt} className="text-odoo-primary w-3.5" />
+                    <span>My Workspace</span>
+                  </button>
+
+                  {role === 'technician' && (
+                    <button
+                      onClick={() => {
+                        setShowUserMenu(false);
+                        navigate('/pwa/tech');
+                      }}
+                      className="w-full text-left px-3.5 py-2 flex items-center gap-2.5 hover:bg-gray-50 text-gray-700 transition-colors"
+                    >
+                      <FontAwesomeIcon icon={faMobileAlt} className="text-teal-600 w-3.5" />
+                      <span>Mobile Technician PWA</span>
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => {
+                      setShowUserMenu(false);
+                      navigate('/');
+                    }}
+                    className="w-full text-left px-3.5 py-2 flex items-center gap-2.5 hover:bg-gray-50 text-gray-700 transition-colors"
+                  >
+                    <FontAwesomeIcon icon={faGlobe} className="text-gray-500 w-3.5" />
+                    <span>Public Website</span>
+                  </button>
+                </div>
+
+                <div className="border-t border-odoo-border pt-1">
+                  <button
+                    onClick={handleSignOut}
+                    className="w-full text-left px-3.5 py-2 text-red-600 hover:bg-red-50 flex items-center gap-2.5 font-medium transition-colors"
+                  >
+                    <FontAwesomeIcon icon={faSignOutAlt} className="w-3.5" />
+                    <span>Sign Out</span>
+                  </button>
+                </div>
               </div>
-            </div>
+            </>
           )}
         </div>
       </div>

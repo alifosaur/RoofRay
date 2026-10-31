@@ -95,5 +95,10 @@ def test_scan_all_links_registered_serials_then_placeholders():
     assert body["total"] == sum(l["quantity"] for l in serialised)
     assert all(sn.startswith("AUTO-") for sn in body["generated"])
     assert client.get(f"/api/orders/{order_id}", headers=ADMIN).json()["status"] == "PACKING"
+    pick_id = client.get(f"/api/orders/{order_id}", headers=ADMIN).json()["pick_list_id"]
+    pick = client.get(f"/api/inventory/pick-lists/{pick_id}", headers=WAREHOUSE).json()
+    assert all(l["picked_qty"] == l["required_qty"] for l in pick["lines"] if l["product"]["category"] != "service")
+    # Test DB is stocked, so nothing is short
+    assert client.post(f"/api/inventory/pick-lists/{pick_id}/receive-shortfall", headers=WAREHOUSE).json()["received"] == []
     assert advance(client, order_id, "PACKED").status_code == 200  # scan gate satisfied
     assert client.post(f"/api/dispatch/orders/{order_id}/scan-all", headers=WAREHOUSE).status_code == 400

@@ -282,6 +282,12 @@ def scan_all_for_order(db: Session, order_id: int, current_user_id: int) -> dict
             else:
                 linked.append(item.serial_no)
             _scan(db, order.id, item.serial_no, current_user_id)
+    # Counted (non-serialised) items are ticked off by quantity as part of "scan everything"
+    from app.models.product import ProductCategory
+    for pl in (order.pick_list.lines if order.pick_list else []):
+        if pl.product and not pl.product.is_serialised and pl.product.category != ProductCategory.SERVICE:
+            pl.picked_qty = pl.required_qty
+    db.commit()
     if generated:
         db.add(AuditLog(record_type="order", record_id=order.id, action="SERIALS_AUTO_GENERATED",
                         notes=f"Placeholder serials created (no scanner): {', '.join(generated)}", user_id=current_user_id))

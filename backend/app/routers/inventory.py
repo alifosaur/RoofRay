@@ -147,3 +147,29 @@ def pack_pick_list(
     """Warehouse confirms picking & packing for an order."""
     return inventory_service.pack_pick_list(db, pick_list_id, current_user.id)
 
+
+
+@router.post("/pick-lists/{pick_list_id}/receive-shortfall")
+def receive_shortfall(
+    pick_list_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.WAREHOUSE, UserRole.ADMIN)),
+):
+    """Records inward stock (purchase) for exactly what this pick list is short of, at catalogue cost price."""
+    from app.models.product import ProductCategory
+    from app.schemas.inventory import StockMovementCreate
+    pick_list = db.query(PickList).filter(PickList.id == pick_list_id).first()
+    if not pick_list:
+        raise HTTPException(status_code=404, detail="Pick list not found")
+    received, total_cost = [], 0.0
+    for line in pick_list.lines:
+        prod = line.product
+        if not prod or prod.category == ProductCategory.SERVICE or prod.stock_quantity >= line.required_qty:
+            continue
+        qty = line.required_qty - prod.stock_quantity
+        inventory_service.record_purchase_movement(db, StockMovementCreate(
+            product_id=prod.id, quantity=qty, unit_cost=prod.cost_price,
+            reference=f"Inward for {pick_list.order.order_number}"), current_user.id)
+        received.append({"sku": prod.sku, "quantity": qty})
+        total_cost += qty * prod.cost_price
+    return {"received": received, "total_cost": round(total_cost, 2)}

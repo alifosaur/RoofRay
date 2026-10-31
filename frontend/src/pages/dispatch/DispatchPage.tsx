@@ -164,6 +164,24 @@ export const DispatchPage: React.FC = () => {
   }, [scanningActive]);
 
   const [scanAllBusy, setScanAllBusy] = useState(false);
+  // Cost of stock still missing for this pick list (non-service lines below the required quantity)
+  const shortfallCost = (pickList?.lines || []).reduce((sum: number, l: any) => {
+    if (!l.product || l.product.category === 'service') return sum;
+    const missing = Math.max(0, l.required_qty - l.product.stock_quantity);
+    return sum + missing * l.product.cost_price;
+  }, 0);
+
+  const handleReceiveShortfall = async () => {
+    if (!pickList) return;
+    if (!window.confirm(`Record a stock purchase for everything this order is short of, at catalogue cost (₹${Math.round(shortfallCost).toLocaleString('en-IN')})? It will count as money spent on the dashboard.`)) return;
+    try {
+      const res = await api.post<any>(`/inventory/pick-lists/${pickList.id}/receive-shortfall`);
+      setActionMessage({ type: 'success', text: `Received stock for ${res.received.length} item(s), ₹${Math.round(res.total_cost).toLocaleString('en-IN')}.` });
+      if (selectedOrderId) await fetchOrderDetails(selectedOrderId);
+    } catch (err: any) {
+      setActionMessage({ type: 'error', text: err.message || 'Could not record the stock' });
+    }
+  };
   const handleScanAll = async () => {
     if (!selectedOrderId) return;
     if (!window.confirm('Link every remaining serialised item for this order? Registered serials in stock are used first; any missing units get AUTO- placeholder serials.')) return;
@@ -353,7 +371,19 @@ export const DispatchPage: React.FC = () => {
                 <div className="border border-gray-200 rounded-lg mb-6 overflow-x-auto">
                   <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-200 text-xs font-bold uppercase tracking-wider text-gray-700 flex justify-between">
                     <span>Items to pack</span>
-                    {pickList && <span className="text-gray-500 normal-case font-semibold">Pick list #{pickList.id} · {pickList.status}</span>}
+                    {pickList && (
+                      <span className="flex items-center gap-2 normal-case font-semibold text-gray-500">
+                        Pick list #{pickList.id} · {pickList.status}
+                        {shortfallCost > 0 && pickList.status !== 'PACKED' && (
+                          <button
+                            onClick={handleReceiveShortfall}
+                            className="bg-amber-600 hover:bg-amber-700 text-white px-2.5 py-1 rounded text-[11px] font-bold"
+                          >
+                            Receive missing stock (₹{Math.round(shortfallCost).toLocaleString('en-IN')})
+                          </button>
+                        )}
+                      </span>
+                    )}
                   </div>
                   {!pickList ? (
                     <div className="p-4 text-xs text-gray-500">No pick list for this order.</div>
@@ -382,7 +412,7 @@ export const DispatchPage: React.FC = () => {
                               <td className="py-2 px-3 font-medium text-gray-900">{l.product?.name}</td>
                               <td className="py-2 px-3 font-mono text-gray-500">{l.product?.sku}</td>
                               <td className="py-2 px-3 text-center font-bold">{l.required_qty}</td>
-                              <td className={`py-2 px-3 text-center font-bold ${done >= l.required_qty ? 'text-emerald-700' : 'text-amber-700'}`}>{done}</td>
+                              <td className={`py-2 px-3 text-center font-bold ${done >= l.required_qty ? 'text-emerald-700' : 'text-amber-700'}`}>{isService ? '—' : done}</td>
                               <td className={`py-2 px-3 text-center ${short ? 'text-red-600 font-bold' : 'text-gray-600'}`}>
                                 {isService ? '—' : l.product?.stock_quantity}
                               </td>

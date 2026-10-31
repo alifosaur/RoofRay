@@ -1,6 +1,6 @@
 from datetime import datetime
-from typing import Optional
-from pydantic import BaseModel, ConfigDict
+from typing import Optional, Any
+from pydantic import BaseModel, ConfigDict, field_validator
 from app.models.user import UserRole
 
 
@@ -11,6 +11,13 @@ class UserBase(BaseModel):
     phone: Optional[str] = None
     hourly_rate: int = 500
     is_active: bool = True
+
+    @field_validator("role", mode="before")
+    @classmethod
+    def parse_role(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            return v.lower()
+        return v
 
 
 class UserCreate(UserBase):
@@ -23,6 +30,13 @@ class UserUpdate(BaseModel):
     phone: Optional[str] = None
     hourly_rate: Optional[int] = None
     is_active: Optional[bool] = None
+
+    @field_validator("role", mode="before")
+    @classmethod
+    def parse_role(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            return v.lower()
+        return v
 
 
 class UserOut(UserBase):

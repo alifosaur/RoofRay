@@ -128,6 +128,56 @@ export const LeadFormPage: React.FC = () => {
       ),
     },
     {
+      id: 'customer_submission',
+      label: 'Portal Submission & Roof Data',
+      content: (
+        <div className="space-y-4 text-xs">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-3 bg-gray-50 rounded border border-gray-200">
+            <div>
+              <span className="text-gray-500 block">Lead Source:</span>
+              <span className="font-semibold text-odoo-primary uppercase">{lead.source || 'customer_portal'}</span>
+            </div>
+            <div>
+              <span className="text-gray-500 block">Property Type:</span>
+              <span className="font-semibold text-gray-900">{lead.property_type || 'Residential'}</span>
+            </div>
+            <div>
+              <span className="text-gray-500 block">Roof Construction:</span>
+              <span className="font-semibold text-gray-900">{lead.roof_type || 'Concrete / Flat'}</span>
+            </div>
+            <div>
+              <span className="text-gray-500 block">Storey / Floor:</span>
+              <span className="font-semibold text-gray-900">Floor #{lead.floor_number || 1}</span>
+            </div>
+            <div>
+              <span className="text-gray-500 block">Roof Orientation:</span>
+              <span className="font-semibold text-emerald-700">{lead.roof_direction || 'South'}</span>
+            </div>
+            <div>
+              <span className="text-gray-500 block">Total Roof Area:</span>
+              <span className="font-bold text-gray-900">{lead.roof_area_sqft ? `${lead.roof_area_sqft} sq.ft` : 'N/A'}</span>
+            </div>
+            <div>
+              <span className="text-gray-500 block">Shadow-Free Zone:</span>
+              <span className="font-bold text-emerald-600">{lead.shadow_free_area_sqft ? `${lead.shadow_free_area_sqft} sq.ft` : 'N/A'}</span>
+            </div>
+            <div>
+              <span className="text-gray-500 block">Monthly Power Bill:</span>
+              <span className="font-bold text-odoo-primary">{lead.monthly_bill_amount ? `₹${lead.monthly_bill_amount.toLocaleString()}` : 'N/A'}</span>
+            </div>
+          </div>
+          {lead.notes && (
+            <div>
+              <span className="text-gray-500 block font-semibold mb-1">Customer Remarks:</span>
+              <div className="p-2.5 bg-purple-50/50 rounded border border-purple-100 text-gray-800">
+                {lead.notes}
+              </div>
+            </div>
+          )}
+        </div>
+      ),
+    },
+    {
       id: 'notes',
       label: 'Internal Notes',
       content: <p className="text-xs text-gray-700 leading-relaxed">{lead.notes || 'No internal notes provided.'}</p>,

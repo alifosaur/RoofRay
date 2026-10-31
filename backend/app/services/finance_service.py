@@ -36,8 +36,21 @@ def update_subsidy_record(db: Session, subsidy_id: int, payload: SubsidyRecordUp
         raise HTTPException(status_code=404, detail="Subsidy record not found")
 
     old_status = subsidy.status.value
-    for k, v in payload.model_dump(exclude_unset=True).items():
-        setattr(subsidy, k, v)
+    data = payload.model_dump(exclude_unset=True)
+
+    if "application_ref" in data and not data.get("application_no"):
+        data["application_no"] = data.pop("application_ref")
+    elif "application_ref" in data:
+        data.pop("application_ref")
+
+    if "approved_amount" in data and not data.get("sanctioned_amount"):
+        data["sanctioned_amount"] = data.pop("approved_amount")
+    elif "approved_amount" in data:
+        data.pop("approved_amount")
+
+    for k, v in data.items():
+        if hasattr(subsidy, k):
+            setattr(subsidy, k, v)
 
     if payload.status and payload.status.value != old_status:
         audit = AuditLog(
@@ -58,7 +71,11 @@ def update_subsidy_record(db: Session, subsidy_id: int, payload: SubsidyRecordUp
 
 def create_or_sync_technician_payout(db: Session, job_id: int) -> TechnicianPayout:
     job = db.query(InstallationJob).filter(InstallationJob.id == job_id).first()
-    if not job or not job.timesheet:
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    timesheet = job.timesheet or db.query(Timesheet).filter(Timesheet.job_id == job.id).first()
+    if not timesheet:
         raise HTTPException(status_code=400, detail="Completed job with timesheet required")
 
     payout = db.query(TechnicianPayout).filter(TechnicianPayout.job_id == job.id).first()
@@ -66,9 +83,9 @@ def create_or_sync_technician_payout(db: Session, job_id: int) -> TechnicianPayo
         payout = TechnicianPayout(
             technician_id=job.technician_id,
             job_id=job.id,
-            hours=job.timesheet.hours,
-            hourly_rate=job.timesheet.hourly_rate,
-            total_amount=job.timesheet.total_cost,
+            hours=timesheet.hours,
+            hourly_rate=timesheet.hourly_rate,
+            total_amount=timesheet.total_cost,
             is_paid=False,
         )
         db.add(payout)

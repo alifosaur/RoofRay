@@ -107,6 +107,8 @@ def complete_job(db: Session, job_id: int, payload: JobCompleteRequest, current_
         timesheet.hourly_rate = hourly_rate
         timesheet.total_cost = total_cost
 
+    db.flush()
+
     # 2. Customer on-screen signature
     sig = db.query(JobSignature).filter(JobSignature.job_id == job.id).first()
     if not sig:
@@ -159,6 +161,10 @@ def complete_job(db: Session, job_id: int, payload: JobCompleteRequest, current_
         user_id=current_user.id,
     )
     db.add(audit_job)
+
+    # 5. Automatically create/sync technician payout record for accounts/admin
+    from app.services import finance_service
+    finance_service.create_or_sync_technician_payout(db, job.id)
 
     db.commit()
     db.refresh(job)

@@ -13,6 +13,7 @@ import {
   faCalculator,
   faChartPie,
   faSearch,
+  faUserShield,
 } from '@fortawesome/free-solid-svg-icons';
 
 interface HomeMenuProps {
@@ -99,6 +100,14 @@ export const HomeMenu: React.FC<HomeMenuProps> = ({ isOpen, onClose }) => {
       path: '/web/accounting',
       icon: faCalculator,
       color: 'bg-slate-700',
+      allowedRoles: ['admin'],
+    },
+    {
+      id: 'users',
+      name: 'User Management',
+      path: '/web/users',
+      icon: faUserShield,
+      color: 'bg-blue-600',
       allowedRoles: ['admin'],
     },
     {

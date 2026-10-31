@@ -83,14 +83,18 @@ def confirm_order(db: Session, order_id: int, current_user_id: int) -> Order:
         )
         db.add(notif_wh)
 
-    # 4. Audit log
+    # 4. Initialize subsidy tracking record
+    from app.services import finance_service
+    finance_service.get_or_create_subsidy_record(db, order.id)
+
+    # 5. Audit log
     audit = AuditLog(
         record_type="order",
         record_id=order.id,
         action="ORDER_CONFIRMED",
         from_status=OrderStatus.DRAFT.value,
         to_status=OrderStatus.CONFIRMED.value,
-        notes=f"Order confirmed. Pick list and installation job auto-created.",
+        notes=f"Order confirmed. Pick list, installation job, and subsidy tracking auto-created.",
         user_id=current_user_id,
     )
     db.add(audit)

@@ -20,6 +20,8 @@ export const CRMPage: React.FC = () => {
   });
   const navigate = useNavigate();
 
+  const [salesMetrics, setSalesMetrics] = useState<any>(null);
+
   const fetchLeads = async () => {
     try {
       const data = await api.get<any[]>('/leads');
@@ -29,8 +31,21 @@ export const CRMPage: React.FC = () => {
     }
   };
 
+  const fetchSalesMetrics = async () => {
+    try {
+      const data = await api.get<any>('/reports/sales-metrics');
+      setSalesMetrics(data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   useEffect(() => {
     fetchLeads();
+    fetchSalesMetrics();
+    // Auto-refresh CRM pipeline every 15 seconds for incoming customer portal leads
+    const interval = setInterval(fetchLeads, 15000);
+    return () => clearInterval(interval);
   }, []);
 
   const columns: KanbanColumn[] = [
@@ -119,7 +134,7 @@ export const CRMPage: React.FC = () => {
         onSearchChange={setSearch}
         currentView={view}
         onViewChange={setView}
-        availableViews={['kanban', 'list']}
+        availableViews={['kanban', 'list', 'graph']}
       />
 
       {view === 'kanban' ? (
@@ -129,12 +144,98 @@ export const CRMPage: React.FC = () => {
           onItemClick={(item) => navigate(`/web/crm/${item.id}`)}
           onMoveItem={handleMove}
         />
-      ) : (
+      ) : view === 'list' ? (
         <ListView
           columns={listColumns}
           data={filteredLeads}
           onRowClick={(row) => navigate(`/web/crm/${row.id}`)}
         />
+      ) : (
+        /* Sales Dashboard & Commission Tracker View */
+        <div className="flex-1 p-6 overflow-y-auto space-y-6 bg-odoo-bg">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white p-4 rounded border border-odoo-border shadow-xs">
+              <span className="text-[11px] text-gray-500 font-semibold uppercase tracking-wider block">Conversion Rate</span>
+              <div className="text-2xl font-bold text-odoo-primary mt-1">
+                {salesMetrics?.conversion_rate_pct ?? 0}%
+              </div>
+              <span className="text-[10px] text-emerald-600 font-medium">Won vs Closed Leads</span>
+            </div>
+
+            <div className="bg-white p-4 rounded border border-odoo-border shadow-xs">
+              <span className="text-[11px] text-gray-500 font-semibold uppercase tracking-wider block">Active Pipeline Value</span>
+              <div className="text-2xl font-bold text-gray-900 mt-1">
+                ₹{(salesMetrics?.pipeline_value || 0).toLocaleString()}
+              </div>
+              <span className="text-[10px] text-gray-400 font-medium">{salesMetrics?.active_pipeline_count || 0} active leads in pipeline</span>
+            </div>
+
+            <div className="bg-white p-4 rounded border border-odoo-border shadow-xs">
+              <span className="text-[11px] text-gray-500 font-semibold uppercase tracking-wider block">Average Deal Size</span>
+              <div className="text-2xl font-bold text-gray-900 mt-1">
+                ₹{(salesMetrics?.average_deal_size || 0).toLocaleString()}
+              </div>
+              <span className="text-[10px] text-gray-400 font-medium">Across won solar projects</span>
+            </div>
+
+            <div className="bg-white p-4 rounded border border-emerald-200 bg-emerald-50/30 shadow-xs">
+              <span className="text-[11px] text-emerald-800 font-semibold uppercase tracking-wider block">Commission Earned (2.5%)</span>
+              <div className="text-2xl font-bold text-emerald-700 mt-1">
+                ₹{(salesMetrics?.commission_earned || 0).toLocaleString()}
+              </div>
+              <span className="text-[10px] text-emerald-600 font-medium">Total earned on confirmed deals</span>
+            </div>
+          </div>
+
+          {/* Won Deals & Commissions Table */}
+          <div className="bg-white rounded border border-odoo-border shadow-xs overflow-hidden">
+            <div className="px-4 py-3 border-b border-odoo-border bg-gray-50/70 flex justify-between items-center text-xs">
+              <h3 className="font-bold text-gray-900 uppercase tracking-wider">Commission Breakdown by Closed Deal</h3>
+              <span className="text-[11px] text-gray-500">Fixed 2.5% Success Fee</span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-gray-50 text-gray-600 border-b border-odoo-border">
+                  <tr>
+                    <th className="py-2.5 px-3">Order #</th>
+                    <th className="py-2.5 px-3">Customer Name</th>
+                    <th className="py-2.5 px-3">Capacity & Type</th>
+                    <th className="py-2.5 px-3 text-right">Deal Value</th>
+                    <th className="py-2.5 px-3 text-center">Rate</th>
+                    <th className="py-2.5 px-3 text-right">Commission Earned</th>
+                    <th className="py-2.5 px-3 text-center">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 text-gray-700">
+                  {salesMetrics?.deals && salesMetrics.deals.length > 0 ? (
+                    salesMetrics.deals.map((d: any, idx: number) => (
+                      <tr key={idx} className="hover:bg-gray-50/60">
+                        <td className="py-2.5 px-3 font-mono font-semibold text-odoo-primary">{d.order_number}</td>
+                        <td className="py-2.5 px-3 font-medium text-gray-900">{d.customer_name}</td>
+                        <td className="py-2.5 px-3">{d.capacity_kw} kW {d.system_type}</td>
+                        <td className="py-2.5 px-3 text-right font-semibold">₹{d.deal_value.toLocaleString()}</td>
+                        <td className="py-2.5 px-3 text-center text-gray-500">{d.commission_rate}</td>
+                        <td className="py-2.5 px-3 text-right font-bold text-emerald-700">₹{d.commission_amount.toLocaleString()}</td>
+                        <td className="py-2.5 px-3 text-center">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-800">
+                            {d.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={7} className="py-6 text-center text-gray-400">
+                        No closed sales orders with commission yet.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Quick Create Lead Modal */}

@@ -53,6 +53,18 @@ export const SurveysPage: React.FC = () => {
     }
   };
 
+  const handleReject = async (surveyId: number) => {
+    const reason = window.prompt('Enter rejection reason (e.g. Roof structurally weak, shading too high):');
+    if (!reason) return;
+    try {
+      await api.post(`/surveys/${surveyId}/reject?reason=${encodeURIComponent(reason)}`);
+      alert('Survey marked REJECTED. Linked lead marked LOST.');
+      fetchSurveys();
+    } catch (err: any) {
+      alert(err.message || 'Error rejecting survey');
+    }
+  };
+
   const columns: ColumnDef<any>[] = [
     { key: 'id', header: 'Survey #' },
     { key: 'lead_id', header: 'Lead ID', render: (r) => `Lead #${r.lead_id}` },
@@ -99,12 +111,20 @@ export const SurveysPage: React.FC = () => {
             </button>
           )}
           {r.status === 'COMPLETED' && (role === 'admin' || role === 'sales') && (
-            <button
-              onClick={() => handleApprove(r.id)}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-0.5 rounded text-[11px] font-semibold"
-            >
-              Approve (Unlock Quote)
-            </button>
+            <div className="flex gap-1.5">
+              <button
+                onClick={() => handleApprove(r.id)}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-0.5 rounded text-[11px] font-semibold"
+              >
+                Approve (Unlock Quote)
+              </button>
+              <button
+                onClick={() => handleReject(r.id)}
+                className="bg-red-600 hover:bg-red-700 text-white px-2 py-0.5 rounded text-[11px] font-semibold"
+              >
+                Reject
+              </button>
+            </div>
           )}
           {r.status === 'APPROVED' && (
             <span className="text-emerald-600 text-[11px] font-bold">✓ Gate Passed</span>

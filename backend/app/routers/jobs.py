@@ -1,4 +1,6 @@
+from datetime import datetime
 from typing import List, Optional
+from pydantic import BaseModel
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
@@ -10,6 +12,32 @@ from app.schemas.job import InstallationJobOut, JobCompleteRequest, JobPhotoOut
 from app.services import job_service
 
 router = APIRouter(prefix="/jobs", tags=["Installation Jobs & Field Service"])
+
+
+class JobUpdate(BaseModel):
+    technician_id: Optional[int] = None
+    scheduled_date: Optional[datetime] = None
+    notes: Optional[str] = None
+    status: Optional[JobStatus] = None
+
+
+@router.put("/{job_id}", response_model=InstallationJobOut)
+def update_job(
+    job_id: int,
+    payload: JobUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.ADMIN, UserRole.SALES)),
+):
+    job = db.query(InstallationJob).filter(InstallationJob.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    for k, v in payload.model_dump(exclude_unset=True).items():
+        setattr(job, k, v)
+
+    db.commit()
+    db.refresh(job)
+    return job
 
 
 @router.get("/my-schedule", response_model=List[InstallationJobOut])

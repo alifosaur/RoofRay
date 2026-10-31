@@ -1,7 +1,7 @@
 import io
 import os
 from datetime import datetime, date, timedelta
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 import jwt
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -232,4 +232,78 @@ def verify_share_token(token: str) -> bool:
         return decoded.get("scope") == "dashboard_readonly"
     except Exception:
         return False
+
+
+def get_sales_metrics(db: Session, sales_user_id: Optional[int] = None) -> Dict[str, Any]:
+    """
+    Sales executive metrics & commission tracker:
+    Monthly conversion rate, pipeline value, average deal size, commission earned per deal.
+    """
+    leads_query = db.query(Lead).filter(Lead.is_deleted == False)
+    if sales_user_id:
+        leads_query = leads_query.filter(Lead.assigned_to_id == sales_user_id)
+
+    all_leads = leads_query.all()
+    total_leads = len(all_leads)
+    won_leads = [l for l in all_leads if l.status == LeadStatus.WON]
+    lost_leads = [l for l in all_leads if l.status == LeadStatus.LOST]
+    active_leads = [l for l in all_leads if l.status not in (LeadStatus.WON, LeadStatus.LOST)]
+
+    won_count = len(won_leads)
+    lost_count = len(lost_leads)
+    closed_count = won_count + lost_count
+    conversion_rate = round((won_count / max(1, closed_count)) * 100, 1)
+
+    # Calculate pipeline value (active leads * standard kW rate or active quotes)
+    pipeline_value = 0.0
+    for l in active_leads:
+        quote = l.quotes[0] if l.quotes else None
+        if quote and quote.total_amount:
+            pipeline_value += quote.total_amount
+        else:
+            pipeline_value += (l.required_capacity or 3.0) * 65000.0
+
+    # Calculate won revenue and average deal size
+    won_orders_query = db.query(Order).filter(Order.status != OrderStatus.DRAFT)
+    if sales_user_id:
+        lead_ids = [l.id for l in won_leads]
+        won_orders_query = won_orders_query.join(Order.quote).filter(Quote.lead_id.in_(lead_ids))
+
+    won_orders = won_orders_query.all()
+    won_revenue = sum(o.total_amount for o in won_orders)
+    avg_deal_size = round(won_revenue / max(1, len(won_orders)), 2)
+
+    # Commission rate: 2.5% per completed/confirmed sale
+    COMMISSION_RATE = 0.025
+    commission_earned = round(won_revenue * COMMISSION_RATE, 2)
+
+    deals = []
+    for o in won_orders:
+        comm = round(o.total_amount * COMMISSION_RATE, 2)
+        deals.append({
+            "order_number": o.order_number,
+            "customer_name": o.customer.name if o.customer else "N/A",
+            "capacity_kw": o.quote.template.capacity_kw if (o.quote and o.quote.template) else 3.0,
+            "system_type": o.quote.template.system_type if (o.quote and o.quote.template) else "On-Grid",
+            "deal_value": o.total_amount,
+            "commission_rate": "2.5%",
+            "commission_amount": comm,
+            "status": o.status.value,
+            "confirmed_at": o.confirmed_at.strftime("%Y-%m-%d") if o.confirmed_at else o.created_at.strftime("%Y-%m-%d"),
+        })
+
+    return {
+        "total_leads": total_leads,
+        "won_count": won_count,
+        "lost_count": lost_count,
+        "active_pipeline_count": len(active_leads),
+        "conversion_rate_pct": conversion_rate,
+        "pipeline_value": round(pipeline_value, 2),
+        "total_won_revenue": round(won_revenue, 2),
+        "average_deal_size": avg_deal_size,
+        "commission_rate_pct": 2.5,
+        "commission_earned": commission_earned,
+        "deals": deals,
+    }
+
 

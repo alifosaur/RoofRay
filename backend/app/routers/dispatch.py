@@ -8,9 +8,76 @@ from app.models.user import User, UserRole
 from app.models.serial import SerialItem, SerialStatus
 from app.schemas.serial import SerialItemRegister, SerialScanRequest, SerialItemOut
 from app.schemas.order import OrderOut
-from app.services import dispatch_service
+from app.models.order import Order, OrderStatus
+from app.services import dispatch_service, ticket_service
 
 router = APIRouter(prefix="/dispatch", tags=["Dispatch & Barcode Scanning"])
+
+
+@router.get("/queue", response_model=List[OrderOut])
+def get_warehouse_order_queue(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.WAREHOUSE, UserRole.ADMIN)),
+):
+    """Warehouse fulfillment queue: returns orders in CONFIRMED, PACKING, PACKED, DISPATCHED, or OUT_FOR_DELIVERY."""
+    return db.query(Order).filter(
+        Order.status.in_([
+            OrderStatus.CONFIRMED,
+            OrderStatus.PACKING,
+            OrderStatus.PACKED,
+            OrderStatus.DISPATCHED,
+            OrderStatus.OUT_FOR_DELIVERY,
+        ])
+    ).order_by(Order.created_at.asc()).all()
+
+
+from pydantic import BaseModel
+
+
+class StageUpdateRequest(BaseModel):
+    status: Optional[OrderStatus] = None
+    stage: Optional[str] = None
+
+
+@router.put("/orders/{order_id}/stage", response_model=OrderOut)
+def advance_order_stage(
+    order_id: int,
+    status: Optional[OrderStatus] = None,
+    payload: Optional[StageUpdateRequest] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.WAREHOUSE, UserRole.ADMIN)),
+):
+    """
+    Updates order fulfillment stage: PACKING -> DISPATCHED -> OUT_FOR_DELIVERY -> DELIVERED.
+    Enforces dispatch gate (all serialized BOM units must be scanned).
+    """
+    target_status = status
+    if payload:
+        if payload.status:
+            target_status = payload.status
+        elif payload.stage:
+            try:
+                target_status = OrderStatus(payload.stage.upper())
+            except ValueError:
+                pass
+
+    if not target_status:
+        raise HTTPException(status_code=400, detail="Target stage/status required")
+
+    return dispatch_service.update_order_stage(db, order_id, target_status, current_user.id)
+
+
+@router.get("/lookup")
+def lookup_serial_warranty(
+    query: Optional[str] = None,
+    serial_no: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.WAREHOUSE, UserRole.ADMIN, UserRole.TECHNICIAN)),
+):
+    """Barcode & serial stock lookup: returns product, status, customer, warranty dates, and service history."""
+    target_q = query or serial_no or ""
+    return ticket_service.lookup_customer_support(db, target_q)
+
 
 
 @router.post("/serials/register", status_code=status.HTTP_201_CREATED)

@@ -169,3 +169,50 @@ def deliver_order(db: Session, order_id: int, current_user_id: int) -> Order:
     db.refresh(order)
     return order
 
+
+def update_order_stage(db: Session, order_id: int, new_status: OrderStatus, current_user_id: int) -> Order:
+    order = db.query(Order).filter(Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    # If transitioning to DISPATCHED or higher, check that all serialized items are scanned
+    if new_status in (OrderStatus.DISPATCHED, OrderStatus.OUT_FOR_DELIVERY, OrderStatus.DELIVERED):
+        missing_items = []
+        for q_line in order.quote.lines:
+            prod = q_line.product
+            if prod and prod.is_serialised:
+                scanned_count = db.query(SerialItem).filter(
+                    SerialItem.order_id == order.id,
+                    SerialItem.product_id == prod.id
+                ).count()
+                if scanned_count < q_line.quantity:
+                    missing_items.append(f"{prod.name} (Required: {q_line.quantity}, Scanned: {scanned_count})")
+
+        if missing_items:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Cannot dispatch. Missing required serialized items: {', '.join(missing_items)}",
+            )
+
+    if new_status == OrderStatus.DELIVERED:
+        return deliver_order(db, order_id, current_user_id)
+
+    old_status = order.status.value
+    order.status = new_status
+
+    audit = AuditLog(
+        record_type="order",
+        record_id=order.id,
+        action=f"ORDER_{new_status.value}",
+        from_status=old_status,
+        to_status=new_status.value,
+        notes=f"Warehouse updated order stage to {new_status.value}.",
+        user_id=current_user_id,
+    )
+    db.add(audit)
+
+    db.commit()
+    db.refresh(order)
+    return order
+
+

@@ -17,19 +17,19 @@ def lookup_customer_support(db: Session, query_str: str) -> List[WarrantyLookupR
 
     # 1. Search by serial number
     serial_match = db.query(SerialItem).filter(SerialItem.serial_no.ilike(f"%{clean_q}%")).first()
-    if serial_match and serial_match.customer:
+    if serial_match:
         cust = serial_match.customer
         today = date.today()
         in_w = bool(serial_match.warranty_end and today <= serial_match.warranty_end)
         days = (serial_match.warranty_end - today).days if serial_match.warranty_end else 0
 
-        history = db.query(Ticket).filter(Ticket.customer_id == cust.id).order_by(Ticket.created_at.desc()).all()
+        history = db.query(Ticket).filter(Ticket.customer_id == cust.id).order_by(Ticket.created_at.desc()).all() if cust else []
         return [
             WarrantyLookupResult(
-                customer_id=cust.id,
-                customer_name=cust.name,
-                customer_phone=cust.phone,
-                customer_address=cust.address,
+                customer_id=cust.id if cust else 0,
+                customer_name=cust.name if cust else "Warehouse / In Stock",
+                customer_phone=cust.phone if cust else "N/A",
+                customer_address=cust.address if cust else "N/A",
                 serial_id=serial_match.id,
                 serial_no=serial_match.serial_no,
                 product_name=serial_match.product.name if serial_match.product else "N/A",

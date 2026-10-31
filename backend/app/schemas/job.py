@@ -1,6 +1,6 @@
 from datetime import datetime
-from typing import List, Optional
-from pydantic import BaseModel, ConfigDict
+from typing import List, Optional, Any
+from pydantic import BaseModel, ConfigDict, model_validator
 from app.models.job import JobStatus
 from app.schemas.user import UserOut
 
@@ -41,11 +41,33 @@ class TimesheetOut(BaseModel):
 
 class JobCompleteRequest(BaseModel):
     confirmed_capacity_kw: float
-    power_generating: bool
-    customer_name: str
-    signature_data: str  # Base64 canvas data or signature URL
+    power_generating: bool = True
+    customer_name: str = "Customer"
+    signature_data: str = ""  # Base64 canvas data or signature URL
     finish_time: Optional[datetime] = None
+    generation_reading_kw: Optional[float] = None
+    inverter_serial: Optional[str] = None
     notes: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def handle_aliases(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            # power_generating aliases
+            if "power_generated_test" in data and "power_generating" not in data:
+                data["power_generating"] = bool(data["power_generated_test"])
+            elif "test_passed" in data and "power_generating" not in data:
+                data["power_generating"] = bool(data["test_passed"])
+
+            # signature aliases
+            if "customer_signature_base64" in data and not data.get("signature_data"):
+                data["signature_data"] = data["customer_signature_base64"]
+            elif "customer_signature" in data and not data.get("signature_data"):
+                data["signature_data"] = data["customer_signature"]
+
+            if not data.get("customer_name"):
+                data["customer_name"] = "Customer"
+        return data
 
 
 class InstallationJobOut(BaseModel):

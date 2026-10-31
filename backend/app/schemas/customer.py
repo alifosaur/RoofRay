@@ -117,3 +117,4 @@ class CustomerSubsidyOut(BaseModel):
     disbursed_date: Optional[str] = None
     rejection_notes: Optional[str] = None
     remarks: Optional[str] = None
+

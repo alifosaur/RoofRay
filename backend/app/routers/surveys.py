@@ -71,6 +71,7 @@ def get_survey(
 
 
 @router.put("/{survey_id}/complete", response_model=SurveyOut)
+@router.post("/{survey_id}/complete", response_model=SurveyOut)
 def complete_survey(
     survey_id: int,
     payload: SurveyComplete,
@@ -99,4 +100,16 @@ def approve_survey(
 ):
     """Manager/Admin approves the survey (required gate for quote generation)."""
     return survey_service.approve_survey(db, survey_id, current_user.id)
+
+
+@router.post("/{survey_id}/reject", response_model=SurveyOut)
+def reject_survey(
+    survey_id: int,
+    reason: str = "Rooftop structurally unsuitable or excessive shading",
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.ADMIN, UserRole.SALES)),
+):
+    """Manager/Admin rejects the survey (marks linked lead as LOST)."""
+    return survey_service.reject_survey(db, survey_id, reason, current_user.id)
+
 

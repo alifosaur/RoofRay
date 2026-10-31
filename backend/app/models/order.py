@@ -8,8 +8,10 @@ from app.core.database import Base
 class OrderStatus(str, enum.Enum):
     DRAFT = "DRAFT"
     CONFIRMED = "CONFIRMED"
+    PACKING = "PACKING"
     PACKED = "PACKED"
     DISPATCHED = "DISPATCHED"
+    OUT_FOR_DELIVERY = "OUT_FOR_DELIVERY"
     DELIVERED = "DELIVERED"
     INSTALLED = "INSTALLED"
     CLOSED = "CLOSED"

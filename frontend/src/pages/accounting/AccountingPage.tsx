@@ -63,9 +63,12 @@ export const AccountingPage: React.FC = () => {
       setSavingSubsidy(true);
       await api.put(`/finance/subsidies/${editingSubsidy.id}`, {
         status: subsidyStatus,
+        application_no: applicationRef || undefined,
         application_ref: applicationRef || undefined,
+        sanctioned_amount: approvedAmount ? Number(approvedAmount) : undefined,
         approved_amount: approvedAmount ? Number(approvedAmount) : undefined,
-        disbursement_date: disbursementDate || undefined,
+        disbursed_date: disbursementDate || undefined,
+        disbursed_amount: subsidyStatus === 'DISBURSED' ? Number(approvedAmount) : undefined,
       });
       setEditingSubsidy(null);
       fetchData();
@@ -149,16 +152,19 @@ export const AccountingPage: React.FC = () => {
     {
       key: 'application_ref',
       header: 'Application Ref',
-      accessor: (row: any) => <span className="font-mono text-gray-600">{row.application_ref || '-'}</span>,
+      accessor: (row: any) => <span className="font-mono text-gray-600">{row.application_no || row.application_ref || '-'}</span>,
     },
     {
       key: 'approved_amount',
       header: 'Approved Subsidy',
-      accessor: (row: any) => (
-        <span className="font-bold text-emerald-700">
-          {row.approved_amount ? `₹${row.approved_amount.toLocaleString()}` : 'Pending Assessment'}
-        </span>
-      ),
+      accessor: (row: any) => {
+        const amt = row.sanctioned_amount || row.approved_amount || row.eligible_amount;
+        return (
+          <span className="font-bold text-emerald-700">
+            {amt ? `₹${amt.toLocaleString()}` : 'Pending Assessment'}
+          </span>
+        );
+      },
     },
     {
       key: 'status',
@@ -188,9 +194,9 @@ export const AccountingPage: React.FC = () => {
             e.stopPropagation();
             setEditingSubsidy(row);
             setSubsidyStatus(row.status);
-            setApplicationRef(row.application_ref || '');
-            setApprovedAmount(row.approved_amount || 0);
-            setDisbursementDate(row.disbursement_date || '');
+            setApplicationRef(row.application_no || row.application_ref || '');
+            setApprovedAmount(row.sanctioned_amount || row.approved_amount || row.eligible_amount || 0);
+            setDisbursementDate(row.disbursed_date || row.disbursement_date || '');
           }}
           className="bg-odoo-accent hover:bg-teal-700 text-white px-2.5 py-1 rounded text-[11px] font-semibold shadow-xs"
         >
@@ -344,9 +350,13 @@ export const AccountingPage: React.FC = () => {
                   className="w-full px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:border-odoo-primary"
                 >
                   <option value="NOT_APPLIED">NOT_APPLIED (Customer paperwork pending)</option>
-                  <option value="APPLIED">APPLIED (Submitted to National Portal)</option>
-                  <option value="APPROVED">APPROVED (Subsidy sanctioned)</option>
-                  <option value="DISBURSED">DISBURSED (Funds transferred to bank)</option>
+                  <option value="APPLICATION_SUBMITTED">APPLICATION_SUBMITTED (National Portal)</option>
+                  <option value="DISCOM_FEASIBILITY_APPROVED">DISCOM_FEASIBILITY_APPROVED (Technical Feasibility Cleared)</option>
+                  <option value="INSTALLATION_INSPECTION_DONE">INSTALLATION_INSPECTION_DONE (DISCOM Net-meter Inspected)</option>
+                  <option value="SUBSIDY_CLAIMED">SUBSIDY_CLAIMED (Online Claim Submitted)</option>
+                  <option value="APPROVED">APPROVED (Subsidy Sanctioned)</option>
+                  <option value="DISBURSED">DISBURSED (Funds Transferred via DBT to Bank)</option>
+                  <option value="REJECTED">REJECTED (Documentation Ineligible)</option>
                 </select>
               </div>
 

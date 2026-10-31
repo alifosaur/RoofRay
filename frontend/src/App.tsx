@@ -23,6 +23,7 @@ import { TechnicianPWAPage } from './pages/pwa/TechnicianPWAPage';
 import { HelpdeskPage } from './pages/helpdesk/HelpdeskPage';
 import { AccountingPage } from './pages/accounting/AccountingPage';
 import { DashboardPage } from './pages/dashboard/DashboardPage';
+import { UsersPage } from './pages/admin/UsersPage';
 
 export const App: React.FC = () => {
   return (
@@ -196,6 +197,14 @@ export const App: React.FC = () => {
               element={
                 <RoleRouteGuard allowedRoles={['admin']}>
                   <AccountingPage />
+                </RoleRouteGuard>
+              }
+            />
+            <Route
+              path="users"
+              element={
+                <RoleRouteGuard allowedRoles={['admin']}>
+                  <UsersPage />
                 </RoleRouteGuard>
               }
             />

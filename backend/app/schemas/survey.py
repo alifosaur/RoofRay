@@ -1,6 +1,6 @@
 from datetime import datetime
-from typing import Optional
-from pydantic import BaseModel, ConfigDict
+from typing import Optional, Any
+from pydantic import BaseModel, ConfigDict, model_validator
 from app.models.survey import SurveyStatus
 
 
@@ -16,6 +16,16 @@ class SurveyComplete(BaseModel):
     roof_tilt_deg: float
     cable_distance_meters: float
     notes: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def handle_aliases(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            if "tilt_angle_deg" in data and "roof_tilt_deg" not in data:
+                data["roof_tilt_deg"] = data["tilt_angle_deg"]
+            if "feasibility_notes" in data and "notes" not in data:
+                data["notes"] = data["feasibility_notes"]
+        return data
 
 
 class SurveyOut(BaseModel):

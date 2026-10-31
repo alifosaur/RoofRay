@@ -34,13 +34,17 @@ class InvoiceOut(BaseModel):
 
 class SubsidyRecordUpdate(BaseModel):
     application_no: Optional[str] = None
+    application_ref: Optional[str] = None
     portal_name: Optional[str] = None
     status: Optional[SubsidyStatus] = None
     eligible_amount: Optional[float] = None
+    sanctioned_amount: Optional[float] = None
+    approved_amount: Optional[float] = None
     disbursed_amount: Optional[float] = None
     applied_date: Optional[date] = None
     approved_date: Optional[date] = None
     disbursed_date: Optional[date] = None
+    rejection_notes: Optional[str] = None
     remarks: Optional[str] = None
 
 
@@ -48,13 +52,17 @@ class SubsidyRecordOut(BaseModel):
     id: int
     order_id: int
     application_no: Optional[str] = None
+    application_ref: Optional[str] = None
     portal_name: str
     status: SubsidyStatus
     eligible_amount: float
+    sanctioned_amount: Optional[float] = 0.0
+    approved_amount: Optional[float] = 0.0
     disbursed_amount: float
     applied_date: Optional[date] = None
     approved_date: Optional[date] = None
     disbursed_date: Optional[date] = None
+    rejection_notes: Optional[str] = None
     remarks: Optional[str] = None
     created_at: datetime
     updated_at: datetime

@@ -52,6 +52,17 @@ class LeadOut(BaseModel):
     phone: str
     email: Optional[str] = None
     address: str
+    city: Optional[str] = None
+    state: Optional[str] = None
+    pincode: Optional[str] = None
+    property_type: Optional[str] = None
+    roof_type: Optional[str] = None
+    roof_area_sqft: Optional[float] = None
+    shadow_free_area_sqft: Optional[float] = None
+    floor_number: Optional[int] = 1
+    roof_direction: Optional[str] = None
+    monthly_bill_amount: Optional[float] = None
+    source: Optional[str] = "customer_portal"
     required_capacity: float
     system_type: str
     notes: Optional[str] = None

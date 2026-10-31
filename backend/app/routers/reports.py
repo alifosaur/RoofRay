@@ -80,3 +80,17 @@ def get_shared_dashboard(
             detail="Invalid or expired shareable dashboard token.",
         )
     return report_service.get_director_dashboard_metrics(db, range)
+
+
+@router.get("/sales-metrics")
+def get_sales_performance_metrics(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.ADMIN, UserRole.SALES)),
+):
+    """
+    Sales dashboard metrics & commission tracking:
+    Conversion rate, pipeline value, average deal size, commission earned per completed sale.
+    """
+    sales_id = current_user.id if current_user.role == UserRole.SALES else None
+    return report_service.get_sales_metrics(db, sales_id)
+

@@ -16,33 +16,58 @@ import {
 
 export const TechnicianPWAPage: React.FC = () => {
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState<'jobs' | 'surveys'>('jobs');
   const [schedule, setSchedule] = useState<any[]>([]);
   const [activeJob, setActiveJob] = useState<any | null>(null);
+  const [surveys, setSurveys] = useState<any[]>([]);
+  const [activeSurvey, setActiveSurvey] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Form states for completion
+  // Form states for installation job completion
   const [powerGenPassed, setPowerGenPassed] = useState(true);
+  const [generationKw, setGenerationKw] = useState<number>(2.8);
+  const [inverterSerialVerified, setInverterSerialVerified] = useState('INV-904821');
   const [capacityKw, setCapacityKw] = useState(3.0);
   const [notes, setNotes] = useState('');
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  // Form states for site survey completion
+  const [surveyForm, setSurveyForm] = useState({
+    roof_direction: 'South',
+    roof_tilt_deg: 20.0,
+    cable_distance_meters: 15.0,
+    notes: 'Structure verified. RCC roof with direct sunlight and short cable run to meter.',
+  });
 
   const sigPadRef = useRef<SignatureCanvas | null>(null);
 
   const fetchSchedule = async () => {
     try {
       setLoading(true);
-      const data = await api.get<any[]>('/jobs/my-schedule');
-      setSchedule(data || []);
+      const [jobsData, surveysData] = await Promise.all([
+        api.get<any[]>('/jobs/my-schedule'),
+        api.get<any[]>('/surveys'),
+      ]);
+      setSchedule(jobsData || []);
+      setSurveys(surveysData || []);
+
       if (activeJob) {
-        const found = (data || []).find((j: any) => j.id === activeJob.id);
+        const found = (jobsData || []).find((j: any) => j.id === activeJob.id);
         if (found) setActiveJob(found);
-      } else if (data && data.length > 0) {
-        setActiveJob(data[0]);
-        setCapacityKw(data[0].capacity_kw || 3.0);
+      } else if (jobsData && jobsData.length > 0) {
+        setActiveJob(jobsData[0]);
+        setCapacityKw(jobsData[0].capacity_kw || 3.0);
+      }
+
+      if (activeSurvey) {
+        const foundS = (surveysData || []).find((s: any) => s.id === activeSurvey.id);
+        if (foundS) setActiveSurvey(foundS);
+      } else if (surveysData && surveysData.length > 0) {
+        setActiveSurvey(surveysData[0]);
       }
     } catch (err) {
-      console.error('Failed to load technician schedule', err);
+      console.error('Failed to load technician data', err);
     } finally {
       setLoading(false);
     }
@@ -51,6 +76,26 @@ export const TechnicianPWAPage: React.FC = () => {
   useEffect(() => {
     fetchSchedule();
   }, []);
+
+  const handleCompleteSurvey = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeSurvey) return;
+    try {
+      setSubmitting(true);
+      await api.post(`/surveys/${activeSurvey.id}/complete`, {
+        roof_direction: surveyForm.roof_direction,
+        roof_tilt_deg: Number(surveyForm.roof_tilt_deg),
+        cable_distance_meters: Number(surveyForm.cable_distance_meters),
+        notes: surveyForm.notes,
+      });
+      alert('Survey report submitted successfully! Waiting for manager approval.');
+      fetchSchedule();
+    } catch (err: any) {
+      alert(err.message || 'Failed to submit survey');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const handleStartJob = async (jobId: number) => {
     try {
@@ -134,13 +179,41 @@ export const TechnicianPWAPage: React.FC = () => {
         </span>
       </header>
 
+      {/* PWA Workflow Mode Selector */}
+      <div className="bg-slate-800/90 border-b border-slate-700 px-4 py-2 flex gap-2">
+        <button
+          onClick={() => setActiveTab('jobs')}
+          className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+            activeTab === 'jobs'
+              ? 'bg-blue-600 text-white shadow-md'
+              : 'bg-slate-700/60 text-gray-400 hover:text-white'
+          }`}
+        >
+          <FontAwesomeIcon icon={faBolt} />
+          <span>Installation Jobs ({schedule.length})</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('surveys')}
+          className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+            activeTab === 'surveys'
+              ? 'bg-amber-600 text-white shadow-md'
+              : 'bg-slate-700/60 text-gray-400 hover:text-white'
+          }`}
+        >
+          <FontAwesomeIcon icon={faMapMarkerAlt} />
+          <span>Site Surveys ({surveys.length})</span>
+        </button>
+      </div>
+
       {/* Main Content */}
       <div className="flex-1 p-4 space-y-4 pb-12 overflow-y-auto">
-        {/* Schedule Selector */}
-        <section>
-          <h2 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">
-            Today's Assigned Jobs ({schedule.length})
-          </h2>
+        {activeTab === 'jobs' ? (
+          <>
+            {/* Schedule Selector */}
+            <section>
+              <h2 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">
+                Today's Assigned Jobs ({schedule.length})
+              </h2>
           <div className="flex space-x-2 overflow-x-auto pb-1 scrollbar-none">
             {schedule.map((job) => (
               <button
@@ -337,6 +410,163 @@ export const TechnicianPWAPage: React.FC = () => {
         ) : (
           <div className="text-center py-16 text-gray-400 text-xs">
             No installation jobs assigned for today.
+          </div>
+        )}
+          </>
+        ) : (
+          /* Site Surveys Tab */
+          <div className="space-y-4">
+            <section>
+              <h2 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">
+                Assigned Site Surveys ({surveys.length})
+              </h2>
+              <div className="flex space-x-2 overflow-x-auto pb-1 scrollbar-none">
+                {surveys.map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => setActiveSurvey(s)}
+                    className={`flex-shrink-0 px-4 py-2.5 rounded-xl text-left border transition-all ${
+                      activeSurvey?.id === s.id
+                        ? 'bg-amber-950/80 border-amber-500 text-white shadow-lg'
+                        : 'bg-slate-800 border-slate-700 text-gray-400'
+                    }`}
+                  >
+                    <div className="text-xs font-bold text-amber-400">Survey #{s.id}</div>
+                    <div className="text-xs font-semibold text-white truncate max-w-[140px]">
+                      Lead #{s.lead_id}
+                    </div>
+                    <div className="text-[10px] mt-0.5">{s.status}</div>
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            {activeSurvey ? (
+              <div className="bg-slate-800 rounded-2xl p-5 border border-slate-700 space-y-4">
+                <div className="flex justify-between items-start border-b border-slate-700 pb-3">
+                  <div>
+                    <span className="text-[10px] text-amber-400 font-bold uppercase">
+                      Site Survey Visit #{activeSurvey.id}
+                    </span>
+                    <h3 className="text-base font-bold text-white">Lead #{activeSurvey.lead_id}</h3>
+                    <p className="text-[11px] text-gray-400">
+                      Scheduled for: {new Date(activeSurvey.scheduled_date).toLocaleString()}
+                    </p>
+                  </div>
+                  <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                    activeSurvey.status === 'APPROVED'
+                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                      : activeSurvey.status === 'COMPLETED'
+                      ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40'
+                      : 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
+                  }`}>
+                    {activeSurvey.status}
+                  </span>
+                </div>
+
+                {activeSurvey.status === 'SCHEDULED' ? (
+                  <form onSubmit={handleCompleteSurvey} className="space-y-4 text-xs">
+                    <div>
+                      <label className="block text-gray-300 font-semibold mb-1">Roof Facing Direction *</label>
+                      <select
+                        value={surveyForm.roof_direction}
+                        onChange={(e) => setSurveyForm({ ...surveyForm, roof_direction: e.target.value })}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white"
+                      >
+                        <option value="South">South (Optimal Solar Yield)</option>
+                        <option value="South-West">South-West</option>
+                        <option value="South-East">South-East</option>
+                        <option value="East">East</option>
+                        <option value="West">West</option>
+                        <option value="North">North (High Shadowing)</option>
+                      </select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-gray-300 font-semibold mb-1">Roof Tilt Angle (deg) *</label>
+                        <input
+                          type="number"
+                          step="1"
+                          required
+                          value={surveyForm.roof_tilt_deg}
+                          onChange={(e) => setSurveyForm({ ...surveyForm, roof_tilt_deg: parseFloat(e.target.value) || 0 })}
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-gray-300 font-semibold mb-1">Cable Run Distance (meters) *</label>
+                        <input
+                          type="number"
+                          step="1"
+                          required
+                          value={surveyForm.cable_distance_meters}
+                          onChange={(e) => setSurveyForm({ ...surveyForm, cable_distance_meters: parseFloat(e.target.value) || 0 })}
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-gray-300 font-semibold mb-1">Site Feasibility Notes & Structural Assessment</label>
+                      <textarea
+                        rows={3}
+                        required
+                        value={surveyForm.notes}
+                        onChange={(e) => setSurveyForm({ ...surveyForm, notes: e.target.value })}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white"
+                        placeholder="Rooftop parapet wall height, parapet shadow-free clearance, cable entry point..."
+                      ></textarea>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={submitting}
+                      className="w-full bg-amber-500 hover:bg-amber-400 active:scale-98 text-slate-950 font-bold py-3.5 rounded-xl text-sm flex items-center justify-center gap-2 shadow-lg transition-transform disabled:opacity-50"
+                    >
+                      <FontAwesomeIcon icon={faCheckCircle} />
+                      <span>{submitting ? 'Submitting Report...' : 'Submit Site Survey Report'}</span>
+                    </button>
+                  </form>
+                ) : (
+                  <div className="space-y-3 text-xs text-gray-300">
+                    <div className="p-3 bg-slate-900 rounded-lg border border-slate-700 space-y-1.5">
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Direction:</span>
+                        <strong className="text-white">{activeSurvey.roof_direction}</strong>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Tilt Angle:</span>
+                        <strong className="text-white">{activeSurvey.roof_tilt_deg}°</strong>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Cable Distance:</span>
+                        <strong className="text-white">{activeSurvey.cable_distance_meters} meters</strong>
+                      </div>
+                    </div>
+                    {activeSurvey.notes && (
+                      <p className="text-[11px] text-gray-400 italic bg-slate-900/50 p-2.5 rounded border border-slate-700">
+                        "{activeSurvey.notes}"
+                      </p>
+                    )}
+                    {activeSurvey.status === 'COMPLETED' && (
+                      <p className="text-[11px] text-amber-400 font-semibold text-center">
+                        Survey submitted. Pending manager approval to unlock quotation creation.
+                      </p>
+                    )}
+                    {activeSurvey.status === 'APPROVED' && (
+                      <p className="text-[11px] text-emerald-400 font-semibold text-center">
+                        ✓ Survey Approved by Engineering Manager. Quotations unlocked!
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-16 text-gray-400 text-xs">
+                No site surveys assigned right now.
+              </div>
+            )}
           </div>
         )}
       </div>

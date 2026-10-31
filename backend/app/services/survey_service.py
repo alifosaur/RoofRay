@@ -3,6 +3,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 from app.models.survey import Survey, SurveyStatus
 from app.models.lead import Lead, LeadStatus
+from app.models.user import User, UserRole
 from app.models.audit import AuditLog
 from app.models.notification import Notification
 from app.schemas.survey import SurveyCreate, SurveyComplete
@@ -13,39 +14,39 @@ def schedule_survey(db: Session, payload: SurveyCreate, current_user_id: int) ->
     if not lead:
         raise HTTPException(status_code=404, detail="Lead not found")
 
-    existing_survey = db.query(Survey).filter(Survey.lead_id == lead.id).first()
-    if existing_survey:
-        raise HTTPException(status_code=400, detail="A survey has already been scheduled for this lead")
+    tech = db.query(User).filter(User.id == payload.technician_id, User.role == UserRole.TECHNICIAN).first()
+    if not tech:
+        raise HTTPException(status_code=404, detail="Technician not found or not a technician")
 
     survey = Survey(
-        lead_id=payload.lead_id,
-        technician_id=payload.technician_id,
+        lead_id=lead.id,
+        technician_id=tech.id,
         scheduled_date=payload.scheduled_date,
         notes=payload.notes,
         status=SurveyStatus.SCHEDULED,
     )
     db.add(survey)
+    db.flush()
 
+    # Move lead to SURVEY_SCHEDULED
     old_lead_status = lead.status.value
     lead.status = LeadStatus.SURVEY_SCHEDULED
 
-    # Audit log
-    audit = AuditLog(
-        record_type="survey",
+    audit_lead = AuditLog(
+        record_type="lead",
         record_id=lead.id,
         action="SURVEY_SCHEDULED",
         from_status=old_lead_status,
-        to_status=SurveyStatus.SCHEDULED.value,
-        notes=f"Site survey scheduled for {payload.scheduled_date}.",
+        to_status=LeadStatus.SURVEY_SCHEDULED.value,
+        notes=f"Survey scheduled with {tech.full_name} for {payload.scheduled_date}.",
         user_id=current_user_id,
     )
-    db.add(audit)
+    db.add(audit_lead)
 
-    # Notify technician
     notif = Notification(
-        user_id=payload.technician_id,
+        user_id=tech.id,
         title="Site Survey Assigned",
-        message=f"You have a site survey scheduled at {lead.address} on {payload.scheduled_date.strftime('%Y-%m-%d %H:%M')}.",
+        message=f"You have been assigned to survey {lead.name} at {lead.address}.",
         link=f"/surveys/{survey.id}",
     )
     db.add(notif)
@@ -108,7 +109,7 @@ def approve_survey(db: Session, survey_id: int, approved_by_id: int) -> Survey:
             action="SURVEY_APPROVED",
             from_status=old_lead_status,
             to_status=LeadStatus.SURVEY_APPROVED.value,
-            notes=f"Site survey approved. Lead ready for quote generation.",
+            notes="Site survey approved. Lead ready for quote generation.",
             user_id=approved_by_id,
         )
         db.add(audit_lead)
@@ -128,3 +129,40 @@ def approve_survey(db: Session, survey_id: int, approved_by_id: int) -> Survey:
     db.refresh(survey)
     return survey
 
+
+def reject_survey(db: Session, survey_id: int, reason: str, user_id: int) -> Survey:
+    survey = db.query(Survey).filter(Survey.id == survey_id).first()
+    if not survey:
+        raise HTTPException(status_code=404, detail="Survey not found")
+
+    survey.status = SurveyStatus.REJECTED
+    lead = db.query(Lead).filter(Lead.id == survey.lead_id).first()
+    if lead:
+        old_status = lead.status.value
+        lead.status = LeadStatus.LOST
+        lead.lost_reason = f"Survey rejected: {reason}"
+        audit_lead = AuditLog(
+            record_type="lead",
+            record_id=lead.id,
+            action="SURVEY_REJECTED",
+            from_status=old_status,
+            to_status=LeadStatus.LOST.value,
+            notes=f"Site survey rejected ({reason}). Lead marked LOST.",
+            user_id=user_id,
+        )
+        db.add(audit_lead)
+
+    audit = AuditLog(
+        record_type="survey",
+        record_id=survey.id,
+        action="SURVEY_REJECTED",
+        from_status=survey.status.value,
+        to_status=SurveyStatus.REJECTED.value,
+        notes=f"Survey rejected by manager: {reason}",
+        user_id=user_id,
+    )
+    db.add(audit)
+
+    db.commit()
+    db.refresh(survey)
+    return survey

@@ -205,18 +205,20 @@ The frontend will be live at `http://localhost:5173`.
 
 ---
 
-## 👥 Demo Accounts & Roles
+## 👥 Roles & Demo Credentials
 
-The system includes pre-seeded demo accounts with simulated Firebase authentication tokens. In the staff portal top navbar, a **Role Switcher** allows you to instantly test the UI from any persona:
+The platform enforces 5 distinct roles with backend endpoint and object-level permission guards, plus UI routing guards:
 
-| Role | Email | Auth Token (Dev Bypass) | Key Permissions |
-| :--- | :--- | :--- | :--- |
-| **Admin** | `admin@sunpower.com` | `admin_uid` | Full access across all apps, executive dashboard, user CRUD |
-| **Sales** | `sales@sunpower.com` | `sales_uid` | CRM Leads, Call Checklist, Surveys, BOM Quotes, Orders |
-| **Warehouse**| `warehouse@sunpower.com` | `warehouse_uid` | Stock management, Pick Lists, Barcode/Serial scanning, Dispatch |
-| **Support** | `support@sunpower.com` | `support_uid` | Serial warranty lookup, Helpdesk ticketing, Repair invoicing |
-| **Accounts** | `accounts@sunpower.com` | `accounts_uid` | Invoices, Payments, Subsidy paperwork, Technician payouts |
-| **Technician** (15 total)| `tech1@sunpower.com` to `tech15@sunpower.com` | `tech_uid_1` to `tech_uid_15` | Site surveys, Mobile PWA installation jobs, timesheets |
+| Role | Default Email | Firebase Dev Token | Login Redirect | Accessible Views & Duties |
+| :--- | :--- | :--- | :--- | :--- |
+| **Admin** | `admin@sunpower.com` | `admin_uid` | `/web/dashboard` | Executive director dashboard, User Management (staff CRUD & status toggles), Accounting & Subsidies, Technician payout approval, all CRM/Survey/Dispatch/Helpdesk apps. |
+| **Sales** | `sales@sunpower.com` | `sales_uid` | `/web/crm` | Lead capture & Kanban, Call checklist, Technician survey scheduling, BOM Quotation builder & PDF generation, Sales metrics & 2.5% commission tracking. |
+| **Warehouse** | `warehouse@sunpower.com` | `warehouse_uid` | `/web/dispatch` | Stock inventory management, Barcode scanning & dispatch fulfillment queue, serial inwarding, delivery dispatch gate enforcement, warranty date activation. |
+| **Technician** (15 crew) | `tech@sunpower.com` or `tech1@sunpower.com` - `tech15@sunpower.com` | `tech_uid`, `tech_uid_1` - `tech_uid_15` | `/technician` (`/pwa/tech`) | Mobile-first touch PWA: Site feasibility survey report submission, installation job start/finish, generation test (> 0 kW required), customer signature canvas, timesheet tracking. |
+| **Customer** | `customer@sunpower.com` | `customer_uid` | `/customer` | Odoo-website-style customer portal: Solar package catalog, PM Surya Ghar subsidy estimator, measurements enquiry submission, 13-stage live project tracker, quote acceptance, equipment & warranty lookup, service tickets. |
+
+> **Password for all seeded accounts**: Any password (or click dev persona quick login button on `/login`).
+> **Public Registration**: Self-registration on `/login` strictly creates `role=customer` and links a `customers` row. Any attempt to supply `role=admin` is rejected and clamped to `customer`. Staff accounts are managed exclusively by the Admin via `/web/users`.
 
 ---
 
@@ -230,7 +232,10 @@ source venv/bin/activate
 pytest
 ```
 
-**Test Coverage Highlights**:
+**Test Coverage Highlights (29 Automated Tests Passed)**:
+- `tests/test_milestone_all_roles_e2e.py`: Complete end-to-end milestone lifecycle across all 5 roles verifying customer self-registration, enquiry submission, sales checklist, technician survey in PWA, admin survey approval gate, quotation & order confirmation, warehouse queue, serial barcode scanning & dispatch gate, auto-warranty activation on delivery, technician installation job with generation test (> 0 kW) and signature, timesheet & payout sync, admin user management, sales commissions, and subsidy stage advancement.
+- `tests/test_phase1_roles_auth_guards.py`: Strict role route guards, customer privilege escalation blocking (403 on staff endpoints), and technician object-level isolation.
+- `tests/test_phase2_customer_portal.py`: Customer portal endpoints, 13-stage timeline tracker, PM Surya Ghar subsidy estimator, equipment warranty lookup, and service ticket creation.
 - `tests/test_phase1_auth.py`: Firebase token decoding, role enforcement (`require_role`), user CRUD.
 - `tests/test_phase2_crm_survey.py`: Public lead capture, soft-delete, call qualification checklist, survey scheduling, and survey completion/approval.
 - `tests/test_phase3_catalog_quote.py`: Product catalog, BOM explosion into quote lines, ReportLab quote PDF generation, quote acceptance.

@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
@@ -11,13 +11,17 @@ router = APIRouter(prefix="/users", tags=["Users"])
 
 @router.get("", response_model=List[UserOut])
 def list_users(
-    role: UserRole = None,
+    role: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role(UserRole.ADMIN)),
 ):
     query = db.query(User)
     if role:
-        query = query.filter(User.role == role)
+        try:
+            target_role = UserRole(role.lower())
+            query = query.filter(User.role == target_role)
+        except ValueError:
+            pass
     return query.order_by(User.id.asc()).all()
 
 

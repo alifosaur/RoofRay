@@ -166,3 +166,4 @@ def test_customer_subsidy_tracker():
         sub = res.json()
         assert "status" in sub
         assert "eligible_amount" in sub
+

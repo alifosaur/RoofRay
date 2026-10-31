@@ -140,21 +140,8 @@ def accept_quote(db: Session, quote_id: int, current_user_id: int) -> Order:
     old_quote_status = quote.status.value
     quote.status = QuoteStatus.ACCEPTED
 
-    # Update lead status to WON
+    # The lead stays SURVEY_APPROVED until installation is complete (then WON, see job_service.complete_job)
     lead = db.query(Lead).filter(Lead.id == quote.lead_id).first()
-    if lead:
-        old_lead_status = lead.status.value
-        lead.status = LeadStatus.WON
-        audit_lead = AuditLog(
-            record_type="lead",
-            record_id=lead.id,
-            action="LEAD_WON",
-            from_status=old_lead_status,
-            to_status=LeadStatus.WON.value,
-            notes=f"Customer accepted quote {quote.quote_number}. Lead marked WON.",
-            user_id=current_user_id,
-        )
-        db.add(audit_lead)
 
     # Auto-create Order in DRAFT status
     count = db.query(Order).count() + 1
@@ -258,12 +245,6 @@ def send_quote(db: Session, quote: Quote, current_user_id: int) -> Quote:
         raise HTTPException(status_code=400, detail=f"Only draft quotations can be sent (current: {quote.status.value})")
     _regenerate_pdf(db, quote)
     quote.status = QuoteStatus.SENT
-    lead = quote.lead
-    if lead and lead.status == LeadStatus.SURVEY_APPROVED:
-        db.add(AuditLog(record_type="lead", record_id=lead.id, action="LEAD_QUOTED", from_status=lead.status.value,
-                        to_status=LeadStatus.QUOTED.value, notes=f"Quotation {quote.quote_number} sent to the customer.",
-                        user_id=current_user_id))
-        lead.status = LeadStatus.QUOTED
     db.add(AuditLog(record_type="quote", record_id=quote.id, action="QUOTE_SENT", from_status=QuoteStatus.DRAFT.value,
                     to_status=QuoteStatus.SENT.value, notes="Quotation PDF shared with the customer.", user_id=current_user_id))
     events.emit(

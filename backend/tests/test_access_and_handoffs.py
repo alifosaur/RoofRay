@@ -105,7 +105,7 @@ def test_lead_stage_changes_are_workflow_driven():
     ctx = confirmed_order(client, "Workflow Lead")
     lead_id = ctx["lead"]["id"]
     # Sales cannot jump stages manually; LOST needs a reason; WON leads cannot be lost
-    assert client.put(f"/api/leads/{lead_id}", headers=SALES, json={"status": "SURVEY_APPROVED"}).status_code == 400
+    assert client.put(f"/api/leads/{lead_id}", headers=SALES, json={"status": "QUOTED"}).status_code == 400
     assert client.put(f"/api/leads/{lead_id}", headers=SALES, json={"status": "LOST"}).status_code == 400
 
     fresh = client.post("/api/leads/public", json={"name": "Not Suitable", "phone": f"9{uuid.uuid4().int % 10**9:09d}", "address": "Somewhere 1"}).json()

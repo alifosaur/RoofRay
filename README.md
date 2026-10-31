@@ -93,13 +93,13 @@ flowchart TD
   T1 -->|no| S3{Sales reviews}
   S3 -->|reject| LOST
   S3 -->|approve| Q1
-  Q1 --> Q2[Send PDF to customer: lead QUOTED]
-  Q2 --> O1[Customer accepts: lead WON, order CONFIRMED → pick list to warehouse + invoice + subsidy record]
+  Q1 --> Q2[Send PDF to customer]
+  Q2 --> O1[Customer accepts: order CONFIRMED → pick list to warehouse + invoice + subsidy record]
   O1 -.-> P1[Payments recorded any time]
   O1 --> W1[Warehouse: scan serials → PACKING]
   W1 --> W2[PACKED → DISPATCHED → OUT_FOR_DELIVERY → DELIVERED]
   W2 -->|warranty dates set, job released| T2[Technician: start, photos, signature, complete]
-  T2 --> O2[Order INSTALLED → timesheet + payout]
+  T2 --> O2[Order INSTALLED, lead WON → timesheet + payout]
   O2 -->|fully paid| O3[Order CLOSED, invoice PAID]
   O1 -.-> SUB[Subsidy tracker: 9 steps, grid-connected only]
 ```

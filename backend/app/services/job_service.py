@@ -16,6 +16,7 @@ from app.services import order_service
 from app.core import events
 from app.models.user import UserRole
 from app.models.finance import SubsidyStatus
+from app.models.lead import LeadStatus
 
 
 def _require_delivered(job: InstallationJob) -> None:
@@ -180,6 +181,11 @@ def complete_job(db: Session, job_id: int, payload: JobCompleteRequest, current_
         finance_service.add_subsidy_step(db, order.subsidy_record, SubsidyStatus.INSTALLATION_DONE, datetime.utcnow().date(),
                                          None, "Installation completed and signed off on site.", None, current_user.id)
     lead = order.quote.lead if order and order.quote else None
+    if lead and lead.status != LeadStatus.WON:
+        db.add(AuditLog(record_type="lead", record_id=lead.id, action="LEAD_WON", from_status=lead.status.value,
+                        to_status=LeadStatus.WON.value, notes=f"Installation completed for {order.order_number}.",
+                        user_id=current_user.id))
+        lead.status = LeadStatus.WON
     events.emit(
         db, "job.completed", {"job_id": job.id, "order_id": job.order_id},
         user_ids=[order.customer.user_id if order else None, lead.assigned_to_id if lead else None],

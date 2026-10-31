@@ -88,8 +88,8 @@ def update_lead(
     if new_status and new_status != lead.status and current_user.role != UserRole.ADMIN:
         # Sales can only mark contact made or close as LOST; every other stage is driven by the workflow
         if new_status == LeadStatus.LOST:
-            if lead.status == LeadStatus.WON:
-                raise HTTPException(status_code=400, detail="A won lead cannot be marked lost")
+            if lead.status == LeadStatus.WON or any(q.order for q in lead.quotes):
+                raise HTTPException(status_code=400, detail="This lead already has an order and cannot be marked lost")
             if not (update_dict.get("lost_reason") or lead.lost_reason):
                 raise HTTPException(status_code=400, detail="A reason is required to mark a lead LOST")
         elif not (new_status == LeadStatus.CONTACTED and lead.status == LeadStatus.NEW):

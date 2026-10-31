@@ -128,24 +128,192 @@ interface SchemeData {
   grid_connected_only: boolean;
 }
 
-const InvoiceLottieAnimation: React.FC = () => {
-  const containerRef = useRef<HTMLDivElement>(null);
+const InvoiceReceiptAnimation: React.FC<{
+  invoiceNumber: string;
+  orderNumber: string;
+  totalAmount: number;
+}> = ({ invoiceNumber, orderNumber, totalAmount }) => {
+  const [animKey, setAnimKey] = useState(0);
+  const today = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  const formattedTotal = Math.round(totalAmount).toLocaleString('en-IN');
+  const formattedSubtotal = Math.round(totalAmount * 0.88).toLocaleString('en-IN');
+  const formattedGst = Math.round(totalAmount * 0.12).toLocaleString('en-IN');
 
-  useEffect(() => {
-    if (!containerRef.current) return;
-    const anim = lottie.loadAnimation({
-      container: containerRef.current,
-      renderer: 'svg',
-      loop: true,
-      autoplay: true,
-      path: '/invoice-success.json',
-    });
-    return () => {
-      anim.destroy();
-    };
-  }, []);
+  const replay = () => setAnimKey((k) => k + 1);
 
-  return <div ref={containerRef} className="w-48 h-48 mx-auto flex items-center justify-center" />;
+  // Exact serrated paper path extracted from the Lottie asset
+  const paperPath = "M -130.5 -172.75 C -126.1 -173.15, -125 -176.583, -125 -178.25 C -125 -178.25, -117.5 -178.25, -117.5 -178.25 C -117.5 -178.25, -115.5 -175.25, -115.5 -175.25 C -115.5 -175.25, -99 -175.25, -99 -175.25 C -99 -175.25, -97 -178.25, -97 -178.25 C -97 -178.25, -90.5 -178.25, -90.5 -178.25 C -90.5 -178.25, -88.5 -175.25, -88.5 -175.25 C -88.5 -175.25, -72 -175.25, -72 -175.25 C -72 -175.25, -70 -178.25, -70 -178.25 C -70 -178.25, -64 -178.25, -64 -178.25 C -64 -178.25, -61.5 -175.25, -61.5 -175.25 C -61.5 -175.25, -44 -175.25, -44 -175.25 C -44 -175.25, -42.5 -178.25, -42.5 -178.25 C -42.5 -178.25, -37.5 -178.25, -37.5 -178.25 C -37.5 -178.25, -35 -175.25, -35 -175.25 C -35 -175.25, -17.5 -175.25, -17.5 -175.25 C -17.5 -175.25, -15.5 -178.25, -15.5 -178.25 C -15.5 -178.25, -10 -178.25, -10 -178.25 C -10 -178.25, -8 -175.25, -8 -175.25 C -8 -175.25, 9.5 -175.25, 9.5 -175.25 C 9.5 -175.25, 11.5 -178.25, 11.5 -178.25 C 11.5 -178.25, 17 -178.25, 17 -178.25 C 17 -178.25, 19 -175.25, 19 -175.25 C 19 -175.25, 35.5 -175.25, 35.5 -175.25 C 35.5 -175.25, 37.5 -178.25, 37.5 -178.25 C 37.5 -178.25, 43.5 -178.25, 43.5 -178.25 C 43.5 -178.25, 45.5 -175.25, 45.5 -175.25 C 45.5 -175.25, 63.5 -175.25, 63.5 -175.25 C 63.5 -175.25, 65 -178.25, 65 -178.25 C 65 -178.25, 70 -178.25, 70 -178.25 C 70 -178.25, 72.5 -175.25, 72.5 -175.25 C 72.5 -175.25, 89.5 -175.25, 89.5 -175.25 C 89.5 -175.25, 91.5 -178.25, 91.5 -178.25 C 91.5 -178.25, 97 -178.25, 97 -178.25 C 97 -178.25, 99 -175.25, 99 -175.25 C 99 -175.25, 117 -175.25, 117 -175.25 C 117 -175.25, 119 -178.25, 119 -178.25 C 119 -178.25, 125 -178.25, 125 -178.25 C 125 -173.85, 128.667 -172.75, 130.5 -172.75 C 130.5 -172.75, 130.5 173.75, 130.5 173.75 C 126.1 173.75, 125.333 176.75, 125.5 178.25 C 125.5 178.25, 118 178.25, 118 178.25 C 118 178.25, 117 175.75, 117 175.75 C 117 175.75, 98 175.75, 98 175.75 C 98 175.75, 97 178.25, 97 178.25 C 97 178.25, 91.5 178.25, 91.5 178.25 C 91.5 178.25, 90 175.75, 90 175.75 C 90 175.75, 71 175.75, 71 175.75 C 71 175.75, 70 178.25, 70 178.25 C 70 178.25, 65 178.25, 65 178.25 C 65 178.25, 64 175.75, 64 175.75 C 64 175.75, 44.5 175.75, 44.5 175.75 C 44.5 175.75, 43 178.25, 43 178.25 C 43 178.25, 37.5 178.25, 37.5 178.25 C 37.5 178.25, 36.5 175.75, 36.5 175.75 C 36.5 175.75, 17.5 175.75, 17.5 175.75 C 17.5 175.75, 16.5 178.25, 16.5 178.25 C 16.5 178.25, 11.5 178.25, 11.5 178.25 C 11.5 178.25, 10 175.75, 10 175.75 C 10 175.75, -9 175.75, -9 175.75 C -9 175.75, -10 178.25, -10 178.25 C -10 178.25, -15.5 178.25, -15.5 178.25 C -15.5 178.25, -16.5 175.75, -16.5 175.75 C -16.5 175.75, -36 175.75, -36 175.75 C -36 175.75, -37 178.25, -37 178.25 C -37 178.25, -43 178.25, -43 178.25 C -43 178.25, -44.5 175.75, -44.5 175.75 C -44.5 175.75, -63 175.75, -63 175.75 C -63 175.75, -64 178.25, -64 178.25 C -64 178.25, -69.5 178.25, -69.5 178.25 C -69.5 178.25, -70.5 175.75, -70.5 175.75 C -70.5 175.75, -89.5 175.75, -89.5 175.75 C -89.5 175.75, -91 178.25, -91 178.25 C -91 178.25, -96.5 178.25, -96.5 178.25 C -96.5 178.25, -98 175.75, -98 175.75 C -98 175.75, -116 175.75, -116 175.75 C -116 175.75, -117.5 178.25, -117.5 178.25 C -117.5 178.25, -125 178.25, -125 178.25 C -125 174.65, -128.667 173.75, -130.5 173.75 C -130.5 173.75, -130.5 -172.75, -130.5 -172.75 Z";
+
+  return (
+    <div className="relative w-full max-w-[320px] mx-auto select-none">
+      <style>{`
+        @keyframes printRollout {
+          0% {
+            transform: translateY(-290px);
+            opacity: 0.2;
+          }
+          20% {
+            opacity: 1;
+          }
+          100% {
+            transform: translateY(0);
+            opacity: 1;
+          }
+        }
+        @keyframes printVibe {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(0.5px); }
+        }
+        .animate-print-feed {
+          animation: printRollout 1.4s cubic-bezier(0.16, 1, 0.3, 1) forwards, printVibe 0.15s ease-in-out 8;
+        }
+      `}</style>
+
+      {/* Replay action */}
+      <div className="flex justify-end mb-1">
+        <button
+          type="button"
+          onClick={replay}
+          className="text-[10px] text-gray-400 hover:text-gray-700 font-semibold flex items-center gap-1 transition-colors"
+          title="Watch thermal print animation again"
+        >
+          <span>↺ Replay Print</span>
+        </button>
+      </div>
+
+      <svg
+        key={animKey}
+        viewBox="0 0 494 520"
+        className="w-full h-auto drop-shadow-md overflow-visible"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <defs>
+          <clipPath id="thermalSlotClip">
+            <rect x="110" y="52" width="274" height="460" />
+          </clipPath>
+          <linearGradient id="paperGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#FFFFFF" />
+            <stop offset="100%" stopColor="#F9FAFB" />
+          </linearGradient>
+          <filter id="thermalShadow" x="-10%" y="-10%" width="120%" height="130%">
+            <feDropShadow dx="0" dy="6" stdDeviation="8" floodColor="#000000" floodOpacity="0.12" />
+          </filter>
+        </defs>
+
+        {/* 1. Thermal Paper (rolls down from printer slot) */}
+        <g clipPath="url(#thermalSlotClip)">
+          <g className="animate-print-feed" style={{ transformOrigin: '245.5px 52px' }}>
+            {/* Paper body */}
+            <g transform="translate(245.5, 230)" filter="url(#thermalShadow)">
+              <path d={paperPath} fill="url(#paperGrad)" stroke="#E5E7EB" strokeWidth="1.5" />
+            </g>
+
+            {/* Actual Live Invoice details printed on paper */}
+            <g transform="translate(115, 60)" className="font-sans">
+              {/* Header */}
+              <text x="130" y="28" textAnchor="middle" fontSize="13" fontWeight="800" fill="#1F2937" letterSpacing="0.5">
+                ROOFRAY SOLUTIONS
+              </text>
+              <text x="130" y="42" textAnchor="middle" fontSize="8.5" fontWeight="600" fill="#6B7280" letterSpacing="1">
+                OFFICIAL TAX INVOICE
+              </text>
+              <line x1="18" y1="52" x2="242" y2="52" stroke="#D1D5DB" strokeDasharray="3,3" strokeWidth="1" />
+
+              {/* Invoice Meta */}
+              <text x="22" y="68" fontSize="10" fontWeight="700" fill="#111827">
+                {invoiceNumber}
+              </text>
+              <text x="238" y="68" textAnchor="end" fontSize="9" fontWeight="600" fill="#4B5563">
+                {today}
+              </text>
+              <text x="22" y="82" fontSize="9" fill="#4B5563">
+                Order Ref: #{orderNumber}
+              </text>
+              <text x="238" y="82" textAnchor="end" fontSize="9" fill="#059669" fontWeight="700">
+                Turnkey Solar
+              </text>
+              <line x1="18" y1="92" x2="242" y2="92" stroke="#E5E7EB" strokeWidth="1" />
+
+              {/* Items */}
+              <text x="22" y="108" fontSize="9.5" fontWeight="600" fill="#1F2937">
+                Rooftop Solar PV Installation
+              </text>
+              <text x="238" y="108" textAnchor="end" fontSize="9.5" fontWeight="700" fill="#1F2937">
+                ₹{formattedSubtotal}
+              </text>
+              <text x="22" y="121" fontSize="8" fill="#6B7280">
+                Includes Inverter, Panels, BOS & Liaison
+              </text>
+
+              <text x="22" y="137" fontSize="9" fill="#4B5563">
+                GST (13.8% blended)
+              </text>
+              <text x="238" y="137" textAnchor="end" fontSize="9" fill="#4B5563">
+                ₹{formattedGst}
+              </text>
+
+              <line x1="18" y1="147" x2="242" y2="147" stroke="#D1D5DB" strokeDasharray="3,3" strokeWidth="1" />
+
+              {/* Total Paid */}
+              <text x="22" y="166" fontSize="11" fontWeight="800" fill="#111827">
+                TOTAL PAID (100%)
+              </text>
+              <text x="238" y="166" textAnchor="end" fontSize="13" fontWeight="900" fill="#047857">
+                ₹{formattedTotal}
+              </text>
+
+              {/* PAID Stamp Badge */}
+              <g transform="translate(24, 182)">
+                <rect x="0" y="0" width="212" height="30" rx="6" fill="#ECFDF5" stroke="#059669" strokeWidth="1.5" strokeDasharray="4,2" />
+                <text x="106" y="19" textAnchor="middle" fontSize="11" fontWeight="900" fill="#059669" letterSpacing="0.8">
+                  ✓ PAID IN FULL · SETTLED
+                </text>
+              </g>
+
+              {/* Barcode lines */}
+              <g transform="translate(45, 226)" fill="#374151">
+                {[2, 1, 3, 1, 2, 4, 1, 2, 3, 1, 4, 2, 1, 3, 2, 4, 1, 2, 1, 3, 4, 2, 1, 2, 3, 1, 2].map((w, i) => (
+                  <rect key={i} x={i * 6.2} y="0" width={w} height="18" />
+                ))}
+              </g>
+              <text x="130" y="254" textAnchor="middle" fontSize="7.5" fontWeight="600" fill="#9CA3AF" letterSpacing="0.5">
+                20-YEAR ACTIVE WARRANTY · DISCOM NET-METER
+              </text>
+              <text x="130" y="266" textAnchor="middle" fontSize="8" fontWeight="700" fill="#714B67">
+                Thank you for powering green with RoofRay!
+              </text>
+            </g>
+          </g>
+        </g>
+
+        {/* 2. Thermal Printer Head & Housing (sits on top of paper) */}
+        {/* Upper printer housing */}
+        <g transform="translate(245, 26)">
+          <path
+            d="M -205 26.035 C -205 26.035, -205 -10.035, -205 -10.035 C -205 -18.871, -197.836 -26.035, -189 -26.035 C -189 -26.035, 189 -26.035, 189 -26.035 C 197.837 -26.035, 205 -18.871, 205 -10.035 C 205 -10.035, 205 25.663, 205 25.663 Z"
+            fill="#333333"
+          />
+        </g>
+
+        {/* Lower printer slot mouth */}
+        <g transform="translate(245, 77.4)">
+          <path
+            d="M 205 -27.151 C 205 -27.151, 205 11.151, 205 11.151 C 205 19.988, 197.837 27.151, 189 27.151 C 189 27.151, -189 27.151, -189 27.151 C -197.836 27.151, -205 19.988, -205 11.151 C -205 11.151, -205 -26.779, -205 -26.779 Z"
+            fill="#262626"
+          />
+        </g>
+
+        {/* Inner black exit slot mouth */}
+        <rect x="110" y="47" width="270" height="9" rx="3" fill="#111111" />
+
+        {/* Active Power LED indicator */}
+        <circle cx="85" cy="52" r="3.5" fill="#10B981" />
+        <circle cx="85" cy="52" r="6" fill="#10B981" opacity="0.3">
+          <animate attributeName="opacity" values="0.2;0.6;0.2" dur="1.8s" repeatCount="indefinite" />
+        </circle>
+      </svg>
+    </div>
+  );
 };
 
 export const CustomerPortalPage: React.FC = () => {
@@ -1785,15 +1953,13 @@ export const CustomerPortalPage: React.FC = () => {
               </button>
             </div>
 
-            {/* Lottie Animation */}
-            <div className="pt-6 pb-2 px-6 text-center bg-gradient-to-b from-purple-50/40 to-white">
-              <InvoiceLottieAnimation />
-              <div className="mt-2">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-300">
-                  <i className="fa-solid fa-circle-check text-emerald-600"></i>
-                  <span>INVOICE #{invoiceModalData.invoiceNumber}</span>
-                </span>
-              </div>
+            {/* Animated Bill Receipt with Actual Live Invoice Details */}
+            <div className="pt-3 pb-2 px-6 text-center bg-gradient-to-b from-purple-50/40 to-white">
+              <InvoiceReceiptAnimation
+                invoiceNumber={invoiceModalData.invoiceNumber}
+                orderNumber={invoiceModalData.orderNumber}
+                totalAmount={invoiceModalData.totalAmount}
+              />
             </div>
 
             {/* Details Box */}

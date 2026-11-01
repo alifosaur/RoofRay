@@ -160,6 +160,10 @@ def record_payment(db: Session, order_id: int, payload: PaymentCreate, current_u
     db.add(payment)
 
     order.paid_amount += payload.amount
+    adv_target = round(order.total_amount * 0.5, 2)
+    for inv in order.invoices:
+        if "ADV" in (inv.invoice_number or "") and order.paid_amount >= adv_target - 0.01:
+            inv.status = InvoiceStatus.PAID
     settle_if_fully_paid(db, order, current_user_id)
     events.emit(
         db, "order.payment", {"order_id": order.id, "amount": payload.amount},
@@ -189,6 +193,10 @@ def settle_if_fully_paid(db: Session, order: Order, current_user_id: int) -> Non
     """Issues the 100% full payment invoice once fully paid, and closes the order once installed."""
     if order.paid_amount + 0.01 < order.total_amount:
         return
+
+    # Mark all existing invoices for this order as PAID
+    for inv in order.invoices:
+        inv.status = InvoiceStatus.PAID
 
     # Check/Create the Final Tax Invoice (Full Payment)
     final_inv = db.query(Invoice).filter(

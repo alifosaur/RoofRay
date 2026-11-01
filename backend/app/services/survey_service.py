@@ -157,6 +157,9 @@ def approve_survey(db: Session, survey_id: int, approved_by_id: int) -> Survey:
         user_id=approved_by_id,
     )
     db.add(audit)
+    notify_list = [lead.assigned_to_id] if (lead and lead.assigned_to_id) else []
+    if lead and lead.customer and lead.customer.user_id:
+        notify_list.append(lead.customer.user_id)
     events.emit(
         db, "survey.approved", {"survey_id": survey.id, "lead_id": survey.lead_id},
         user_ids=[survey.technician_id, lead.assigned_to_id if lead else None, lead.customer.user_id if (lead and lead.customer) else None],
@@ -165,7 +168,7 @@ def approve_survey(db: Session, survey_id: int, approved_by_id: int) -> Survey:
         message="Your site survey has been approved. A quotation will follow.",
         link="/customer",
         category="Surveys",
-        notify_user_ids=[lead.customer.user_id] if (lead and lead.customer) else [],
+        notify_user_ids=notify_list,
     )
 
     db.commit()

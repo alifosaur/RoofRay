@@ -62,12 +62,28 @@ interface QuoteData {
   created_at: string;
   valid_until?: string | null;
   has_pdf: boolean;
+  order?: {
+    id: number;
+    order_number: string;
+    status: string;
+    paid_amount: number;
+    balance_amount: number;
+    is_fully_paid: boolean;
+    can_pay_balance: boolean;
+    final_invoice?: {
+      id: number;
+      invoice_number: string;
+      total_amount: number;
+      status: string;
+    } | null;
+  } | null;
   lines: QuoteLine[];
 }
 
 interface OrderData {
   id: number;
   order_number: string;
+  quote_id?: number | null;
   status: string;
   total_amount: number;
   paid_amount: number;
@@ -723,8 +739,8 @@ export const CustomerPortalPage: React.FC = () => {
             {[
               { id: 'catalogue', label: 'Solar Packages', icon: 'fa-cubes-stacked' },
               { id: 'enquiry', label: 'Enquiry & Sizing', icon: 'fa-ruler-combined' },
-              { id: 'tracker', label: 'Project Tracker', icon: 'fa-route', badge: tracker?.current_stage_name },
-              { id: 'quotes', label: 'Quotations & Orders', icon: 'fa-file-invoice-dollar', count: quotes.length },
+              { id: 'tracker', label: 'Project Tracker', icon: 'fa-route', badge: orders.some(o => o.can_pay_balance) ? '⚡ Final Payment Due' : tracker?.current_stage_name },
+              { id: 'quotes', label: 'Quotations & Orders', icon: 'fa-file-invoice-dollar', count: quotes.length, badge: orders.some(o => o.can_pay_balance) ? 'Pay 50%' : undefined },
               { id: 'equipment', label: 'Equipment & Queries', icon: 'fa-shield-halved', count: equipment.length, badge: tickets.filter((t) => t.status !== 'CLOSED' && t.status !== 'CUSTOMER_CONFIRMED').length > 0 ? `${tickets.filter((t) => t.status !== 'CLOSED' && t.status !== 'CUSTOMER_CONFIRMED').length} Active Query` : undefined },
               { id: 'schemes', label: 'PM Surya Ghar & Subsidy', icon: 'fa-hand-holding-dollar' },
             ].map((tab) => (
@@ -776,6 +792,42 @@ export const CustomerPortalPage: React.FC = () => {
             </button>
           </div>
         )}
+
+        {/* Persistent Installation Complete / Final Balance Due Banner */}
+        {orders.find(o => o.can_pay_balance) && (() => {
+          const po = orders.find(o => o.can_pay_balance)!;
+          return (
+            <div className="mb-6 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white p-4 sm:p-5 shadow-lg border border-emerald-400/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2">
+              <div className="flex items-center gap-3.5">
+                <div className="w-11 h-11 rounded-xl bg-white/20 backdrop-blur-xs flex items-center justify-center text-xl shrink-0 shadow-inner">
+                  ⚡
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-white/25 text-white">
+                      Installation Verified
+                    </span>
+                    <span className="text-xs text-emerald-100 font-medium">Order #{po.order_number}</span>
+                  </div>
+                  <h3 className="text-sm sm:text-base font-extrabold tracking-tight mt-0.5">
+                    Technician has completed and verified your rooftop installation!
+                  </h3>
+                  <p className="text-xs text-emerald-100/90 mt-0.5">
+                    System is mounted, tested & operational. Please pay the remaining 50% balance of <strong>₹{po.balance_amount.toLocaleString()}</strong> to receive your official Final Tax Invoice and activate 100% warranty coverage.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => handlePayBalance(po.id, po.balance_amount)}
+                className="w-full sm:w-auto px-5 py-2.5 bg-white hover:bg-emerald-50 text-emerald-800 font-extrabold text-xs rounded-xl shadow-md flex items-center justify-center gap-2 transition-transform active:scale-95 shrink-0"
+              >
+                <i className="fa-solid fa-credit-card"></i>
+                <span>Pay Final 50% Balance (₹{po.balance_amount.toLocaleString()})</span>
+              </button>
+            </div>
+          );
+        })()}
 
         {/* ---------------------------------------------------- */}
         {/* TAB 1: PRODUCT CATALOGUE */}
@@ -1306,6 +1358,37 @@ export const CustomerPortalPage: React.FC = () => {
         {/* ---------------------------------------------------- */}
         {activeTab === 'tracker' && (
           <div className="max-w-4xl mx-auto">
+            {/* Prominent Balance Payment Due Banner on Tracker */}
+            {orders.find(o => o.can_pay_balance) && (() => {
+              const po = orders.find(o => o.can_pay_balance)!;
+              return (
+                <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white rounded-xl p-5 shadow-lg mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border border-emerald-400/40">
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-xs flex items-center justify-center text-2xl shrink-0">
+                      ⚡
+                    </div>
+                    <div>
+                      <span className="inline-block px-2.5 py-0.5 bg-white/20 rounded-full text-[10px] font-extrabold uppercase tracking-wider mb-1">
+                        Installation Verified • Final Step
+                      </span>
+                      <h3 className="text-base font-bold">Technician Completed Solar Installation!</h3>
+                      <p className="text-xs text-emerald-100 mt-0.5">
+                        Your solar system is installed and operational. Clear the final 50% balance of <strong>₹{po.balance_amount.toLocaleString()}</strong> to receive your Final Full Payment Tax Invoice and activate 100% warranty coverage.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handlePayBalance(po.id, po.balance_amount)}
+                    className="px-5 py-2.5 bg-white hover:bg-emerald-50 text-emerald-800 font-extrabold text-xs rounded-xl shadow whitespace-nowrap flex items-center gap-2 transition-transform active:scale-95 shrink-0"
+                  >
+                    <i className="fa-solid fa-credit-card"></i>
+                    <span>Pay Final 50% Balance (₹{po.balance_amount.toLocaleString()})</span>
+                  </button>
+                </div>
+              );
+            })()}
+
             {/* Top Project Summary Card */}
             <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm mb-6">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -1456,116 +1539,19 @@ export const CustomerPortalPage: React.FC = () => {
               )}
             </div>
 
-            {/* Quotations List */}
-            {quotes.length === 0 ? (
-              <div className="bg-white border border-gray-200 rounded-xl p-8 text-center text-gray-500">
-                <i className="fa-solid fa-file-invoice text-3xl text-gray-300 mb-2"></i>
-                <p className="text-sm font-semibold">No quotations generated yet</p>
-                <p className="text-xs text-gray-400 mt-1">Submit your roof details to receive an engineering BOM quotation.</p>
-              </div>
-            ) : (
-              quotes.map((q) => (
-                <div key={q.id} className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-gray-100 pb-4 mb-4">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-base font-bold text-gray-900">{q.quote_number}</span>
-                        <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full ${
-                          q.status === 'ACCEPTED'
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : q.status === 'SENT'
-                            ? 'bg-blue-100 text-blue-800'
-                            : 'bg-amber-100 text-amber-800'
-                        }`}>
-                          {q.status}
-                        </span>
-                      </div>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        Template: <span className="font-semibold text-gray-700">{q.bom_name}</span> ({q.capacity_kw} kW {q.system_type})
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          downloadFile(`/quotes/${q.id}/pdf`, `Quote_${q.quote_number}.pdf`).catch((err) =>
-                            alert(err.message || 'Quotation PDF not available')
-                          )
-                        }
-                        className="px-3 py-1.5 border border-gray-200 hover:bg-gray-50 text-xs font-semibold text-gray-700 rounded flex items-center gap-1.5"
-                      >
-                        <i className="fa-solid fa-file-pdf text-red-500"></i>
-                        <span>Download PDF</span>
-                      </button>
-                      {q.status === 'SENT' && (
-                        <button
-                          onClick={() => handleAcceptQuote(q.id)}
-                          className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded flex items-center gap-1.5 shadow-sm"
-                        >
-                          <i className="fa-solid fa-check"></i>
-                          <span>Accept & Pay 50% Advance (₹{Math.round(q.total_amount * 0.5).toLocaleString()})</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* BOM Lines Table */}
-                  <div className="overflow-x-auto mb-4">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-gray-50 text-gray-600 border-y border-gray-200">
-                        <tr>
-                          <th className="py-2 px-3">BOM Item / Product</th>
-                          <th className="py-2 px-3">SKU</th>
-                          <th className="py-2 px-3 text-center">Qty</th>
-                          <th className="py-2 px-3 text-right">Unit Price</th>
-                          <th className="py-2 px-3 text-right">Subtotal</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100 text-gray-700">
-                        {q.lines.map((line, idx) => (
-                          <tr key={idx} className="hover:bg-gray-50/50">
-                            <td className="py-2 px-3 font-medium text-gray-900">{line.product_name}</td>
-                            <td className="py-2 px-3 font-mono text-[11px] text-gray-500">{line.sku}</td>
-                            <td className="py-2 px-3 text-center font-bold">{line.quantity}</td>
-                            <td className="py-2 px-3 text-right">₹{line.unit_price.toLocaleString()}</td>
-                            <td className="py-2 px-3 text-right font-semibold">₹{line.subtotal.toLocaleString()}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Quote Totals */}
-                  <div className="bg-gray-50 p-4 rounded-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                    <div className="space-y-1">
-                      <span className="text-xs text-gray-500 block">
-                        * Includes turnkey mounting, wiring, net-metering liaison, and 20-year warranty.
-                      </span>
-                      <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-amber-50 border border-amber-200 text-[11px] text-amber-800 font-medium">
-                        <i className="fa-solid fa-shield-halved text-amber-600"></i>
-                        <span>Payment Terms: <strong>50% advance</strong> on acceptance • <strong>50% final balance</strong> post-installation</span>
-                      </div>
-                    </div>
-                    <div className="text-right text-xs space-y-1">
-                      <div className="text-gray-500">Subtotal: <span className="font-semibold text-gray-800">₹{q.subtotal.toLocaleString()}</span></div>
-                      <div className="text-gray-500">GST (13.8% blended): <span className="font-semibold text-gray-800">₹{q.tax_amount.toLocaleString()}</span></div>
-                      <div className="text-base font-bold text-odoo-purple pt-1 border-t border-gray-200">
-                        Total Amount: ₹{q.total_amount.toLocaleString()}
-                      </div>
-                      <div className="text-xs font-semibold text-emerald-700">
-                        50% Advance Booking: ₹{Math.round(q.total_amount * 0.5).toLocaleString()}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-
-            {/* Confirmed Orders Card */}
+            {/* Confirmed Orders Card - Elevated to Top of Tab */}
             {orders.length > 0 && (
-              <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4">Confirmed Sales Orders & Milestone Payments</h3>
+              <div className="bg-white border-2 border-purple-200 rounded-xl p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">
+                    Confirmed Sales Orders & Milestone Payments
+                  </h3>
+                  {orders.some(o => o.can_pay_balance) && (
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300 animate-pulse">
+                      ⚡ Action Required: 50% Balance Due
+                    </span>
+                  )}
+                </div>
                 <div className="space-y-4">
                   {orders.map((o) => (
                     <div key={o.id} className="p-4 border border-gray-200 rounded-xl bg-gray-50/70 space-y-3">
@@ -1679,7 +1665,7 @@ export const CustomerPortalPage: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => handlePayBalance(o.id, o.balance_amount)}
-                              className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-bold shadow-sm flex items-center gap-1.5"
+                              className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-bold shadow-sm flex items-center gap-1.5 animate-pulse"
                             >
                               <i className="fa-solid fa-credit-card"></i>
                               <span>Pay Final 50% Balance (₹{o.balance_amount.toLocaleString()})</span>
@@ -1691,6 +1677,178 @@ export const CustomerPortalPage: React.FC = () => {
                   ))}
                 </div>
               </div>
+            )}
+
+            {/* Quotations List */}
+            {quotes.length === 0 ? (
+              <div className="bg-white border border-gray-200 rounded-xl p-8 text-center text-gray-500">
+                <i className="fa-solid fa-file-invoice text-3xl text-gray-300 mb-2"></i>
+                <p className="text-sm font-semibold">No quotations generated yet</p>
+                <p className="text-xs text-gray-400 mt-1">Submit your roof details to receive an engineering BOM quotation.</p>
+              </div>
+            ) : (
+              quotes.map((q) => {
+                const linkedOrder = q.order || orders.find(o => o.quote_id === q.id || o.order_number.endsWith(q.quote_number.replace('QT-', '')));
+                return (
+                <div key={q.id} className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-gray-100 pb-4 mb-4">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-base font-bold text-gray-900">{q.quote_number}</span>
+                        <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full ${
+                          q.status === 'ACCEPTED'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : q.status === 'SENT'
+                            ? 'bg-blue-100 text-blue-800'
+                            : 'bg-amber-100 text-amber-800'
+                        }`}>
+                          {q.status}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        Template: <span className="font-semibold text-gray-700">{q.bom_name}</span> ({q.capacity_kw} kW {q.system_type})
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          downloadFile(`/quotes/${q.id}/pdf`, `Quote_${q.quote_number}.pdf`).catch((err) =>
+                            alert(err.message || 'Quotation PDF not available')
+                          )
+                        }
+                        className="px-3 py-1.5 border border-gray-200 hover:bg-gray-50 text-xs font-semibold text-gray-700 rounded flex items-center gap-1.5"
+                      >
+                        <i className="fa-solid fa-file-pdf text-red-500"></i>
+                        <span>Download PDF</span>
+                      </button>
+                      {q.status === 'SENT' && (
+                        <button
+                          onClick={() => handleAcceptQuote(q.id)}
+                          className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded flex items-center gap-1.5 shadow-sm"
+                        >
+                          <i className="fa-solid fa-check"></i>
+                          <span>Accept & Pay 50% Advance (₹{Math.round(q.total_amount * 0.5).toLocaleString()})</span>
+                        </button>
+                      )}
+                      {q.status === 'ACCEPTED' && linkedOrder?.can_pay_balance && (
+                        <button
+                          type="button"
+                          onClick={() => handlePayBalance(linkedOrder.id, linkedOrder.balance_amount)}
+                          className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded flex items-center gap-1.5 shadow-sm animate-pulse"
+                        >
+                          <i className="fa-solid fa-credit-card"></i>
+                          <span>Pay Remaining 50% (₹{linkedOrder.balance_amount.toLocaleString()})</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* BOM Lines Table */}
+                  <div className="overflow-x-auto mb-4">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-gray-50 text-gray-600 border-y border-gray-200">
+                        <tr>
+                          <th className="py-2 px-3">BOM Item / Product</th>
+                          <th className="py-2 px-3">SKU</th>
+                          <th className="py-2 px-3 text-center">Qty</th>
+                          <th className="py-2 px-3 text-right">Unit Price</th>
+                          <th className="py-2 px-3 text-right">Subtotal</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 text-gray-700">
+                        {q.lines.map((line, idx) => (
+                          <tr key={idx} className="hover:bg-gray-50/50">
+                            <td className="py-2 px-3 font-medium text-gray-900">{line.product_name}</td>
+                            <td className="py-2 px-3 font-mono text-[11px] text-gray-500">{line.sku}</td>
+                            <td className="py-2 px-3 text-center font-bold">{line.quantity}</td>
+                            <td className="py-2 px-3 text-right">₹{line.unit_price.toLocaleString()}</td>
+                            <td className="py-2 px-3 text-right font-semibold">₹{line.subtotal.toLocaleString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Quote Totals */}
+                  <div className="bg-gray-50 p-4 rounded-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                    <div className="space-y-1">
+                      <span className="text-xs text-gray-500 block">
+                        * Includes turnkey mounting, wiring, net-metering liaison, and 20-year warranty.
+                      </span>
+                      <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-amber-50 border border-amber-200 text-[11px] text-amber-800 font-medium">
+                        <i className="fa-solid fa-shield-halved text-amber-600"></i>
+                        <span>Payment Terms: <strong>50% advance</strong> on acceptance • <strong>50% final balance</strong> post-installation</span>
+                      </div>
+                    </div>
+                    <div className="text-right text-xs space-y-1">
+                      <div className="text-gray-500">Subtotal: <span className="font-semibold text-gray-800">₹{q.subtotal.toLocaleString()}</span></div>
+                      <div className="text-gray-500">GST (13.8% blended): <span className="font-semibold text-gray-800">₹{q.tax_amount.toLocaleString()}</span></div>
+                      <div className="text-base font-bold text-odoo-purple pt-1 border-t border-gray-200">
+                        Total Amount: ₹{q.total_amount.toLocaleString()}
+                      </div>
+                      <div className="text-xs font-semibold text-emerald-700">
+                        50% Advance Booking: ₹{Math.round(q.total_amount * 0.5).toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* If installation verified, prominent payment prompt inside the quotation card */}
+                  {linkedOrder?.can_pay_balance && (
+                    <div className="mt-4 p-4 bg-emerald-50 border-2 border-emerald-400 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
+                          <span className="text-xs font-extrabold text-emerald-900 uppercase tracking-wide">
+                            ✓ Installation Confirmed by Technician
+                          </span>
+                        </div>
+                        <p className="text-xs text-emerald-800 mt-1">
+                          Your solar power plant is completely installed and tested. Please pay the remaining 50% balance of <strong>₹{linkedOrder.balance_amount.toLocaleString()}</strong> to generate your Final Tax Invoice.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handlePayBalance(linkedOrder.id, linkedOrder.balance_amount)}
+                        className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-md whitespace-nowrap flex items-center gap-2 transition-transform active:scale-95 shrink-0"
+                      >
+                        <i className="fa-solid fa-credit-card"></i>
+                        <span>Pay Final 50% Balance (₹{linkedOrder.balance_amount.toLocaleString()})</span>
+                      </button>
+                    </div>
+                  )}
+                  {linkedOrder?.is_fully_paid && (
+                    <div className="mt-4 p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between text-xs text-emerald-800 font-semibold">
+                      <span className="flex items-center gap-2">
+                        <i className="fa-solid fa-circle-check text-emerald-600"></i>
+                        <span>100% Fully Settled • Official Tax Invoice & 20-Yr Warranty Cleared</span>
+                      </span>
+                      {linkedOrder.final_invoice && (
+                        <button
+                          type="button"
+                          onClick={() => setInvoiceModalData({
+                            invoiceNumber: linkedOrder.final_invoice!.invoice_number,
+                            invoiceId: linkedOrder.final_invoice!.id,
+                            totalAmount: linkedOrder.final_invoice!.total_amount,
+                            orderNumber: linkedOrder.order_number,
+                          })}
+                          className="px-3 py-1 bg-white hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded font-bold"
+                        >
+                          View Full Invoice
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  {q.status === 'ACCEPTED' && !linkedOrder?.can_pay_balance && !linkedOrder?.is_fully_paid && (
+                    <div className="mt-3 p-2.5 bg-blue-50/70 border border-blue-200 rounded-lg text-xs text-blue-800 font-medium flex items-center gap-2">
+                      <i className="fa-solid fa-clock-rotate-left text-blue-600"></i>
+                      <span>50% Advance Booking Paid. Waiting for technician installation completion to unlock remaining 50% payment.</span>
+                    </div>
+                  )}
+                </div>
+                );
+              })
             )}
           </div>
         )}

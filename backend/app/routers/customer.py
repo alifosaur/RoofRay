@@ -430,6 +430,19 @@ def get_customer_quotes(
             "created_at": q.created_at.strftime("%Y-%m-%d"),
             "valid_until": None,  # quotes carry no validity date
             "has_pdf": bool(q.pdf_path),
+            "order": {
+                "id": q.order.id,
+                "order_number": q.order.order_number,
+                "status": q.order.status.value,
+                "paid_amount": q.order.paid_amount,
+                "balance_amount": round(max(0.0, q.order.total_amount - q.order.paid_amount), 2),
+                "is_fully_paid": round(max(0.0, q.order.total_amount - q.order.paid_amount), 2) <= 0.01,
+                "can_pay_balance": bool(
+                    q.order.installation_job
+                    and q.order.installation_job.status == JobStatus.COMPLETED
+                    and round(max(0.0, q.order.total_amount - q.order.paid_amount), 2) > 0.01
+                ),
+            } if q.order else None,
             "lines": [
                 {
                     "product_name": l.product.name if l.product else "Item",
@@ -572,8 +585,8 @@ def get_customer_orders(
             {
                 "id": p.id,
                 "amount": p.amount,
-                "payment_method": p.payment_method.value,
-                "reference": p.transaction_ref or f"PAY-{p.id}",
+                "payment_method": (p.method.value if hasattr(p.method, "value") else str(p.method)) if hasattr(p, "method") and p.method else "ONLINE",
+                "reference": getattr(p, "transaction_ref", None) or f"PAY-{p.id}",
                 "date": p.created_at.strftime("%Y-%m-%d"),
             }
             for p in o.payments
@@ -585,6 +598,7 @@ def get_customer_orders(
         out.append({
             "id": o.id,
             "order_number": o.order_number,
+            "quote_id": o.quote_id,
             "status": o.status.value,
             "total_amount": o.total_amount,
             "paid_amount": o.paid_amount,

@@ -25,8 +25,8 @@ export const AccountingPage: React.FC = () => {
   const [editingSubsidy, setEditingSubsidy] = useState<any | null>(null);
   const [subsidyStatus, setSubsidyStatus] = useState('');
   const [applicationRef, setApplicationRef] = useState('');
-  const [approvedAmount, setApprovedAmount] = useState<number>(0);
-  const [disbursedAmount, setDisbursedAmount] = useState<number>(0);
+  const [approvedAmount, setApprovedAmount] = useState<number | string>('');
+  const [disbursedAmount, setDisbursedAmount] = useState<number | string>('');
   const [stepDate, setStepDate] = useState('');
   const [stepNotes, setStepNotes] = useState('');
   const [stepDoc, setStepDoc] = useState<File | null>(null);
@@ -457,10 +457,42 @@ export const AccountingPage: React.FC = () => {
               )}
               <div className="grid grid-cols-2 gap-3">
                 <label className="block text-gray-700 font-medium">Sanctioned amount (₹)
-                  <input type="number" step="0.01" min="0" value={approvedAmount} onChange={(e) => setApprovedAmount(Number(e.target.value))} className="w-full px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:border-odoo-primary mt-1" />
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    value={approvedAmount}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === '') {
+                        setApprovedAmount('');
+                        return;
+                      }
+                      const num = parseFloat(val);
+                      if (!isNaN(num) && num >= 0) setApprovedAmount(val);
+                    }}
+                    className="w-full px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:border-odoo-primary mt-1"
+                  />
                 </label>
                 <label className="block text-gray-700 font-medium">Disbursed amount (₹)
-                  <input type="number" step="0.01" min="0" value={disbursedAmount} onChange={(e) => setDisbursedAmount(Number(e.target.value))} className="w-full px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:border-odoo-primary mt-1" />
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    value={disbursedAmount}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === '') {
+                        setDisbursedAmount('');
+                        return;
+                      }
+                      const num = parseFloat(val);
+                      if (!isNaN(num) && num >= 0) setDisbursedAmount(val);
+                    }}
+                    className="w-full px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:border-odoo-primary mt-1"
+                  />
                 </label>
               </div>
 

@@ -25,7 +25,7 @@ export const JobsPage: React.FC = () => {
   // Complete job modal
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [powerGenerated, setPowerGenerated] = useState(true);
-  const [confirmedCapacity, setConfirmedCapacity] = useState<number>(3);
+  const [confirmedCapacity, setConfirmedCapacity] = useState<string | number>('');
   const [jobNotes, setJobNotes] = useState('');
   const [submittingComplete, setSubmittingComplete] = useState(false);
   const [actionError, setActionError] = useState('');
@@ -249,7 +249,10 @@ export const JobsPage: React.FC = () => {
 
                   {selectedJob.status === 'IN_PROGRESS' && (
                     <button
-                      onClick={() => setShowCompleteModal(true)}
+                      onClick={() => {
+                        setConfirmedCapacity(selectedJob.confirmed_capacity_kw ?? selectedJob.capacity_kw ?? '');
+                        setShowCompleteModal(true);
+                      }}
                       className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded text-xs shadow-xs flex items-center gap-1.5"
                     >
                       <FontAwesomeIcon icon={faCheckSquare} />
@@ -397,9 +400,19 @@ export const JobsPage: React.FC = () => {
                 <input
                   type="number"
                   step="0.1"
+                  min="0.1"
+                  placeholder="e.g. 3.0"
                   required
                   value={confirmedCapacity}
-                  onChange={(e) => setConfirmedCapacity(Number(e.target.value))}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === '') {
+                      setConfirmedCapacity('');
+                      return;
+                    }
+                    const num = parseFloat(val);
+                    if (!isNaN(num) && num >= 0) setConfirmedCapacity(val);
+                  }}
                   className="w-full px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:border-odoo-primary"
                 />
               </div>

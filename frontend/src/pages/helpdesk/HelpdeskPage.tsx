@@ -39,8 +39,8 @@ export const HelpdeskPage: React.FC = () => {
   const [selectedTicket, setSelectedTicket] = useState<any | null>(null);
   const [showResolveModal, setShowResolveModal] = useState(false);
   const [resolutionNotes, setResolutionNotes] = useState('');
-  const [partsCost, setPartsCost] = useState(0);
-  const [labourCost, setLabourCost] = useState(0);
+  const [partsCost, setPartsCost] = useState<number | string>('');
+  const [labourCost, setLabourCost] = useState<number | string>('');
   const [submittingAction, setSubmittingAction] = useState(false);
   const [actionError, setActionError] = useState('');
 
@@ -505,8 +505,18 @@ export const HelpdeskPage: React.FC = () => {
                       <input
                         type="number"
                         step="0.01"
+                        min="0"
+                        placeholder="0.00"
                         value={partsCost}
-                        onChange={(e) => setPartsCost(Number(e.target.value))}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === '') {
+                            setPartsCost('');
+                            return;
+                          }
+                          const num = parseFloat(val);
+                          if (!isNaN(num) && num >= 0) setPartsCost(val);
+                        }}
                         className="w-full px-3 py-1.5 border border-gray-300 rounded bg-white"
                       />
                     </div>
@@ -515,8 +525,18 @@ export const HelpdeskPage: React.FC = () => {
                       <input
                         type="number"
                         step="0.01"
+                        min="0"
+                        placeholder="0.00"
                         value={labourCost}
-                        onChange={(e) => setLabourCost(Number(e.target.value))}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === '') {
+                            setLabourCost('');
+                            return;
+                          }
+                          const num = parseFloat(val);
+                          if (!isNaN(num) && num >= 0) setLabourCost(val);
+                        }}
                         className="w-full px-3 py-1.5 border border-gray-300 rounded bg-white"
                       />
                     </div>

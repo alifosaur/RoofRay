@@ -38,7 +38,7 @@ export const TechnicianPWAPage: React.FC = () => {
 
   // Form states for installation job completion
   const [powerGenPassed, setPowerGenPassed] = useState(true);
-  const [capacityKw, setCapacityKw] = useState<number>(0);
+  const [capacityKw, setCapacityKw] = useState<number | string>('');
 
   // Time handling: Start and Finish times (HH:MM)
   const pad2 = (n: number) => String(n).padStart(2, '0');
@@ -130,8 +130,8 @@ export const TechnicianPWAPage: React.FC = () => {
 
   // Form states for warranty & service query resolution
   const [resolutionNotes, setResolutionNotes] = useState('');
-  const [partsCost, setPartsCost] = useState(0);
-  const [labourCost, setLabourCost] = useState(0);
+  const [partsCost, setPartsCost] = useState<number | string>('');
+  const [labourCost, setLabourCost] = useState<number | string>('');
   const [resolvingTicket, setResolvingTicket] = useState(false);
 
   const sigPadRef = useRef<SignatureCanvas | null>(null);
@@ -153,7 +153,7 @@ export const TechnicianPWAPage: React.FC = () => {
         if (found) setActiveJob(found);
       } else if (jobsData && jobsData.length > 0) {
         setActiveJob(jobsData[0]);
-        setCapacityKw(jobsData[0].capacity_kw || 0);
+        setCapacityKw(jobsData[0].confirmed_capacity_kw ?? jobsData[0].capacity_kw ?? '');
       }
 
       if (activeSurvey) {
@@ -411,7 +411,7 @@ export const TechnicianPWAPage: React.FC = () => {
                       key={job.id}
                       onClick={() => {
                         setActiveJob(job);
-                        setCapacityKw(job.confirmed_capacity_kw || job.capacity_kw || 0);
+                        setCapacityKw(job.confirmed_capacity_kw ?? job.capacity_kw ?? '');
                       }}
                       className={`flex-shrink-0 px-4 py-2.5 rounded-xl text-left border transition-all ${
                         activeJob?.id === job.id
@@ -648,8 +648,20 @@ export const TechnicianPWAPage: React.FC = () => {
                         <input
                           type="number"
                           step="0.1"
+                          min="0.1"
+                          placeholder="e.g. 3.0"
                           value={capacityKw}
-                          onChange={(e) => setCapacityKw(Number(e.target.value))}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === '') {
+                              setCapacityKw('');
+                              return;
+                            }
+                            const num = parseFloat(val);
+                            if (!isNaN(num) && num >= 0) {
+                              setCapacityKw(val);
+                            }
+                          }}
                           className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-900 font-bold focus:border-[#714B67] focus:outline-none"
                         />
                       </div>
@@ -1176,8 +1188,17 @@ export const TechnicianPWAPage: React.FC = () => {
                             type="number"
                             min="0"
                             step="10"
+                            placeholder="0.00"
                             value={partsCost}
-                            onChange={(e) => setPartsCost(Number(e.target.value))}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val === '') {
+                                setPartsCost('');
+                                return;
+                              }
+                              const num = parseFloat(val);
+                              if (!isNaN(num) && num >= 0) setPartsCost(val);
+                            }}
                             className="w-full bg-white border border-gray-300 rounded-lg px-3 py-1.5 text-gray-900 font-mono"
                           />
                         </div>
@@ -1189,8 +1210,17 @@ export const TechnicianPWAPage: React.FC = () => {
                             type="number"
                             min="0"
                             step="10"
+                            placeholder="0.00"
                             value={labourCost}
-                            onChange={(e) => setLabourCost(Number(e.target.value))}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val === '') {
+                                setLabourCost('');
+                                return;
+                              }
+                              const num = parseFloat(val);
+                              if (!isNaN(num) && num >= 0) setLabourCost(val);
+                            }}
                             className="w-full bg-white border border-gray-300 rounded-lg px-3 py-1.5 text-gray-900 font-mono"
                           />
                         </div>

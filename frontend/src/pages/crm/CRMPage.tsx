@@ -7,6 +7,7 @@ import { KanbanView, KanbanColumn, KanbanItem } from '../../components/odoo/Kanb
 import { ListView, ColumnDef } from '../../components/odoo/ListView';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faDolly, faCheckCircle, faCalendarCheck } from '@fortawesome/free-solid-svg-icons';
+import { useAuth } from '../../context/AuthContext';
 import { validateEmail, validatePhone, sanitizePhone, validateAddress, countWords } from '../../utils/validators';
 
 export const CRMPage: React.FC = () => {
@@ -23,6 +24,8 @@ export const CRMPage: React.FC = () => {
     system_type: 'On-Grid',
   });
   const navigate = useNavigate();
+  const { user, role } = useAuth();
+  const isAdmin = role === 'admin' || user?.role === 'admin';
 
   const [salesMetrics, setSalesMetrics] = useState<any>(null);
 
@@ -189,19 +192,60 @@ export const CRMPage: React.FC = () => {
   };
 
   const handleMove = async (itemId: string | number, newStatus: string) => {
-    if (newStatus === 'SURVEY_SCHEDULED') {
-      navigate(`/web/crm/${itemId}?action=schedule_survey`);
-      return;
+    const currentLead = leads.find((l) => String(l.id) === String(itemId));
+    if (currentLead && currentLead.status === newStatus) return;
+
+    if (!isAdmin) {
+      if (newStatus === 'SURVEY_SCHEDULED') {
+        navigate(`/web/crm/${itemId}?action=schedule_survey`);
+        return;
+      }
+      if (newStatus === 'LOST') {
+        const reason = window.prompt('Please enter the reason for marking this lead Lost:');
+        if (!reason) return;
+        try {
+          setLeads((prev) =>
+            prev.map((l) => (String(l.id) === String(itemId) ? { ...l, status: newStatus } : l))
+          );
+          await api.put(`/leads/${itemId}`, { status: 'LOST', lost_reason: reason });
+          fetchLeads();
+        } catch (err: any) {
+          fetchLeads();
+          alert(err.message || 'Error updating status');
+        }
+        return;
+      }
+      if (WORKFLOW_HINTS[newStatus]) {
+        alert(WORKFLOW_HINTS[newStatus]);
+        if (newStatus === 'QUALIFIED' || newStatus === 'QUOTED') navigate(`/web/crm/${itemId}`);
+        return;
+      }
+    } else {
+      if (newStatus === 'LOST') {
+        const reason = window.prompt('Please enter the reason for marking this lead Lost:', 'Customer dropped out');
+        if (!reason) return;
+        try {
+          setLeads((prev) =>
+            prev.map((l) => (String(l.id) === String(itemId) ? { ...l, status: newStatus } : l))
+          );
+          await api.put(`/leads/${itemId}`, { status: 'LOST', lost_reason: reason });
+          fetchLeads();
+        } catch (err: any) {
+          fetchLeads();
+          alert(err.message || 'Error updating status');
+        }
+        return;
+      }
     }
-    if (WORKFLOW_HINTS[newStatus]) {
-      alert(WORKFLOW_HINTS[newStatus]);
-      if (newStatus === 'QUALIFIED' || newStatus === 'QUOTED') navigate(`/web/crm/${itemId}`);
-      return;
-    }
+
     try {
+      setLeads((prev) =>
+        prev.map((l) => (String(l.id) === String(itemId) ? { ...l, status: newStatus } : l))
+      );
       await api.put(`/leads/${itemId}`, { status: newStatus });
       fetchLeads();
     } catch (err: any) {
+      fetchLeads();
       alert(err.message || 'Error updating status');
     }
   };

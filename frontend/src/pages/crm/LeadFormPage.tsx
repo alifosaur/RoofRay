@@ -35,9 +35,15 @@ export const LeadFormPage: React.FC = () => {
   // null = let the backend compute the subsidy from the schemes table
   const [subsidyAmount, setSubsidyAmount] = useState<number | null>(null);
 
-  const [checklist, setChecklist] = useState({
-    shadow_free_area_sqft: 0,
-    monthly_bill_amount: 0,
+  const [checklist, setChecklist] = useState<{
+    shadow_free_area_sqft: number | '';
+    monthly_bill_amount: number | '';
+    is_grid_suitable: boolean;
+    remarks: string;
+    lost_reason: string;
+  }>({
+    shadow_free_area_sqft: '',
+    monthly_bill_amount: '',
     is_grid_suitable: true,
     remarks: '',
     lost_reason: '',
@@ -133,7 +139,11 @@ export const LeadFormPage: React.FC = () => {
   const handleSaveChecklist = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await api.post(`/leads/${id}/checklist`, checklist);
+      await api.post(`/leads/${id}/checklist`, {
+        ...checklist,
+        shadow_free_area_sqft: checklist.shadow_free_area_sqft === '' ? 0 : Number(checklist.shadow_free_area_sqft),
+        monthly_bill_amount: checklist.monthly_bill_amount === '' ? 0 : Number(checklist.monthly_bill_amount),
+      });
       setShowChecklistModal(false);
       fetchLeadData();
     } catch (err: any) {
@@ -743,8 +753,16 @@ export const LeadFormPage: React.FC = () => {
                 <input
                   type="number"
                   required
+                  min="1"
+                  step="1"
+                  inputMode="numeric"
+                  placeholder="e.g. 400"
                   value={checklist.shadow_free_area_sqft}
-                  onChange={(e) => setChecklist({ ...checklist, shadow_free_area_sqft: parseFloat(e.target.value) })}
+                  onKeyDown={(e) => ['-', '+', '.', 'e', 'E'].includes(e.key) && e.preventDefault()}
+                  onChange={(e) => {
+                    const digits = e.target.value.replace(/\D/g, '');
+                    setChecklist({ ...checklist, shadow_free_area_sqft: digits === '' ? '' : parseInt(digits, 10) });
+                  }}
                   className="w-full border border-gray-300 rounded px-2.5 py-1.5 focus:border-odoo-primary focus:outline-none"
                 />
               </div>
@@ -754,8 +772,16 @@ export const LeadFormPage: React.FC = () => {
                 <input
                   type="number"
                   required
+                  min="1"
+                  step="1"
+                  inputMode="numeric"
+                  placeholder="e.g. 4500"
                   value={checklist.monthly_bill_amount}
-                  onChange={(e) => setChecklist({ ...checklist, monthly_bill_amount: parseFloat(e.target.value) })}
+                  onKeyDown={(e) => ['-', '+', '.', 'e', 'E'].includes(e.key) && e.preventDefault()}
+                  onChange={(e) => {
+                    const digits = e.target.value.replace(/\D/g, '');
+                    setChecklist({ ...checklist, monthly_bill_amount: digits === '' ? '' : parseInt(digits, 10) });
+                  }}
                   className="w-full border border-gray-300 rounded px-2.5 py-1.5 focus:border-odoo-primary focus:outline-none"
                 />
               </div>

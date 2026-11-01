@@ -350,7 +350,26 @@ export const CustomerPortalPage: React.FC = () => {
   } | null>(null);
 
   // Enquiry form state
-  const [enquiryForm, setEnquiryForm] = useState({
+  const [enquiryForm, setEnquiryForm] = useState<{
+    name: string;
+    phone: string;
+    email: string;
+    address: string;
+    city: string;
+    state: string;
+    pincode: string;
+    property_type: string;
+    roof_type: string;
+    roof_length_ft: number | '';
+    roof_width_ft: number | '';
+    shadow_free_area_sqft: number | '';
+    floor_number: number | '';
+    roof_direction: string;
+    monthly_bill_amount: number | '';
+    preferred_system_type: string;
+    preferred_capacity_kw: number;
+    notes: string;
+  }>({
     name: user?.full_name || '',
     phone: user?.phone || '',
     email: user?.email || '',
@@ -360,16 +379,39 @@ export const CustomerPortalPage: React.FC = () => {
     pincode: '',
     property_type: '',
     roof_type: '',
-    roof_length_ft: 0,
-    roof_width_ft: 0,
-    shadow_free_area_sqft: 0,
-    floor_number: 1,
+    roof_length_ft: '',
+    roof_width_ft: '',
+    shadow_free_area_sqft: '',
+    floor_number: '',
     roof_direction: '',
-    monthly_bill_amount: 0,
+    monthly_bill_amount: '',
     preferred_system_type: 'On-Grid',
     preferred_capacity_kw: 3.0,
     notes: '',
   });
+
+  // Handle strictly positive integer measurable inputs (can be cleared freely without locking to 0)
+  const handlePositiveIntInput = (
+    field: 'roof_length_ft' | 'roof_width_ft' | 'shadow_free_area_sqft' | 'floor_number' | 'monthly_bill_amount',
+    val: string,
+    maxVal?: number
+  ) => {
+    const digits = val.replace(/\D/g, '');
+    if (digits === '') {
+      setEnquiryForm(prev => ({ ...prev, [field]: '' }));
+      return;
+    }
+    const num = parseInt(digits, 10);
+    if (isNaN(num) || num <= 0) {
+      setEnquiryForm(prev => ({ ...prev, [field]: '' }));
+      return;
+    }
+    if (maxVal && num > maxVal) {
+      setEnquiryForm(prev => ({ ...prev, [field]: maxVal }));
+      return;
+    }
+    setEnquiryForm(prev => ({ ...prev, [field]: num }));
+  };
 
   // Ticket modal state
   const [showTicketModal, setShowTicketModal] = useState(false);
@@ -459,7 +501,9 @@ export const CustomerPortalPage: React.FC = () => {
   };
 
   // Live solar kW helper from roof dimensions
-  const computedRoofArea = (enquiryForm.roof_length_ft || 0) * (enquiryForm.roof_width_ft || 0);
+  const roofLength = Number(enquiryForm.roof_length_ft) || 0;
+  const roofWidth = Number(enquiryForm.roof_width_ft) || 0;
+  const computedRoofArea = roofLength * roofWidth;
   const estimatedKwFromArea = Math.max(1, Math.min(10, Math.floor(computedRoofArea / 100)));
   const estimatedMonthlyUnits = Math.round(enquiryForm.preferred_capacity_kw * 115);
   const estimatedMonthlySavings = Math.round(estimatedMonthlyUnits * 7.5);
@@ -495,7 +539,16 @@ export const CustomerPortalPage: React.FC = () => {
     try {
       // Blank / zero measurements mean "not known" and are sent as missing, never as values
       const body = Object.fromEntries(
-        Object.entries({ ...enquiryForm, phone: sanitizePhone(enquiryForm.phone), roof_area_sqft: computedRoofArea }).map(([k, v]) => [k, v === '' || v === 0 ? undefined : v])
+        Object.entries({
+          ...enquiryForm,
+          phone: sanitizePhone(enquiryForm.phone),
+          roof_length_ft: enquiryForm.roof_length_ft !== '' && Number(enquiryForm.roof_length_ft) > 0 ? Number(enquiryForm.roof_length_ft) : undefined,
+          roof_width_ft: enquiryForm.roof_width_ft !== '' && Number(enquiryForm.roof_width_ft) > 0 ? Number(enquiryForm.roof_width_ft) : undefined,
+          roof_area_sqft: computedRoofArea > 0 ? computedRoofArea : undefined,
+          shadow_free_area_sqft: enquiryForm.shadow_free_area_sqft !== '' && Number(enquiryForm.shadow_free_area_sqft) > 0 ? Number(enquiryForm.shadow_free_area_sqft) : undefined,
+          floor_number: enquiryForm.floor_number !== '' && Number(enquiryForm.floor_number) > 0 ? Number(enquiryForm.floor_number) : 1,
+          monthly_bill_amount: enquiryForm.monthly_bill_amount !== '' && Number(enquiryForm.monthly_bill_amount) > 0 ? Number(enquiryForm.monthly_bill_amount) : undefined,
+        }).map(([k, v]) => [k, v === '' || v === 0 ? undefined : v])
       );
       const res = await api.post<any>('/customer/enquiry', body);
       setNoticeMessage(res.message || 'Thank you! Our sales representative will contact you soon.');
@@ -1002,39 +1055,51 @@ export const CustomerPortalPage: React.FC = () => {
                       <label className="block text-xs font-semibold text-gray-700 mb-1">Roof Length (ft)</label>
                       <input
                         type="number"
-                        min="5"
-                        max="200"
+                        min="1"
+                        max="500"
+                        step="1"
+                        inputMode="numeric"
+                        placeholder="e.g. 30"
                         value={enquiryForm.roof_length_ft}
-                        onChange={(e) => setEnquiryForm({ ...enquiryForm, roof_length_ft: parseFloat(e.target.value) || 0 })}
-                        className="w-full px-3 py-2 text-xs border border-gray-300 rounded"
+                        onKeyDown={(e) => ['-', '+', '.', 'e', 'E'].includes(e.key) && e.preventDefault()}
+                        onChange={(e) => handlePositiveIntInput('roof_length_ft', e.target.value, 500)}
+                        className="w-full px-3 py-2 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-odoo-purple"
                       />
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-gray-700 mb-1">Roof Width (ft)</label>
                       <input
                         type="number"
-                        min="5"
-                        max="200"
+                        min="1"
+                        max="500"
+                        step="1"
+                        inputMode="numeric"
+                        placeholder="e.g. 20"
                         value={enquiryForm.roof_width_ft}
-                        onChange={(e) => setEnquiryForm({ ...enquiryForm, roof_width_ft: parseFloat(e.target.value) || 0 })}
-                        className="w-full px-3 py-2 text-xs border border-gray-300 rounded"
+                        onKeyDown={(e) => ['-', '+', '.', 'e', 'E'].includes(e.key) && e.preventDefault()}
+                        onChange={(e) => handlePositiveIntInput('roof_width_ft', e.target.value, 500)}
+                        className="w-full px-3 py-2 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-odoo-purple"
                       />
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-gray-700 mb-1">Total Roof Area</label>
                       <div className="px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded font-bold text-gray-700">
-                        {computedRoofArea} sq.ft
+                        {computedRoofArea > 0 ? `${computedRoofArea.toLocaleString()} sq.ft` : '— (Auto-calculated)'}
                       </div>
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-gray-700 mb-1">Shadow-Free Area (sq.ft)</label>
                       <input
                         type="number"
-                        min="0"
-                        max="5000"
+                        min="1"
+                        max="100000"
+                        step="1"
+                        inputMode="numeric"
+                        placeholder="e.g. 400"
                         value={enquiryForm.shadow_free_area_sqft}
-                        onChange={(e) => setEnquiryForm({ ...enquiryForm, shadow_free_area_sqft: parseFloat(e.target.value) || 0 })}
-                        className="w-full px-3 py-2 text-xs border border-gray-300 rounded"
+                        onKeyDown={(e) => ['-', '+', '.', 'e', 'E'].includes(e.key) && e.preventDefault()}
+                        onChange={(e) => handlePositiveIntInput('shadow_free_area_sqft', e.target.value, 100000)}
+                        className="w-full px-3 py-2 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-odoo-purple"
                       />
                     </div>
                     <div>
@@ -1055,10 +1120,14 @@ export const CustomerPortalPage: React.FC = () => {
                       <input
                         type="number"
                         min="1"
-                        max="30"
+                        max="100"
+                        step="1"
+                        inputMode="numeric"
+                        placeholder="e.g. 1"
                         value={enquiryForm.floor_number}
-                        onChange={(e) => setEnquiryForm({ ...enquiryForm, floor_number: parseInt(e.target.value) || 1 })}
-                        className="w-full px-3 py-2 text-xs border border-gray-300 rounded"
+                        onKeyDown={(e) => ['-', '+', '.', 'e', 'E'].includes(e.key) && e.preventDefault()}
+                        onChange={(e) => handlePositiveIntInput('floor_number', e.target.value, 100)}
+                        className="w-full px-3 py-2 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-odoo-purple"
                       />
                     </div>
                     <div>
@@ -1081,11 +1150,15 @@ export const CustomerPortalPage: React.FC = () => {
                       <label className="block text-xs font-semibold text-gray-700 mb-1">Monthly Power Bill (₹)</label>
                       <input
                         type="number"
-                        min="500"
-                        max="200000"
+                        min="1"
+                        max="10000000"
+                        step="1"
+                        inputMode="numeric"
+                        placeholder="e.g. 4500"
                         value={enquiryForm.monthly_bill_amount}
-                        onChange={(e) => setEnquiryForm({ ...enquiryForm, monthly_bill_amount: parseFloat(e.target.value) || 0 })}
-                        className="w-full px-3 py-2 text-xs border border-gray-300 rounded font-semibold text-gray-800"
+                        onKeyDown={(e) => ['-', '+', '.', 'e', 'E'].includes(e.key) && e.preventDefault()}
+                        onChange={(e) => handlePositiveIntInput('monthly_bill_amount', e.target.value, 10000000)}
+                        className="w-full px-3 py-2 text-xs border border-gray-300 rounded font-semibold text-gray-800 focus:ring-1 focus:ring-odoo-purple"
                       />
                     </div>
                   </div>

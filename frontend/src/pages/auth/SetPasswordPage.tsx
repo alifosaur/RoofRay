@@ -3,6 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../../api/client';
 import { SiteNavbar } from '../../components/layout/SiteNavbar';
 import { SiteFooter } from '../../components/layout/SiteFooter';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faEye, faEyeSlash } from '@fortawesome/free-solid-svg-icons';
 import { validatePassword } from '../../utils/validators';
 
 // Local auth mode: landing page for admin-issued setup links and password reset links
@@ -12,6 +14,8 @@ export const SetPasswordPage: React.FC = () => {
   const navigate = useNavigate();
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -44,11 +48,51 @@ export const SetPasswordPage: React.FC = () => {
           {error && <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded">{error}</div>}
           <div>
             <label className="block text-xs font-semibold text-gray-700 mb-1">New Password (min. 8 characters)</label>
-            <input className={input} type="password" minLength={8} placeholder="At least 8 characters" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" required />
+            <div className="relative">
+              <input
+                className={`${input} pr-10`}
+                type={showPassword ? 'text' : 'password'}
+                minLength={8}
+                placeholder="At least 8 characters"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="new-password"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 p-1 cursor-pointer transition-colors"
+                title={showPassword ? 'Hide password' : 'Show password'}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                <FontAwesomeIcon icon={showPassword ? faEyeSlash : faEye} className="text-sm" />
+              </button>
+            </div>
           </div>
           <div>
             <label className="block text-xs font-semibold text-gray-700 mb-1">Confirm Password</label>
-            <input className={input} type="password" minLength={8} placeholder="Repeat password" value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password" required />
+            <div className="relative">
+              <input
+                className={`${input} pr-10`}
+                type={showConfirm ? 'text' : 'password'}
+                minLength={8}
+                placeholder="Repeat password"
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+                autoComplete="new-password"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirm(!showConfirm)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 p-1 cursor-pointer transition-colors"
+                title={showConfirm ? 'Hide password' : 'Show password'}
+                aria-label={showConfirm ? 'Hide password' : 'Show password'}
+              >
+                <FontAwesomeIcon icon={showConfirm ? faEyeSlash : faEye} className="text-sm" />
+              </button>
+            </div>
           </div>
           <button disabled={loading || !token} className="w-full py-2.5 bg-[#6B4B63] text-white font-semibold text-sm rounded disabled:opacity-60 cursor-pointer">
             {loading ? 'Saving…' : 'Set password and sign in'}

@@ -5,7 +5,7 @@ import { SiteNavbar } from '../../components/layout/SiteNavbar';
 import { SiteFooter } from '../../components/layout/SiteFooter';
 import { ScriptHeading } from '../../components/common/ScriptHeading';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSignInAlt, faUserPlus } from '@fortawesome/free-solid-svg-icons';
+import { faSignInAlt, faUserPlus, faEye, faEyeSlash } from '@fortawesome/free-solid-svg-icons';
 import { validateEmail, validatePassword, validatePhone, sanitizePhone } from '../../utils/validators';
 
 type Mode = 'login' | 'register' | 'forgot';
@@ -61,6 +61,7 @@ export const LoginPage: React.FC = () => {
   const [mode, setMode] = useState<Mode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
@@ -270,16 +271,27 @@ export const LoginPage: React.FC = () => {
 
               {mode !== 'forgot' && (
                 <Field label="Password (at least 8 characters)">
-                  <input
-                    className={inputClass}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    type="password"
-                    minLength={8}
-                    placeholder="Min. 8 characters"
-                    autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-                  />
+                  <div className="relative">
+                    <input
+                      className={`${inputClass} pr-10`}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      type={showPassword ? 'text' : 'password'}
+                      minLength={8}
+                      placeholder="Min. 8 characters"
+                      autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 p-1 cursor-pointer transition-colors"
+                      title={showPassword ? 'Hide password' : 'Show password'}
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      <FontAwesomeIcon icon={showPassword ? faEyeSlash : faEye} className="text-sm" />
+                    </button>
+                  </div>
                 </Field>
               )}
 

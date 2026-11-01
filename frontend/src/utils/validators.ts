@@ -84,3 +84,4 @@ export const validatePincode = (pincode: string): { isValid: boolean; message?: 
   }
   return { isValid: true };
 };
+

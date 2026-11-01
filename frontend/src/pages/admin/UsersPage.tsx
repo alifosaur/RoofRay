@@ -15,6 +15,8 @@ import {
   faWarehouse,
   faUserTie,
   faUser,
+  faEye,
+  faEyeSlash,
 } from '@fortawesome/free-solid-svg-icons';
 
 interface UserItem {
@@ -56,6 +58,7 @@ export const UsersPage: React.FC = () => {
     setShowCreateModal(true);
   };
   const [setupLink, setSetupLink] = useState<string | null>(null);
+  const [showNewUserPassword, setShowNewUserPassword] = useState(false);
 
   const fetchUsers = async () => {
     try {
@@ -445,15 +448,26 @@ export const UsersPage: React.FC = () => {
 
               <div>
                 <label className="block text-gray-700 font-semibold mb-1">Initial password (at least 8 chars)</label>
-                <input
-                  type="password"
-                  minLength={8}
-                  value={newUser.password}
-                  onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-                  placeholder="At least 8 characters (leave blank to send a setup link instead)"
-                  className="w-full border border-gray-300 rounded px-3 py-2"
-                  autoComplete="new-password"
-                />
+                <div className="relative">
+                  <input
+                    type={showNewUserPassword ? 'text' : 'password'}
+                    minLength={8}
+                    value={newUser.password}
+                    onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                    placeholder="At least 8 characters (leave blank to send a setup link instead)"
+                    className="w-full border border-gray-300 rounded px-3 py-2 pr-10"
+                    autoComplete="new-password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewUserPassword(!showNewUserPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 p-1 cursor-pointer transition-colors"
+                    title={showNewUserPassword ? 'Hide password' : 'Show password'}
+                    aria-label={showNewUserPassword ? 'Hide password' : 'Show password'}
+                  >
+                    <FontAwesomeIcon icon={showNewUserPassword ? faEyeSlash : faEye} className="text-sm" />
+                  </button>
+                </div>
                 <span className="text-[10px] text-gray-400">Share it with the staff member; they sign in with their email and this password.</span>
               </div>
 

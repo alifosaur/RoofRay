@@ -8,6 +8,7 @@ from app.models.audit import AuditLog
 from app.models.notification import Notification
 from app.schemas.survey import SurveyCreate, SurveyComplete
 from app.core import events
+from app.core.config import settings
 
 
 def schedule_survey(db: Session, payload: SurveyCreate, current_user_id: int) -> Survey:
@@ -63,6 +64,43 @@ def schedule_survey(db: Session, payload: SurveyCreate, current_user_id: int) ->
         category="Surveys",
         notify_user_ids=[tech.id],
     )
+
+    # Send formal notification emails mentioning technician name directly (no placeholders or test variables)
+    from app.core import mailer
+    if tech and tech.email:
+        mailer.send_email(
+            tech.email,
+            f"New Site Survey Assignment: {lead.name} — RoofRay",
+            (
+                f"Hello {tech.full_name},\n\n"
+                f"You have been assigned to conduct a rooftop solar site survey for customer {lead.name}.\n\n"
+                f"Survey Details:\n"
+                f"• Customer Name: {lead.name}\n"
+                f"• Contact Phone: {lead.phone}\n"
+                f"• Site Address: {lead.address}\n"
+                f"• Scheduled Date & Time: {payload.scheduled_date:%d %B %Y at %I:%M %p}\n"
+                f"• Notes / Instructions: {payload.notes or 'Perform structural load assessment and shadow-free measurement'}\n\n"
+                f"Please open your RoofRay field portal at {settings.PUBLIC_APP_URL}/technician to upload site photos and submit the feasibility report.\n\n"
+                f"Best regards,\nRoofRay Solar Operations"
+            ),
+        )
+
+    customer_email = (lead.customer.user.email if (lead.customer and lead.customer.user) else None) or lead.email
+    if customer_email:
+        mailer.send_email(
+            customer_email,
+            f"Your Site Survey is Scheduled with Technician {tech.full_name} — RoofRay",
+            (
+                f"Hello {lead.name},\n\n"
+                f"Your rooftop solar site survey has been scheduled.\n\n"
+                f"Assigned Technician: {tech.full_name}\n"
+                f"Scheduled Visit: {payload.scheduled_date:%d %B %Y at %I:%M %p}\n"
+                f"Site Location: {lead.address}\n\n"
+                f"Our certified technician {tech.full_name} will visit your premises to conduct structural load inspection, measure azimuth tilt, and verify shadow-free area.\n\n"
+                f"You can track your live project progress anytime at {settings.PUBLIC_APP_URL}/customer\n\n"
+                f"Best regards,\nRoofRay Solutions Team"
+            ),
+        )
 
     db.commit()
     db.refresh(survey)

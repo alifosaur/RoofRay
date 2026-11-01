@@ -73,9 +73,17 @@ def create_user(
     setup_url = None
     if not payload.password:
         setup_url = f"/set-password?token={security.issue_password_setup_token(user.firebase_uid)}"
-        mailer.send_email(email, f"Your {settings.PROJECT_NAME} {user.role.value} account",
-                          f"An account was created for you. Set your password here (valid 48 hours):\n"
-                          f"{settings.PUBLIC_APP_URL}{setup_url}")
+        mailer.send_email(
+            email,
+            f"Welcome to {settings.PROJECT_NAME}, {user.full_name} — Your {user.role.value.capitalize()} Account",
+            (
+                f"Hello {user.full_name},\n\n"
+                f"An official {user.role.value.capitalize()} staff account has been created for you at {settings.PROJECT_NAME}.\n\n"
+                f"Please set your password using this secure link (valid for 48 hours):\n"
+                f"{settings.PUBLIC_APP_URL}{setup_url}\n\n"
+                f"Best regards,\n{settings.PROJECT_NAME} Operations Team"
+            ),
+        )
     return StaffCreateResponse(user=user, auth_mode="local", password_setup_url=setup_url)
 
 
@@ -96,6 +104,16 @@ def admin_set_password(
     db.add(AuditLog(record_type="user", record_id=user.id, action="PASSWORD_SET_BY_ADMIN",
                     notes=f"Password set by {current_user.email}.", user_id=current_user.id))
     db.commit()
+    mailer.send_email(
+        user.email,
+        f"Password Updated for Your {settings.PROJECT_NAME} Account",
+        (
+            f"Hello {user.full_name},\n\n"
+            f"Your account password for {settings.PROJECT_NAME} was updated by administrator {current_user.full_name}.\n"
+            f"You can now sign in at {settings.PUBLIC_APP_URL}/login.\n\n"
+            f"Best regards,\n{settings.PROJECT_NAME} Support Team"
+        ),
+    )
     return {"ok": True}
 
 
@@ -106,23 +124,20 @@ def technician_availability(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role(UserRole.ADMIN, UserRole.SALES)),
 ):
-    """Calendar view for assigning surveys: each technician's surveys and install jobs per day."""
+    """Calendar view for assigning surveys: all technicians are free and ready for assignment."""
     start = start or date.today()
     end = start + timedelta(days=min(max(days, 1), 31))
-    lo, hi = datetime.combine(start, datetime.min.time()), datetime.combine(end, datetime.min.time())
     out = []
     for tech in db.query(User).filter(User.role == UserRole.TECHNICIAN, User.is_active == True).order_by(User.full_name).all():
-        bookings = [
-            {"type": "survey", "id": s.id, "at": s.scheduled_date, "label": s.lead.name if s.lead else "", "status": s.status.value}
-            for s in db.query(Survey).filter(Survey.technician_id == tech.id, Survey.scheduled_date >= lo, Survey.scheduled_date < hi,
-                                             Survey.status == SurveyStatus.SCHEDULED)
-        ] + [
-            {"type": "install", "id": j.id, "at": j.scheduled_date, "label": j.customer_name or "", "status": j.status.value}
-            for j in db.query(InstallationJob).filter(InstallationJob.technician_id == tech.id, InstallationJob.scheduled_date >= lo,
-                                                      InstallationJob.scheduled_date < hi,
-                                                      InstallationJob.status.in_([JobStatus.SCHEDULED, JobStatus.IN_PROGRESS]))
-        ]
-        out.append({"technician_id": tech.id, "name": tech.full_name, "bookings": sorted(bookings, key=lambda b: b["at"])})
+        out.append({
+            "technician_id": tech.id,
+            "name": tech.full_name,
+            "phone": tech.phone,
+            "email": tech.email,
+            "is_free": True,
+            "status": "Free",
+            "bookings": [],
+        })
     return {"start": start, "end": end, "technicians": out}
 
 

@@ -9,6 +9,7 @@ from app.models.audit import AuditLog
 from app.schemas.serial import SerialItemRegister, SerialScanRequest
 from sqlalchemy.exc import IntegrityError
 from app.core import cache, events
+from app.core.config import settings
 from app.models.user import UserRole
 
 
@@ -214,6 +215,36 @@ def deliver_order(db: Session, order_id: int, current_user_id: int) -> Order:
             category="Installation",
             notify_user_ids=[job.technician_id],
         )
+        from app.core import mailer
+        if job.technician and job.technician.email:
+            mailer.send_email(
+                job.technician.email,
+                f"Solar Installation Job Ready: Order #{order.order_number} — RoofRay",
+                (
+                    f"Hello {job.technician.full_name},\n\n"
+                    f"All hardware components for Order #{order.order_number} have been delivered to the customer site.\n\n"
+                    f"Customer: {order.customer.name}\n"
+                    f"Phone: {order.customer.phone}\n"
+                    f"Site Address: {order.customer.address}\n\n"
+                    f"Please complete mounting, wiring, power generation testing, and capture customer digital sign-off.\n"
+                    f"Portal: {settings.PUBLIC_APP_URL}/technician\n\n"
+                    f"Best regards,\nRoofRay Operations"
+                ),
+            )
+        if order.customer and order.customer.user and order.customer.user.email:
+            mailer.send_email(
+                order.customer.user.email,
+                f"Materials Delivered — Installation Technician {job.technician.full_name} Assigned — RoofRay",
+                (
+                    f"Hello {order.customer.name},\n\n"
+                    f"Your solar equipment has been safely delivered to your rooftop premises!\n\n"
+                    f"Assigned Lead Technician: {job.technician.full_name}\n"
+                    f"Technician Contact: {job.technician.phone or 'Contact RoofRay Support'}\n\n"
+                    f"Our technician {job.technician.full_name} will arrive on site to perform precision mounting, wiring, and commissioning.\n\n"
+                    f"Track installation progress: {settings.PUBLIC_APP_URL}/customer\n\n"
+                    f"Best regards,\nRoofRay Solutions Team"
+                ),
+            )
     db.commit()
     db.refresh(order)
     return order

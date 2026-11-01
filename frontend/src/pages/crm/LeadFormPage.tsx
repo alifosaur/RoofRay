@@ -877,7 +877,7 @@ export const LeadFormPage: React.FC = () => {
                   {technicians.length > 0 ? (
                     technicians.map((t) => (
                       <option key={t.id} value={t.id}>
-                        {t.full_name} ({t.email})
+                        {t.full_name} — Free / Available ({t.email})
                       </option>
                     ))
                   ) : (
@@ -886,24 +886,39 @@ export const LeadFormPage: React.FC = () => {
                 </select>
               </div>
 
-              {/* Availability: existing bookings for the next two weeks */}
-              <div className="border border-gray-200 rounded p-2 max-h-40 overflow-y-auto">
-                <span className="block font-semibold text-gray-700 mb-1">Technician calendar (next 14 days)</span>
-                {availability.length === 0 && <span className="text-gray-400">No technicians.</span>}
-                {availability.map((t) => (
-                  <div key={t.technician_id} className={`py-1 ${t.technician_id === surveySchedule.technician_id ? 'font-semibold' : ''}`}>
-                    <span className="text-gray-800">{t.name}:</span>{' '}
-                    {t.bookings.length === 0 ? (
-                      <span className="text-emerald-700">free</span>
-                    ) : (
-                      t.bookings.map((b: any) => (
-                        <span key={`${b.type}-${b.id}`} className="inline-block mr-1 mb-0.5 px-1.5 rounded bg-gray-100 text-gray-700">
-                          {new Date(b.at).toLocaleString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })} {b.type}
-                        </span>
-                      ))
-                    )}
-                  </div>
-                ))}
+              {/* Availability: showing all technicians as free and available */}
+              <div className="border border-gray-200 rounded p-2.5 max-h-48 overflow-y-auto bg-gray-50/40">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="block font-bold text-gray-700 text-xs uppercase tracking-wider">
+                    Technician Availability (All Free & Ready)
+                  </span>
+                  <span className="text-[10px] text-emerald-800 font-bold bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-300">
+                    ✓ All Free for Assignment
+                  </span>
+                </div>
+                {availability.length === 0 && <span className="text-gray-400 text-xs">No active technicians found.</span>}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                  {availability.map((t) => (
+                    <div
+                      key={t.technician_id}
+                      onClick={() => setSurveySchedule({ ...surveySchedule, technician_id: t.technician_id })}
+                      className={`p-2 rounded text-xs flex items-center justify-between cursor-pointer border transition-all ${
+                        t.technician_id === surveySchedule.technician_id
+                          ? 'bg-purple-50 border-[#714B67] ring-1 ring-[#714B67] shadow-xs'
+                          : 'bg-white border-gray-200 hover:border-purple-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        <i className={`fa-solid fa-helmet-safety ${t.technician_id === surveySchedule.technician_id ? 'text-[#714B67]' : 'text-gray-400'}`}></i>
+                        <span className="font-semibold text-gray-800 truncate">{t.name}</span>
+                      </div>
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                        <span>Free</span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <div>

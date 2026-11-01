@@ -149,6 +149,22 @@ class PasswordSetupRequest(BaseModel):
 class ForgotPasswordRequest(BaseModel):
     email: str
 
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, v: str) -> str:
+        return _check_email_format(v)
+
+
+class ResetPasswordWithOtpRequest(BaseModel):
+    email: str
+    otp: str = Field(min_length=6, max_length=6)
+    password: str = Field(min_length=8)
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, v: str) -> str:
+        return _check_email_format(v)
+
 
 class AuthResponse(BaseModel):
     access_token: str

@@ -16,6 +16,7 @@ from app.models.user import User, UserRole
 from app.models.customer import Customer
 from app.schemas.user import (
     OtpRequest, UserOut, UserRegisterRequest, UserLoginRequest, AuthResponse, PasswordSetupRequest, ForgotPasswordRequest,
+    ResetPasswordWithOtpRequest,
 )
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
@@ -147,10 +148,47 @@ def set_password(payload: PasswordSetupRequest, db: Session = Depends(get_db)):
 
 @router.post("/forgot-password")
 def forgot_password(payload: ForgotPasswordRequest, request: Request, db: Session = Depends(get_db)):
-    """Local mode: issues a reset link. Always answers the same way so emails cannot be enumerated."""
-    user = db.query(User).filter(User.email == payload.email.lower().strip()).first()
+    """Issues a 6-digit OTP code to reset password. Always answers the same way so emails cannot be enumerated."""
+    email = payload.email.lower().strip()
+    user = db.query(User).filter(User.email == email).first()
     if user and user.is_active:
-        link = f"{settings.PUBLIC_APP_URL}/set-password?token={security.issue_password_setup_token(user.firebase_uid)}"
-        mailer.send_email(user.email, f"{settings.PROJECT_NAME} password reset",
-                          f"Set a new password here (valid 48 hours):\n{link}\n\nIf you did not ask for this, ignore this email.")
-    return {"message": "If the account exists, a password reset link has been sent."}
+        last = (db.query(EmailOtp)
+                .filter(EmailOtp.email == email, EmailOtp.purpose == "reset_password")
+                .order_by(EmailOtp.id.desc()).first())
+        if last and (datetime.utcnow() - last.created_at).total_seconds() < 60:
+            raise HTTPException(status_code=429, detail="Please wait a minute before requesting another code")
+        code = f"{secrets.randbelow(10**6):06d}"
+        db.add(EmailOtp(email=email, purpose="reset_password", code_hash=_otp_hash(email, code),
+                        expires_at=datetime.utcnow() + timedelta(minutes=OTP_TTL_MINUTES)))
+        db.commit()
+        mailer.send_email(user.email, f"{settings.PROJECT_NAME} password reset code: {code}",
+                          f"Your password reset verification code is {code}. It expires in {OTP_TTL_MINUTES} minutes.\n\n"
+                          "Enter this code on the password reset screen to set a new password.\n\n"
+                          "If you did not request this, you can safely ignore this email.")
+    return {"message": "If an account exists for this email, a 6-digit verification code has been sent."}
+
+
+@router.post("/reset-password")
+def reset_password(payload: ResetPasswordWithOtpRequest, db: Session = Depends(get_db)):
+    """Verifies the reset OTP code and updates the user's password."""
+    email = payload.email.lower().strip()
+    user = db.query(User).filter(User.email == email).first()
+    if not user or not user.is_active:
+        raise HTTPException(status_code=400, detail="Account not found or inactive")
+
+    otp = (db.query(EmailOtp)
+           .filter(EmailOtp.email == email, EmailOtp.purpose == "reset_password", EmailOtp.used == False)
+           .order_by(EmailOtp.id.desc()).first())
+    if not otp or otp.expires_at < datetime.utcnow():
+        raise HTTPException(status_code=400, detail="Verification code expired or not requested. Please request a new code.")
+    if otp.attempts >= OTP_MAX_ATTEMPTS:
+        raise HTTPException(status_code=400, detail="Too many wrong attempts. Please request a new code.")
+    if not hmac.compare_digest(otp.code_hash, _otp_hash(email, payload.otp.strip())):
+        otp.attempts += 1
+        db.commit()
+        raise HTTPException(status_code=400, detail="Incorrect verification code")
+
+    otp.used = True
+    user.password_hash = security.hash_password(payload.password)
+    db.commit()
+    return {"message": "Password reset successfully. You can now sign in with your new password."}

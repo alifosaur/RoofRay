@@ -52,7 +52,7 @@ const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, 
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const { user, isLoading, login, logout, register, requestSignupOtp, requestPasswordReset } = useAuth();
+  const { user, isLoading, login, logout, register, requestSignupOtp, requestPasswordReset, resetPasswordWithOtp } = useAuth();
   const [otp, setOtp] = useState('');
   const [otpSent, setOtpSent] = useState(false);
   const signingIn = useRef(false);
@@ -61,7 +61,9 @@ export const LoginPage: React.FC = () => {
   const [mode, setMode] = useState<Mode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
@@ -84,6 +86,10 @@ export const LoginPage: React.FC = () => {
     setMode(m);
     setError(null);
     setNotice(null);
+    setOtp('');
+    setOtpSent(false);
+    setPassword('');
+    setConfirmPassword('');
   };
 
   const run = async (action: () => Promise<void>) => {
@@ -146,10 +152,42 @@ export const LoginPage: React.FC = () => {
         navigate(getRoleHomePath(u.role));
       });
     } else {
-      run(async () => {
-        await requestPasswordReset(email.trim());
-        setNotice('If an account exists for this email, a password reset link has been sent.');
-      });
+      // mode === 'forgot'
+      if (!otpSent) {
+        run(async () => {
+          await requestPasswordReset(email.trim());
+          setOtpSent(true);
+          setNotice(`A 6-digit verification code has been sent to ${email.trim()}. Enter the code and your new password below.`);
+        });
+      } else {
+        if (!otp || otp.trim().length !== 6) {
+          setError('Please enter the 6-digit verification code sent to your email.');
+          return;
+        }
+        const pwdCheck = validatePassword(password);
+        if (!pwdCheck.isValid) {
+          setError(pwdCheck.message || 'Password must be at least 8 characters long.');
+          return;
+        }
+        if (password !== confirmPassword) {
+          setError('Passwords do not match.');
+          return;
+        }
+        run(async () => {
+          const res = await resetPasswordWithOtp({
+            email: email.trim(),
+            otp: otp.trim(),
+            password,
+          });
+          setMode('login');
+          setOtp('');
+          setOtpSent(false);
+          setPassword('');
+          setConfirmPassword('');
+          setError(null);
+          setNotice(res.message || 'Password reset successfully! Please sign in with your new password.');
+        });
+      }
     }
   };
 
@@ -168,6 +206,8 @@ export const LoginPage: React.FC = () => {
             <p className="mt-3 text-sm text-[#6C757D]">
               {mode === 'register'
                 ? 'Customers can register here. Staff accounts are created by an administrator.'
+                : mode === 'forgot'
+                ? (otpSent ? 'Enter the verification code sent to your email along with your new password.' : 'Enter your email to receive a password reset verification code.')
                 : 'Choose your role and sign in to open your workspace.'}
             </p>
           </div>
@@ -245,10 +285,11 @@ export const LoginPage: React.FC = () => {
                   type="email"
                   autoComplete="email"
                   placeholder="name@domain.com"
+                  disabled={mode === 'forgot' && otpSent}
                 />
               </Field>
 
-              {mode === 'register' && otpSent && (
+              {((mode === 'register' && otpSent) || (mode === 'forgot' && otpSent)) && (
                 <Field label="Verification code (from your email)">
                   <input
                     className={inputClass}
@@ -257,20 +298,46 @@ export const LoginPage: React.FC = () => {
                     inputMode="numeric"
                     autoComplete="one-time-code"
                     required
+                    maxLength={6}
                     placeholder="6-digit code"
                   />
-                  <button
-                    type="button"
-                    onClick={() => run(async () => { await requestSignupOtp(email.trim()); setNotice('A new code has been sent.'); })}
-                    className="mt-1 text-xs text-[#6B4B63] hover:underline"
-                  >
-                    Resend code
-                  </button>
+                  <div className="flex justify-between items-center mt-1">
+                    <button
+                      type="button"
+                      onClick={() => run(async () => {
+                        if (mode === 'register') {
+                          await requestSignupOtp(email.trim());
+                        } else {
+                          await requestPasswordReset(email.trim());
+                        }
+                        setNotice('A new verification code has been sent.');
+                      })}
+                      className="text-xs text-[#6B4B63] hover:underline"
+                    >
+                      Resend code
+                    </button>
+                    {mode === 'forgot' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOtpSent(false);
+                          setOtp('');
+                          setPassword('');
+                          setConfirmPassword('');
+                          setNotice(null);
+                          setError(null);
+                        }}
+                        className="text-xs text-gray-500 hover:text-gray-700 hover:underline"
+                      >
+                        Change email
+                      </button>
+                    )}
+                  </div>
                 </Field>
               )}
 
-              {mode !== 'forgot' && (
-                <Field label="Password (at least 8 characters)">
+              {(mode !== 'forgot' || otpSent) && (
+                <Field label={mode === 'forgot' ? 'New Password (at least 8 characters)' : 'Password (at least 8 characters)'}>
                   <div className="relative">
                     <input
                       className={`${inputClass} pr-10`}
@@ -295,13 +362,44 @@ export const LoginPage: React.FC = () => {
                 </Field>
               )}
 
+              {mode === 'forgot' && otpSent && (
+                <Field label="Confirm New Password">
+                  <div className="relative">
+                    <input
+                      className={`${inputClass} pr-10`}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      required
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      minLength={8}
+                      placeholder="Repeat new password"
+                      autoComplete="new-password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 p-1 cursor-pointer transition-colors"
+                      title={showConfirmPassword ? 'Hide password' : 'Show password'}
+                      aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                    >
+                      <FontAwesomeIcon icon={showConfirmPassword ? faEyeSlash : faEye} className="text-sm" />
+                    </button>
+                  </div>
+                </Field>
+              )}
 
               <button
                 type="submit"
                 disabled={loading}
                 className="w-full py-2.5 bg-[#6B4B63] hover:bg-[#583D51] disabled:opacity-60 text-white font-semibold text-sm rounded transition-colors"
               >
-                {loading ? 'Please wait…' : mode === 'login' ? 'Sign in' : mode === 'register' ? (otpSent ? 'Verify & create account' : 'Send verification code') : 'Send reset link'}
+                {loading
+                  ? 'Please wait…'
+                  : mode === 'login'
+                  ? 'Sign in'
+                  : mode === 'register'
+                  ? (otpSent ? 'Verify & create account' : 'Send verification code')
+                  : (otpSent ? 'Reset password' : 'Send verification code')}
               </button>
             </form>
             )}

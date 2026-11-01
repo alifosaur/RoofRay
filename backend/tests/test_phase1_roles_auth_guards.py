@@ -83,6 +83,58 @@ def test_login_requires_correct_password():
                                                    "full_name": "No Code", "phone": "9000000002"}).status_code == 422
 
 
+def test_password_reset_with_otp():
+    """User requests password reset OTP, verifies with new password, and logs in."""
+    from app.core import mailer
+    email = f"reset_{uuid.uuid4().hex[:6]}@example.com"
+    initial_pass = "initial-pass-123"
+    register(client, {
+        "email": email, "password": initial_pass, "full_name": "Reset Test", "phone": "9876543210"
+    })
+
+    # Request reset OTP
+    res = client.post("/api/auth/forgot-password", json={"email": email})
+    assert res.status_code == 200
+    assert "verification code" in res.json()["message"]
+
+    # Extract OTP from mailer outbox
+    msg = [m for m in mailer.outbox if m["to"] == email][-1]
+    import re
+    match = re.search(r"\b(\d{6})\b", msg["body"])
+    assert match is not None
+    otp_code = match.group(1)
+
+    # Wrong code fails
+    bad_res = client.post("/api/auth/reset-password", json={
+        "email": email, "otp": "000000", "password": "new-secure-password"
+    })
+    assert bad_res.status_code == 400
+
+    # Short password fails
+    short_res = client.post("/api/auth/reset-password", json={
+        "email": email, "otp": otp_code, "password": "short"
+    })
+    assert short_res.status_code == 422
+
+    # Correct code resets password
+    reset_ok = client.post("/api/auth/reset-password", json={
+        "email": email, "otp": otp_code, "password": "new-secure-password"
+    })
+    assert reset_ok.status_code == 200
+
+    # Old password no longer works
+    assert client.post("/api/auth/login", json={"email": email, "password": initial_pass}).status_code == 401
+
+    # New password works
+    login_ok = client.post("/api/auth/login", json={"email": email, "password": "new-secure-password"})
+    assert login_ok.status_code == 200
+
+    # Reusing the same OTP fails
+    assert client.post("/api/auth/reset-password", json={
+        "email": email, "otp": otp_code, "password": "another-password-123"
+    }).status_code == 400
+
+
 def test_admin_creates_staff_with_password_setup_link():
     email = f"staff_{uuid.uuid4().hex[:6]}@example.com"
     res = client.post("/api/users", headers=admin_headers, json={

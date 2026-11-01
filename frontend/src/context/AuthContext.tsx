@@ -32,6 +32,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<UserProfile>;
   register: (payload: RegisterPayload) => Promise<UserProfile>;
   requestPasswordReset: (email: string) => Promise<void>;
+  resetPasswordWithOtp: (payload: { email: string; otp: string; password: string }) => Promise<{ message: string }>;
   requestSignupOtp: (email: string) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -101,6 +102,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await api.post('/auth/forgot-password', { email });
   };
 
+  const resetPasswordWithOtp = async (payload: { email: string; otp: string; password: string }) => {
+    return await api.post<{ message: string }>('/auth/reset-password', payload);
+  };
+
   const requestSignupOtp = async (email: string) => {
     await api.post('/auth/register/request-otp', { email });
   };
@@ -119,6 +124,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         login,
         register,
         requestPasswordReset,
+        resetPasswordWithOtp,
         requestSignupOtp,
         logout,
       }}

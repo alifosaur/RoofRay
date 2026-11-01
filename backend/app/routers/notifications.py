@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -12,14 +12,29 @@ router = APIRouter(prefix="/notifications", tags=["Notifications"])
 
 
 @router.get("")
-def list_my_notifications(limit: int = 30, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    rows = (db.query(Notification).filter(Notification.user_id == current_user.id)
-            .order_by(Notification.created_at.desc()).limit(min(limit, 100)).all())
+def list_my_notifications(
+    limit: int = 50,
+    category: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    query = db.query(Notification).filter(Notification.user_id == current_user.id)
+    if category and category.lower() != "all":
+        query = query.filter(Notification.category.ilike(category))
+    rows = query.order_by(Notification.created_at.desc()).limit(min(limit, 100)).all()
     unread = db.query(Notification).filter(Notification.user_id == current_user.id, Notification.is_read == False).count()
     return {
         "unread_count": unread,
         "items": [
-            {"id": n.id, "title": n.title, "message": n.message, "link": n.link, "is_read": n.is_read, "created_at": n.created_at}
+            {
+                "id": n.id,
+                "title": n.title,
+                "message": n.message,
+                "link": n.link,
+                "category": n.category or "General",
+                "is_read": n.is_read,
+                "created_at": n.created_at,
+            }
             for n in rows
         ],
     }

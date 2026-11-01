@@ -74,6 +74,8 @@ def _stage_event(db: Session, order: Order, new_status: OrderStatus) -> None:
         title=f"Order {order.order_number}: {new_status.value.replace('_', ' ').title()}",
         message=f"Your solar order is now {new_status.value.replace('_', ' ').lower()}.",
         link="/customer",
+        category="Orders",
+        notify_user_ids=[order.customer.user_id] if (order.customer and order.customer.user_id) else [],
     )
 
 
@@ -204,10 +206,13 @@ def deliver_order(db: Session, order_id: int, current_user_id: int) -> Order:
     if job:
         events.emit(
             db, "job.released", {"job_id": job.id, "order_id": order.id},
-            user_ids=[job.technician_id], roles=[UserRole.ADMIN],
+            user_ids=[job.technician_id],
+            roles=[UserRole.ADMIN],
             title="Installation job ready",
             message=f"Materials delivered for {order.customer.name}. The installation job is now on your schedule.",
             link="/technician",
+            category="Installation",
+            notify_user_ids=[job.technician_id],
         )
     db.commit()
     db.refresh(order)

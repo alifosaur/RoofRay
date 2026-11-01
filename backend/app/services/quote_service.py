@@ -191,6 +191,8 @@ def accept_quote(db: Session, quote_id: int, current_user_id: int) -> Order:
         title="Quotation accepted",
         message=f"{quote.quote_number} accepted. Sales Order {order.order_number} awaits payment and confirmation.",
         link=f"/web/orders/{order.id}",
+        category="Orders",
+        notify_user_ids=[lead.assigned_to_id] if (lead and lead.assigned_to_id) else [],
     )
 
     # Competing quotes for the same enquiry are closed so only one order reaches the warehouse
@@ -249,10 +251,13 @@ def send_quote(db: Session, quote: Quote, current_user_id: int) -> Quote:
                     to_status=QuoteStatus.SENT.value, notes="Quotation PDF shared with the customer.", user_id=current_user_id))
     events.emit(
         db, "quote.sent", {"quote_id": quote.id, "lead_id": quote.lead_id},
-        user_ids=[quote.customer.user_id if quote.customer else None], roles=[UserRole.ADMIN],
+        user_ids=[quote.customer.user_id if quote.customer else None],
+        roles=[UserRole.ADMIN],
         title="Your quotation is ready",
         message=f"Quotation {quote.quote_number} for ₹{quote.total_amount:,.0f} is ready to review in your portal.",
         link="/customer",
+        category="CRM",
+        notify_user_ids=[quote.customer.user_id] if (quote.customer and quote.customer.user_id) else [],
     )
     db.commit()
     db.refresh(quote)

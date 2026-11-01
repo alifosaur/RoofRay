@@ -74,12 +74,16 @@ def confirm_order(db: Session, order_id: int, current_user_id: int, require_paym
         title="New pick list",
         message=f"Order {order.order_number} confirmed for {order.customer.name}. Pick list ready.",
         link="/web/inventory?tab=picklists",
+        category="Orders",
+        notify_roles=[UserRole.WAREHOUSE],
     )
     events.emit(
         db, "order.confirmed", {"order_id": order.id},
         user_ids=[order.customer.user_id, order.quote.lead.assigned_to_id if order.quote and order.quote.lead else None],
         title="Order confirmed",
         message=f"Order {order.order_number} is confirmed and has been sent to the warehouse.",
+        category="Orders",
+        notify_user_ids=[order.customer.user_id] if order.customer and order.customer.user_id else [],
     )
 
     # 4. Initialize subsidy tracking record

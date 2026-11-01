@@ -96,6 +96,9 @@ def ticket_event(db: Session, ticket: Ticket, title: str) -> None:
         roles=[UserRole.ADMIN, UserRole.SALES],
         title=f"Ticket {ticket.ticket_number}: {title}",
         message=f"{ticket.subject} — {ticket.status.value.replace('_', ' ').lower()}",
+        link=f"/web/helpdesk",
+        category="Helpdesk",
+        notify_user_ids=[ticket.assigned_to_id] if ticket.assigned_to_id else [],
     )
 
 

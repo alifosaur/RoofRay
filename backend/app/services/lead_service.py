@@ -177,10 +177,13 @@ def notify_new_lead(db: Session, lead: Lead) -> None:
     """New lead hand-off to the assigned sales user (live + notification)."""
     events.emit(
         db, "lead.created", {"lead_id": lead.id, "name": lead.name},
-        user_ids=[lead.assigned_to_id], roles=[UserRole.ADMIN],
+        user_ids=[lead.assigned_to_id],
+        roles=[UserRole.ADMIN],
         title="New lead assigned",
         message=f"New lead from {lead.name} for {lead.required_capacity} kW {lead.system_type}.",
         link=f"/web/crm/{lead.id}",
+        category="CRM",
+        notify_user_ids=[lead.assigned_to_id] if lead.assigned_to_id else [],
     )
 
 

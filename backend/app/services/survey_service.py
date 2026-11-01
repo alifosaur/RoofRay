@@ -57,9 +57,11 @@ def schedule_survey(db: Session, payload: SurveyCreate, current_user_id: int) ->
         db, "survey.assigned", {"survey_id": survey.id, "lead_id": lead.id},
         user_ids=[tech.id, lead.customer.user_id if lead.customer else None],
         roles=[UserRole.ADMIN],
-        title="Site survey assigned",
+        title="Site survey assigned to you",
         message=f"Survey for {lead.name} at {lead.address} on {payload.scheduled_date:%d %b %Y %H:%M}.",
         link="/technician",
+        category="Surveys",
+        notify_user_ids=[tech.id],
     )
 
     db.commit()
@@ -105,6 +107,8 @@ def complete_survey(db: Session, survey_id: int, payload: SurveyComplete, curren
         title="Site survey needs review",
         message=f"Technician did not confirm feasibility for {lead.name}. Review and approve or reject.",
         link=f"/web/crm/{lead.id}",
+        category="Surveys",
+        notify_user_ids=[lead.assigned_to_id] if lead.assigned_to_id else [],
     )
 
     db.commit()
@@ -159,6 +163,9 @@ def approve_survey(db: Session, survey_id: int, approved_by_id: int) -> Survey:
         roles=[UserRole.ADMIN],
         title="Site survey approved",
         message="Your site survey has been approved. A quotation will follow.",
+        link="/customer",
+        category="Surveys",
+        notify_user_ids=[lead.customer.user_id] if (lead and lead.customer) else [],
     )
 
     db.commit()

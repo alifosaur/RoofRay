@@ -158,22 +158,18 @@ def _compute_director_metrics(db: Session, date_range: str, granularity: str) ->
     total_revenue = round(sum(j["revenue"] for j in jobs), 2)
     total_profit = round(sum(j["net_profit"] for j in jobs), 2)
 
-    payments = [p for p in db.query(Payment).all() if in_range(p.created_at)]
-    purchases = [m for m in db.query(StockMovement).filter(StockMovement.movement_type == MovementType.PURCHASE).all() if in_range(m.created_at)]
-    timesheets = [t for t in db.query(Timesheet).all() if in_range(t.finish_time)]
-    expenses = [e for e in db.query(Expense).all() if in_range(datetime.combine(e.expense_date, datetime.min.time()))]
+    # Cash collected & pending balances calculated strictly from the won orders
+    received = round(sum(j["paid_amount"] for j in jobs), 2)
+    pending = round(sum(j["pending_amount"] for j in jobs), 2)
 
-    received = round(sum(p.amount for p in payments), 2)
-    stock_spend = round(sum(m.quantity * m.unit_cost for m in purchases), 2)
-    tech_spend = round(sum(t.total_cost for t in timesheets), 2)
-    other_spend = round(sum(e.amount for e in expenses), 2)
+    # Operational costs strictly from the won jobs
+    stock_spend = round(sum(j["stock_cost"] for j in jobs), 2)
+    tech_spend = round(sum(j["technician_cost"] for j in jobs), 2)
+    other_spend = round(sum(j["other_costs"] for j in jobs), 2)
+    total_spend = round(stock_spend + tech_spend + other_spend, 2)
 
-    open_orders = db.query(Order).filter(Order.status != OrderStatus.DRAFT).all()
-    pending = round(sum(max(0.0, o.total_amount - o.paid_amount) for o in open_orders), 2)
-
-    payouts = db.query(TechnicianPayout).all()
-    payouts_unpaid = round(sum(p.total_amount for p in payouts if not p.is_paid), 2)
-    payouts_paid = round(sum(p.total_amount for p in payouts if p.is_paid and in_range(p.paid_at)), 2)
+    payouts_unpaid = round(sum(j["technician_cost"] for j in jobs if j.get("job_status") != "COMPLETED"), 2)
+    payouts_paid = round(sum(j["technician_cost"] for j in jobs if j.get("job_status") == "COMPLETED"), 2)
 
     # Continuous timeline buckets so the chart draws an actual continuous trend line graph
     series: Dict[str, Dict[str, float]] = {}
@@ -183,10 +179,13 @@ def _compute_director_metrics(db: Session, date_range: str, granularity: str) ->
     now = datetime.utcnow()
 
     if date_range == "all":
-        # Show at least 14 to 30 continuous days of trend line
-        all_dts = [p.created_at for p in payments] + [datetime.strptime(j["created_at"], "%Y-%m-%d") for j in jobs]
+        # Show at least 14 to 30 continuous days of trend line for day/week, or from earliest month
+        all_dts = [datetime.strptime(j["created_at"], "%Y-%m-%d") for j in jobs]
         earliest_dt = min(all_dts) if all_dts else (now - timedelta(days=14))
-        timeline_start = min(earliest_dt - timedelta(days=7), now - timedelta(days=14))
+        if granularity == "month":
+            timeline_start = datetime(earliest_dt.year, earliest_dt.month, 1)
+        else:
+            timeline_start = min(earliest_dt - timedelta(days=7), now - timedelta(days=14))
         timeline_end = now
     elif date_range == "this_month":
         # Always span at least 14 days or from month start to today
@@ -227,17 +226,11 @@ def _compute_director_metrics(db: Session, date_range: str, granularity: str) ->
     for j in jobs:
         dt = datetime.strptime(j["created_at"], "%Y-%m-%d")
         add(dt, "revenue", j["revenue"])
+        add(dt, "received", j["paid_amount"])
         add(dt, "profit", j["net_profit"])
-        # Operational job costs (BOM components + technician labor + order expenses)
         add(dt, "spent", j.get("total_costs", 0.0))
 
-    for p in payments:
-        add(p.created_at, "received", p.amount)
-
-    for e in expenses:
-        add(datetime.combine(e.expense_date, datetime.min.time()), "spent", e.amount)
-
-    has_activity = bool(jobs or payments or expenses)
+    has_activity = bool(jobs)
     profit_series = [{"period": k, **v} for k, v in sorted(series.items())] if has_activity else []
 
     unfinished_by_stage = {

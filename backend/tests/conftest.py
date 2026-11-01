@@ -11,6 +11,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.load_catalog import load_catalog  # noqa: E402
 from app.core import security  # noqa: E402
+from app.core import cache  # noqa: E402
+
+cache.invalidate("dash:")
 
 # Test-only: treat the bearer string as the user's UID so tests can act as any seeded test account.
 # Production code has no such bypass; tests of the real local-token flow use security.issue_session_token.

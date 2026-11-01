@@ -43,7 +43,7 @@ def test_director_dashboard_and_profit_metrics():
     token = share_res.json()["share_token"]
 
     # Public unauthenticated query using token
-    pub_res = client.get(f"/api/reports/shared/{token}")
+    pub_res = client.get(f"/api/reports/shared/{token}?range=all")
     assert pub_res.status_code == 200
     assert pub_res.json()["revenue"] == data["revenue"]
 

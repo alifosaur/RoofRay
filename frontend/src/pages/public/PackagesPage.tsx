@@ -114,7 +114,7 @@ export const PackagesPage: React.FC = () => {
                     : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-100'
                 }`}
               >
-                On-Grid Systems (Subsidized)
+                On-Grid Systems (Subsidy Eligible)
               </button>
               <button
                 onClick={() => setFilterType('Off-Grid')}
@@ -152,7 +152,7 @@ export const PackagesPage: React.FC = () => {
           )}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {visiblePackages.map((pkg) => {
-              const netPrice = pkg.grossPrice - pkg.subsidyAmount;
+              const isEligible = pkg.type === 'On-Grid' || pkg.subsidyAmount > 0;
 
               return (
                 <div
@@ -184,32 +184,26 @@ export const PackagesPage: React.FC = () => {
                       {pkg.tagline}
                     </p>
 
-                    {/* Pricing Breakdown */}
-                    <div className="bg-gray-50/70 border border-gray-200/60 rounded-lg p-4 mb-6 space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">Gross System Cost:</span>
-                        <span className="font-semibold text-gray-800">
+                    {/* Pricing & Subsidy Eligibility */}
+                    <div className="bg-gray-50/70 border border-gray-200/60 rounded-lg p-4 mb-6 space-y-2.5">
+                      <div className="flex justify-between items-baseline">
+                        <span className="text-xs font-bold text-gray-600">Turnkey Package Price:</span>
+                        <span className="text-2xl font-extrabold text-[#6B4B63]">
                           ₹{pkg.grossPrice.toLocaleString()}
                         </span>
                       </div>
-                      {pkg.subsidyAmount > 0 ? (
-                        <div className="flex justify-between text-sm">
-                          <span className="text-[#5CC9B0] font-medium">PM Surya Ghar Subsidy:</span>
-                          <span className="font-bold text-[#5CC9B0]">
-                            -₹{pkg.subsidyAmount.toLocaleString()}
+                      <div className="pt-2 border-t border-dashed border-gray-200 flex justify-between items-center text-xs">
+                        <span className="text-gray-500 font-medium">Govt Subsidy:</span>
+                        {isEligible ? (
+                          <span className="inline-flex items-center gap-1 font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded border border-emerald-200">
+                            <FontAwesomeIcon icon={faCheckCircle} className="text-emerald-500 text-[10px]" />
+                            Eligible
                           </span>
-                        </div>
-                      ) : (
-                        <div className="flex justify-between text-xs text-gray-400">
-                          <span>Central Subsidy:</span>
-                          <span>Ineligible (Off-Grid)</span>
-                        </div>
-                      )}
-                      <div className="pt-2 border-t border-dashed border-gray-300 flex justify-between items-baseline">
-                        <span className="text-sm font-bold text-[#212529]">Net Investment:</span>
-                        <span className="text-2xl font-extrabold text-[#6B4B63]">
-                          ₹{netPrice.toLocaleString()}
-                        </span>
+                        ) : (
+                          <span className="font-semibold text-gray-500 bg-gray-100 px-2.5 py-0.5 rounded border border-gray-200">
+                            Not Eligible
+                          </span>
+                        )}
                       </div>
                     </div>
 

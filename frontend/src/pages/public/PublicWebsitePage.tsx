@@ -95,9 +95,8 @@ export const PublicWebsitePage: React.FC = () => {
       capacityKw: 2,
       idealFor: '1-2 BHK Apartments & Small Homes',
       monthlyUnits: '~250 units/mo',
-      grossPrice: 130000,
-      subsidy: 60000,
-      netPrice: 70000,
+      price: 130000,
+      subsidyEligible: true,
       monthlySavings: '₹2,100',
       popular: false,
       highlights: ['4 × 540W Mono PERC Panels', '2 kW IP65 Smart Inverter', 'DISCOM Net-Meter Liaison'],
@@ -108,12 +107,11 @@ export const PublicWebsitePage: React.FC = () => {
       capacityKw: 3,
       idealFor: '3-4 BHK Homes with 1-2 Air Conditioners',
       monthlyUnits: '~375 units/mo',
-      grossPrice: 185000,
-      subsidy: 78000,
-      netPrice: 107000,
+      price: 185000,
+      subsidyEligible: true,
       monthlySavings: '₹3,400',
       popular: true,
-      highlights: ['6 × 540W Mono PERC Panels', '3.3 kW Smart Grid-Tie Inverter', 'Max ₹78,000 Govt Subsidy'],
+      highlights: ['6 × 540W Mono PERC Panels', '3.3 kW Smart Grid-Tie Inverter', 'Heavy Duty Wind-Rated Mounts'],
     },
     {
       id: 3,
@@ -121,12 +119,11 @@ export const PublicWebsitePage: React.FC = () => {
       capacityKw: 5,
       idealFor: 'Large Independent Bungalows & Clinics',
       monthlyUnits: '~625 units/mo',
-      grossPrice: 295000,
-      subsidy: 78000,
-      netPrice: 217000,
+      price: 295000,
+      subsidyEligible: true,
       monthlySavings: '₹5,800',
       popular: false,
-      highlights: ['10 × 540W Mono PERC Panels', '5 kW Three-Phase Smart Inverter', 'Heavy Duty Wind-Rated Mounts'],
+      highlights: ['10 × 540W Mono PERC Panels', '5 kW Three-Phase Smart Inverter', 'Surge & Earthing Protection'],
     },
   ];
 
@@ -393,7 +390,7 @@ export const PublicWebsitePage: React.FC = () => {
                 </ScriptHeading>
               </div>
               <p className="mt-4 text-gray-600 text-base leading-relaxed">
-                Factory-tested kits with Tier-1 monocrystalline panels, smart inverters, DISCOM net-metering paperwork, and upfront PM Surya Ghar subsidy deductions.
+                Factory-tested turnkey systems with Tier-1 monocrystalline panels, smart inverters, DISCOM net-metering paperwork, and lifetime engineering support.
               </p>
             </div>
 
@@ -404,7 +401,7 @@ export const PublicWebsitePage: React.FC = () => {
                   className={`bg-white rounded-2xl p-6 sm:p-7 flex flex-col justify-between border transition-all duration-200 ${
                     pkg.popular
                       ? 'border-[#6B4B63] shadow-lg ring-2 ring-[#6B4B63]/15 relative'
-                      : 'border-gray-200 shadow-sm hover:shadow-md hover:border-gray-300'
+                      : 'border-gray-200 shadow-sm hover:border-gray-300'
                   }`}
                 >
                   {pkg.popular && (
@@ -429,21 +426,26 @@ export const PublicWebsitePage: React.FC = () => {
 
                     <p className="text-xs text-gray-500 mt-2 mb-4 leading-relaxed">{pkg.idealFor}</p>
 
-                    {/* Pricing Breakdown */}
+                    {/* Pricing & Subsidy Eligibility */}
                     <div className="bg-gray-50 rounded-xl p-4 mb-5 border border-gray-100">
-                      <div className="flex justify-between items-center text-xs text-gray-500 mb-1">
-                        <span>Gross System Price:</span>
-                        <span className="line-through">₹{pkg.grossPrice.toLocaleString()}</span>
-                      </div>
-                      <div className="flex justify-between items-center text-xs text-emerald-700 font-semibold mb-2">
-                        <span>Central Subsidy (DBT):</span>
-                        <span>- ₹{pkg.subsidy.toLocaleString()}</span>
-                      </div>
-                      <div className="pt-2 border-t border-gray-200 flex justify-between items-baseline">
-                        <span className="text-xs font-bold text-gray-800">Effective Net Price:</span>
+                      <div className="flex justify-between items-baseline mb-2">
+                        <span className="text-xs font-bold text-gray-700">Turnkey System Price:</span>
                         <span className="text-2xl font-extrabold text-[#6B4B63]">
-                          ₹{pkg.netPrice.toLocaleString()}
+                          ₹{pkg.price.toLocaleString()}
                         </span>
+                      </div>
+                      <div className="pt-2 border-t border-dashed border-gray-200 flex justify-between items-center text-xs">
+                        <span className="text-gray-500 font-medium">Govt Subsidy:</span>
+                        {pkg.subsidyEligible ? (
+                          <span className="inline-flex items-center gap-1 font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded border border-emerald-200">
+                            <FontAwesomeIcon icon={faCheckCircle} className="text-emerald-500 text-[10px]" />
+                            Eligible
+                          </span>
+                        ) : (
+                          <span className="font-semibold text-gray-500 bg-gray-100 px-2.5 py-0.5 rounded border border-gray-200">
+                            Not Eligible
+                          </span>
+                        )}
                       </div>
                     </div>
 

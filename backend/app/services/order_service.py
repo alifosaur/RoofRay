@@ -90,30 +90,37 @@ def confirm_order(db: Session, order_id: int, current_user_id: int, require_paym
     from app.services import finance_service
     finance_service.get_or_create_subsidy_record(db, order.id)
 
-    # 5. Sales invoice from the quote so accounting sees the receivable
-    if not order.invoice:
+    # 5. Advance invoice for the 50% payment (or full invoice if fully paid)
+    advance_invoice = db.query(Invoice).filter(
+        Invoice.order_id == order.id,
+        (Invoice.invoice_number == f"INV-{order.order_number}-ADV") | (Invoice.invoice_number.like("%ADV%"))
+    ).first()
+    if not advance_invoice:
         quote = order.quote
+        advance_amount = round(order.total_amount * 0.5, 2)
+        advance_subtotal = round(advance_amount / 1.18, 2)
+        advance_tax = round(advance_amount - advance_subtotal, 2)
         invoice = Invoice(
-            invoice_number=f"INV-{order.order_number}",
+            invoice_number=f"INV-{order.order_number}-ADV",
             order_id=order.id,
             customer_id=order.customer_id,
             invoice_type=InvoiceType.SALES,
-            status=InvoiceStatus.PAID if order.paid_amount >= order.total_amount else InvoiceStatus.ISSUED,
-            subtotal=quote.subtotal if quote else order.total_amount,
-            tax_amount=quote.tax_amount if quote else 0.0,
-            total_amount=order.total_amount,
+            status=InvoiceStatus.PAID if order.paid_amount >= advance_amount - 0.01 else InvoiceStatus.ISSUED,
+            subtotal=advance_subtotal,
+            tax_amount=advance_tax,
+            total_amount=advance_amount,
             due_date=(datetime.utcnow() + timedelta(days=15)).date(),
         )
         db.add(invoice)
         db.flush()
-        for q_line in (quote.lines if quote else []):
-            db.add(InvoiceLine(
-                invoice_id=invoice.id,
-                description=q_line.product.name if q_line.product else f"Product #{q_line.product_id}",
-                quantity=q_line.quantity,
-                unit_price=q_line.unit_price,
-                amount=q_line.subtotal,
-            ))
+        system_name = f" ({quote.template.name})" if (quote and quote.template) else ""
+        db.add(InvoiceLine(
+            invoice_id=invoice.id,
+            description=f"50% Advance Booking & Procurement — Order {order.order_number}{system_name}",
+            quantity=1,
+            unit_price=advance_amount,
+            amount=advance_amount,
+        ))
 
     # 6. Audit log
     audit = AuditLog(
@@ -179,11 +186,52 @@ def record_payment(db: Session, order_id: int, payload: PaymentCreate, current_u
 
 
 def settle_if_fully_paid(db: Session, order: Order, current_user_id: int) -> None:
-    """Marks the sales invoice PAID once fully paid, and closes the order once it is also installed."""
+    """Issues the 100% full payment invoice once fully paid, and closes the order once installed."""
     if order.paid_amount + 0.01 < order.total_amount:
         return
-    if order.invoice and order.invoice.status == InvoiceStatus.ISSUED:
-        order.invoice.status = InvoiceStatus.PAID
+
+    # Check/Create the Final Tax Invoice (Full Payment)
+    final_inv = db.query(Invoice).filter(
+        Invoice.order_id == order.id,
+        (Invoice.invoice_number == f"INV-{order.order_number}-FINAL") | (Invoice.invoice_number == f"INV-{order.order_number}")
+    ).first()
+
+    if not final_inv:
+        quote = order.quote
+        final_inv = Invoice(
+            invoice_number=f"INV-{order.order_number}-FINAL",
+            order_id=order.id,
+            customer_id=order.customer_id,
+            invoice_type=InvoiceType.SALES,
+            status=InvoiceStatus.PAID,
+            subtotal=quote.subtotal if quote else order.total_amount,
+            tax_amount=quote.tax_amount if quote else 0.0,
+            total_amount=order.total_amount,
+            due_date=datetime.utcnow().date(),
+        )
+        db.add(final_inv)
+        db.flush()
+        for q_line in (quote.lines if quote else []):
+            db.add(InvoiceLine(
+                invoice_id=final_inv.id,
+                description=q_line.product.name if q_line.product else f"Component #{q_line.product_id}",
+                quantity=q_line.quantity,
+                unit_price=q_line.unit_price,
+                amount=q_line.subtotal,
+            ))
+        events.emit(
+            db, "invoice.issued", {"invoice_id": final_inv.id, "order_id": order.id},
+            user_ids=[order.customer.user_id if order.customer else None],
+            roles=[UserRole.ADMIN],
+            title="Final Tax Invoice (Full Payment) Ready",
+            message=f"Order {order.order_number} is 100% paid! Your official tax invoice {final_inv.invoice_number} is available for download.",
+            link="/customer",
+            category="Orders",
+            notify_user_ids=[order.customer.user_id] if (order.customer and order.customer.user_id) else [],
+        )
+    else:
+        final_inv.status = InvoiceStatus.PAID
+
     if order.status == OrderStatus.INSTALLED:
         order.status = OrderStatus.CLOSED
         events.emit(db, "order.closed", {"order_id": order.id}, user_ids=[order.customer.user_id], roles=[UserRole.ADMIN])

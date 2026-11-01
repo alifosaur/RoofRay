@@ -199,14 +199,29 @@ def complete_job(db: Session, job_id: int, payload: JobCompleteRequest, current_
                         to_status=LeadStatus.WON.value, notes=f"Installation completed for {order.order_number}.",
                         user_id=current_user.id))
         lead.status = LeadStatus.WON
-    events.emit(
-        db, "job.completed", {"job_id": job.id, "order_id": job.order_id},
-        user_ids=[order.customer.user_id if order else None, lead.assigned_to_id if lead else None],
-        roles=[UserRole.ADMIN],
-        title="Installation complete",
-        message=f"Your {job.confirmed_capacity_kw} kW system has been installed and tested.",
-        link="/customer",
-    )
+    remaining_balance = round(max(0.0, order.total_amount - order.paid_amount), 2) if order else 0.0
+    if remaining_balance > 0.01:
+        events.emit(
+            db, "job.completed", {"job_id": job.id, "order_id": job.order_id},
+            user_ids=[order.customer.user_id if order else None],
+            roles=[UserRole.ADMIN],
+            title="Installation Confirmed — Final 50% Payment Due",
+            message=f"Technician {current_user.full_name} has verified installation of your {job.confirmed_capacity_kw} kW system! Please pay the remaining 50% balance (₹{remaining_balance:,.2f}) to receive your final full payment tax invoice.",
+            link="/customer",
+            category="Orders",
+            notify_user_ids=[order.customer.user_id] if (order and order.customer) else [],
+        )
+    else:
+        events.emit(
+            db, "job.completed", {"job_id": job.id, "order_id": job.order_id},
+            user_ids=[order.customer.user_id if order else None, lead.assigned_to_id if lead else None],
+            roles=[UserRole.ADMIN],
+            title="Installation complete",
+            message=f"Your {job.confirmed_capacity_kw} kW system has been installed and tested.",
+            link="/customer",
+            category="Orders",
+            notify_user_ids=[order.customer.user_id] if (order and order.customer) else [],
+        )
 
     db.commit()
     db.refresh(job)

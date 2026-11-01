@@ -476,13 +476,26 @@ def accept_customer_quote(
         )
         db.refresh(order)
 
+    # Confirm the order with advance payment (auto-generates 50% Advance Invoice, warehouse pick list, and installation job)
+    if order.status == OrderStatus.DRAFT:
+        order = order_service.confirm_order(db, order.id, current_user.id, require_payment=True)
+        db.refresh(order)
+
+    advance_inv = order.advance_invoice or order.invoice
+
     return {
-        "message": f"Quote {quote.quote_number} accepted! 50% Advance Booking of ₹{advance_amount:,.2f} recorded.",
+        "message": f"Quote {quote.quote_number} accepted! 50% Advance Booking of ₹{advance_amount:,.2f} recorded and Advance Invoice {advance_inv.invoice_number if advance_inv else ''} issued.",
         "order_id": order.id,
         "order_number": order.order_number,
         "status": order.status.value,
         "advance_paid": advance_amount,
         "remaining_balance": round(order.total_amount - order.paid_amount, 2),
+        "invoice": {
+            "id": advance_inv.id,
+            "invoice_number": advance_inv.invoice_number,
+            "total_amount": advance_inv.total_amount,
+            "status": advance_inv.status.value,
+        } if advance_inv else None,
     }
 
 
@@ -584,6 +597,18 @@ def get_customer_orders(
             "created_at": o.created_at.strftime("%Y-%m-%d"),
             "delivery_date": o.delivered_at.strftime("%Y-%m-%d") if o.delivered_at else None,
             "payments": payments,
+            "advance_invoice": {
+                "id": o.advance_invoice.id,
+                "invoice_number": o.advance_invoice.invoice_number,
+                "total_amount": o.advance_invoice.total_amount,
+                "status": o.advance_invoice.status.value,
+            } if o.advance_invoice else None,
+            "final_invoice": {
+                "id": o.final_invoice.id,
+                "invoice_number": o.final_invoice.invoice_number,
+                "total_amount": o.final_invoice.total_amount,
+                "status": o.final_invoice.status.value,
+            } if o.final_invoice else None,
             "invoice": {
                 "id": o.invoice.id,
                 "invoice_number": o.invoice.invoice_number,

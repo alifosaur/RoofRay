@@ -163,8 +163,13 @@ def generate_invoice_pdf(invoice) -> bytes:
     doc = SimpleDocTemplate(buf, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
     styles = getSampleStyleSheet()
     cust = invoice.customer
+    is_adv = "ADV" in (invoice.invoice_number or "")
+    is_final = "FINAL" in (invoice.invoice_number or "") or (invoice.order and invoice.total_amount >= invoice.order.total_amount - 0.01)
+
+    inv_title_suffix = "Advance Payment Invoice (50%)" if is_adv else ("Final Tax Invoice (Full Payment)" if is_final else "Tax Invoice")
+
     story = [
-        Paragraph(f"{settings.PROJECT_NAME} — Tax Invoice", styles["Title"]),
+        Paragraph(f"{settings.PROJECT_NAME} — {inv_title_suffix}", styles["Title"]),
         Paragraph(settings.COMPANY_CONTACT_LINE, styles["Normal"]),
         Spacer(1, 10),
         Paragraph(
@@ -182,10 +187,20 @@ def generate_invoice_pdf(invoice) -> bytes:
     rows += [
         ["", "", "Subtotal", f"{invoice.subtotal:,.2f}"],
         ["", "", "Tax", f"{invoice.tax_amount:,.2f}"],
-        ["", "", "Total", f"{invoice.total_amount:,.2f}"],
+        ["", "", "Total Amount", f"{invoice.total_amount:,.2f}"],
     ]
     if invoice.order:
-        rows.append(["", "", "Paid", f"{invoice.order.paid_amount:,.2f}"])
+        if is_adv:
+            rows.append(["", "", "Advance Paid (50%)", f"{invoice.total_amount:,.2f}"])
+            rows.append(["", "", "Remaining on Completion", f"{invoice.order.total_amount - invoice.total_amount:,.2f}"])
+        elif is_final and invoice.order.paid_amount >= invoice.order.total_amount - 0.01:
+            adv_part = round(invoice.order.total_amount * 0.5, 2)
+            fin_part = round(invoice.order.total_amount - adv_part, 2)
+            rows.append(["", "", "50% Advance Settled", f"{adv_part:,.2f}"])
+            rows.append(["", "", "50% Final Settled", f"{fin_part:,.2f}"])
+            rows.append(["", "", "Balance Due", "0.00 (PAID IN FULL)"])
+        else:
+            rows.append(["", "", "Paid", f"{invoice.order.paid_amount:,.2f}"])
     t = Table(rows, colWidths=[300, 50, 100, 100], repeatRows=1)
     t.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#714B67")),

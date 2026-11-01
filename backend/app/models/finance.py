@@ -53,7 +53,7 @@ class Invoice(Base):
 
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
-    order = relationship("Order", back_populates="invoice")
+    order = relationship("Order", back_populates="invoices", foreign_keys=[order_id])
     ticket = relationship("Ticket", back_populates="repair_invoice")
     customer = relationship("Customer")
     lines = relationship("InvoiceLine", back_populates="invoice", cascade="all, delete-orphan")

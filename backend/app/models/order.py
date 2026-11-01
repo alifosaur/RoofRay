@@ -43,8 +43,35 @@ class Order(Base):
     pick_list = relationship("PickList", back_populates="order", uselist=False)
     serial_items = relationship("SerialItem", back_populates="order")
     installation_job = relationship("InstallationJob", back_populates="order", uselist=False)
-    invoice = relationship("Invoice", back_populates="order", uselist=False)
+    invoices = relationship("Invoice", back_populates="order", cascade="all, delete-orphan", foreign_keys="[Invoice.order_id]")
     subsidy_record = relationship("SubsidyRecord", back_populates="order", uselist=False)
+
+    @property
+    def invoice(self):
+        if not self.invoices:
+            return None
+        for inv in self.invoices:
+            if "FINAL" in inv.invoice_number or inv.total_amount >= self.total_amount - 0.01:
+                return inv
+        return self.invoices[0]
+
+    @property
+    def advance_invoice(self):
+        if not self.invoices:
+            return None
+        for inv in self.invoices:
+            if "ADV" in inv.invoice_number:
+                return inv
+        return None
+
+    @property
+    def final_invoice(self):
+        if not self.invoices:
+            return None
+        for inv in self.invoices:
+            if "FINAL" in inv.invoice_number or inv.total_amount >= self.total_amount - 0.01:
+                return inv
+        return None
 
     @property
     def invoice_id(self):

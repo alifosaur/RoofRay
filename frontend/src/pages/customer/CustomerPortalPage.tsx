@@ -92,6 +92,18 @@ interface OrderData {
     total_amount: number;
     status: string;
   } | null;
+  advance_invoice?: {
+    id: number;
+    invoice_number: string;
+    total_amount: number;
+    status: string;
+  } | null;
+  final_invoice?: {
+    id: number;
+    invoice_number: string;
+    total_amount: number;
+    status: string;
+  } | null;
 }
 
 interface SubsidyRecord {
@@ -137,6 +149,7 @@ const InvoiceReceiptAnimation: React.FC<{
   const [animKey, setAnimKey] = useState(0);
   const [isPrinting, setIsPrinting] = useState(false);
   const today = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  const isAdv = invoiceNumber.includes('ADV');
   const formattedTotal = Math.round(totalAmount).toLocaleString('en-IN');
   const formattedSubtotal = Math.round(totalAmount * 0.88).toLocaleString('en-IN');
   const formattedGst = Math.round(totalAmount * 0.12).toLocaleString('en-IN');
@@ -222,7 +235,7 @@ const InvoiceReceiptAnimation: React.FC<{
                 ROOFRAY SOLUTIONS
               </text>
               <text x="130" y="38" textAnchor="middle" fontSize="8.5" fontWeight="600" fill="#6B7280" letterSpacing="1">
-                OFFICIAL TAX INVOICE
+                {isAdv ? 'ADVANCE BOOKING INVOICE (50%)' : 'OFFICIAL TAX INVOICE'}
               </text>
               <line x1="18" y1="48" x2="242" y2="48" stroke="#D1D5DB" strokeDasharray="3,3" strokeWidth="1" />
 
@@ -263,7 +276,7 @@ const InvoiceReceiptAnimation: React.FC<{
 
               {/* Total Paid */}
               <text x="22" y="162" fontSize="11" fontWeight="800" fill="#111827">
-                TOTAL PAID (100%)
+                {isAdv ? 'ADVANCE PAID (50%)' : 'TOTAL PAID (100%)'}
               </text>
               <text x="238" y="162" textAnchor="end" fontSize="13" fontWeight="900" fill="#047857">
                 ₹{formattedTotal}
@@ -273,7 +286,7 @@ const InvoiceReceiptAnimation: React.FC<{
               <g transform="translate(24, 178)">
                 <rect x="0" y="0" width="212" height="30" rx="6" fill="#ECFDF5" stroke="#059669" strokeWidth="1.5" strokeDasharray="4,2" />
                 <text x="106" y="19" textAnchor="middle" fontSize="11" fontWeight="900" fill="#059669" letterSpacing="0.8">
-                  ✓ PAID IN FULL · SETTLED
+                  {isAdv ? '✓ 50% ADVANCE BOOKED' : '✓ PAID IN FULL · SETTLED'}
                 </text>
               </g>
 
@@ -571,6 +584,14 @@ export const CustomerPortalPage: React.FC = () => {
       const res = await api.post<any>(`/customer/quotes/${quoteId}/accept`);
       setNoticeMessage(res.message || 'Quote accepted and 50% advance recorded!');
       await loadData();
+      if (res.invoice) {
+        setInvoiceModalData({
+          invoiceNumber: res.invoice.invoice_number,
+          invoiceId: res.invoice.id,
+          totalAmount: res.invoice.total_amount,
+          orderNumber: res.order_number,
+        });
+      }
       setActiveTab('tracker');
     } catch (err: any) {
       alert(err.message || 'Failed to accept quote');
@@ -1404,6 +1425,11 @@ export const CustomerPortalPage: React.FC = () => {
                     <li key={inv.id} className="py-2.5 flex items-center justify-between border-b border-gray-100 last:border-0">
                       <div>
                         <span className="font-mono font-bold text-gray-900">{inv.invoice_number}</span>
+                        {inv.invoice_number?.includes('ADV') ? (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 ml-2">50% Advance</span>
+                        ) : inv.invoice_number?.includes('FINAL') ? (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 ml-2">100% Full Payment</span>
+                        ) : null}
                         <span className="text-[11px] text-gray-400 ml-2">Due in 15 days</span>
                       </div>
                       <div className="flex items-center gap-3">
@@ -1603,8 +1629,38 @@ export const CustomerPortalPage: React.FC = () => {
                           )}
                         </div>
 
-                        <div className="flex items-center gap-2">
-                          {o.invoice && (
+                        <div className="flex flex-wrap items-center gap-2">
+                          {o.advance_invoice && (
+                            <button
+                              type="button"
+                              onClick={() => setInvoiceModalData({
+                                invoiceNumber: o.advance_invoice!.invoice_number,
+                                invoiceId: o.advance_invoice!.id,
+                                totalAmount: o.advance_invoice!.total_amount,
+                                orderNumber: o.order_number,
+                              })}
+                              className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 rounded text-xs font-bold flex items-center gap-1.5 shadow-2xs"
+                            >
+                              <i className="fa-solid fa-file-invoice text-blue-600"></i>
+                              <span>50% Advance Invoice</span>
+                            </button>
+                          )}
+                          {o.final_invoice && (
+                            <button
+                              type="button"
+                              onClick={() => setInvoiceModalData({
+                                invoiceNumber: o.final_invoice!.invoice_number,
+                                invoiceId: o.final_invoice!.id,
+                                totalAmount: o.final_invoice!.total_amount,
+                                orderNumber: o.order_number,
+                              })}
+                              className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded text-xs font-bold flex items-center gap-1.5 shadow-2xs"
+                            >
+                              <i className="fa-solid fa-file-invoice-dollar text-emerald-600"></i>
+                              <span>Final Invoice (Full Payment)</span>
+                            </button>
+                          )}
+                          {!o.advance_invoice && !o.final_invoice && o.invoice && (
                             <button
                               type="button"
                               onClick={() => setInvoiceModalData({
@@ -2236,17 +2292,25 @@ export const CustomerPortalPage: React.FC = () => {
         </div>
       )}
 
-      {/* FULL PAYMENT INVOICE GENERATION LOTTIE MODAL */}
-      {invoiceModalData && (
+      {/* FULL / ADVANCE PAYMENT INVOICE GENERATION LOTTIE MODAL */}
+      {invoiceModalData && (() => {
+        const isAdv = invoiceModalData.invoiceNumber.includes('ADV');
+        return (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-purple-100 overflow-hidden animate-in fade-in zoom-in duration-200">
             {/* Header banner */}
             <div className="bg-gradient-to-r from-[#714B67] to-[#8A5D7C] text-white p-5 text-center relative">
               <span className="inline-block px-3 py-1 bg-white/20 rounded-full text-[11px] font-bold tracking-wider uppercase mb-1">
-                Official Tax Invoice Generated
+                {isAdv ? '50% Advance Booking Invoice' : 'Official Tax Invoice Generated'}
               </span>
-              <h3 className="text-xl font-extrabold tracking-tight">Full Payment Settled!</h3>
-              <p className="text-xs text-purple-100 mt-1">Order #{invoiceModalData.orderNumber} is 100% cleared.</p>
+              <h3 className="text-xl font-extrabold tracking-tight">
+                {isAdv ? '50% Advance Booking Paid!' : 'Full Payment Settled!'}
+              </h3>
+              <p className="text-xs text-purple-100 mt-1">
+                {isAdv
+                  ? `Order #${invoiceModalData.orderNumber} 50% advance booking is confirmed.`
+                  : `Order #${invoiceModalData.orderNumber} is 100% cleared and settled.`}
+              </p>
               <button
                 type="button"
                 onClick={() => setInvoiceModalData(null)}
@@ -2273,16 +2337,20 @@ export const CustomerPortalPage: React.FC = () => {
                   <span className="font-mono font-bold text-gray-900">{invoiceModalData.invoiceNumber}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-500">Total Settled:</span>
+                  <span className="text-gray-500">{isAdv ? 'Advance Settled (50%):' : 'Total Settled:'}</span>
                   <strong className="text-emerald-700 font-bold text-sm">₹{Math.round(invoiceModalData.totalAmount).toLocaleString('en-IN')}</strong>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-gray-500">Payment Status:</span>
-                  <span className="font-semibold text-emerald-700">PAID IN FULL (100%)</span>
+                  <span className="font-semibold text-emerald-700">
+                    {isAdv ? 'PAID (50% Advance Booking)' : 'PAID IN FULL (100%)'}
+                  </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-500">Warranty Coverage:</span>
-                  <span className="font-semibold text-gray-800">20-Year Active Guarantee</span>
+                  <span className="text-gray-500">{isAdv ? 'Next Milestone:' : 'Warranty Coverage:'}</span>
+                  <span className="font-semibold text-gray-800">
+                    {isAdv ? 'Warehouse Dispatch & Installation' : '20-Year Active Guarantee'}
+                  </span>
                 </div>
               </div>
 
@@ -2297,7 +2365,7 @@ export const CustomerPortalPage: React.FC = () => {
                   className="w-full py-3 px-4 bg-[#714B67] hover:bg-[#5C3C54] text-white font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-2 transition-transform active:scale-[0.98]"
                 >
                   <i className="fa-solid fa-file-arrow-down text-sm"></i>
-                  <span>Download Tax Invoice (PDF)</span>
+                  <span>{isAdv ? 'Download Advance Invoice (PDF)' : 'Download Full Tax Invoice (PDF)'}</span>
                 </button>
                 <button
                   type="button"
@@ -2310,7 +2378,8 @@ export const CustomerPortalPage: React.FC = () => {
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Reference Odoo Site Footer */}
       <SiteFooter />

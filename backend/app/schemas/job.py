@@ -85,6 +85,9 @@ class InstallationJobOut(BaseModel):
     status: JobStatus
     job_number: Optional[str] = None
     order_number: Optional[str] = None
+    technician_name: Optional[str] = None
+    technician_phone: Optional[str] = None
+    technician_email: Optional[str] = None
     customer_name: Optional[str] = None
     customer_phone: Optional[str] = None
     site_address: Optional[str] = None

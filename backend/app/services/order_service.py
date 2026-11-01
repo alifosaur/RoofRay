@@ -51,14 +51,24 @@ def confirm_order(db: Session, order_id: int, current_user_id: int, require_paym
 
     # 2. Automatically create an installation job on the crew schedule
     if not order.installation_job:
-        # Find available technician (round-robin or first active technician)
-        technician = db.query(User).filter(User.role == UserRole.TECHNICIAN, User.is_active == True).first()
-        tech_id = technician.id if technician else current_user_id
+        selected_tech_id = None
+        if order.quote and order.quote.lead and order.quote.lead.survey and order.quote.lead.survey.technician_id:
+            survey_tech = db.query(User).filter(
+                User.id == order.quote.lead.survey.technician_id,
+                User.role == UserRole.TECHNICIAN,
+                User.is_active == True,
+            ).first()
+            if survey_tech:
+                selected_tech_id = survey_tech.id
+
+        if not selected_tech_id:
+            technician = db.query(User).filter(User.role == UserRole.TECHNICIAN, User.is_active == True).first()
+            selected_tech_id = technician.id if technician else current_user_id
 
         scheduled_install_date = datetime.utcnow() + timedelta(days=5)
         install_job = InstallationJob(
             order_id=order.id,
-            technician_id=tech_id,
+            technician_id=selected_tech_id,
             scheduled_date=scheduled_install_date,
             status=JobStatus.SCHEDULED,
             notes=f"Installation job auto-created for Order {order.order_number}.",

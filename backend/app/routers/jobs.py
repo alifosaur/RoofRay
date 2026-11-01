@@ -27,7 +27,7 @@ def update_job(
     job_id: int,
     payload: JobUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.ADMIN, UserRole.SALES)),
+    current_user: User = Depends(require_role(UserRole.ADMIN, UserRole.SALES, UserRole.WAREHOUSE)),
 ):
     job = db.query(InstallationJob).filter(InstallationJob.id == job_id).first()
     if not job:

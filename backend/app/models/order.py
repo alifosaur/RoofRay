@@ -109,3 +109,19 @@ class Order(Base):
             parts = [p for p in (l.address, l.city, l.state, l.pincode) if p]
             return ", ".join(parts) if parts else l.address
         return None
+
+    @property
+    def technician_id(self):
+        if self.installation_job:
+            return self.installation_job.technician_id
+        if self.quote and self.quote.lead and self.quote.lead.survey:
+            return self.quote.lead.survey.technician_id
+        return None
+
+    @property
+    def technician_name(self):
+        if self.installation_job and self.installation_job.technician:
+            return self.installation_job.technician.full_name
+        if self.quote and self.quote.lead and self.quote.lead.survey and self.quote.lead.survey.technician:
+            return self.quote.lead.survey.technician.full_name
+        return None

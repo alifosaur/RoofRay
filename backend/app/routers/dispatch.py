@@ -37,6 +37,11 @@ from pydantic import BaseModel
 class StageUpdateRequest(BaseModel):
     status: Optional[OrderStatus] = None
     stage: Optional[str] = None
+    technician_id: Optional[int] = None
+
+
+class DeliverOrderRequest(BaseModel):
+    technician_id: Optional[int] = None
 
 
 @router.put("/orders/{order_id}/stage", response_model=OrderOut)
@@ -52,6 +57,7 @@ def advance_order_stage(
     Enforces dispatch gate (all serialized BOM units must be scanned).
     """
     target_status = status
+    tech_id = None
     if payload:
         if payload.status:
             target_status = payload.status
@@ -60,11 +66,12 @@ def advance_order_stage(
                 target_status = OrderStatus(payload.stage.upper())
             except ValueError:
                 pass
+        tech_id = payload.technician_id
 
     if not target_status:
         raise HTTPException(status_code=400, detail="Target stage/status required")
 
-    return dispatch_service.update_order_stage(db, order_id, target_status, current_user.id)
+    return dispatch_service.update_order_stage(db, order_id, target_status, current_user.id, technician_id=tech_id)
 
 
 @router.get("/lookup")
@@ -133,6 +140,7 @@ def scan_serial_to_order(
 @router.post("/orders/{order_id}/deliver", response_model=OrderOut)
 def deliver_order(
     order_id: int,
+    payload: Optional[DeliverOrderRequest] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role(UserRole.WAREHOUSE, UserRole.ADMIN)),
 ):
@@ -141,7 +149,8 @@ def deliver_order(
     GATE: Blocks delivery (HTTP 400) until every serialized BOM item has been scanned.
     AUTO-WARRANTY: Sets delivered_on = today and warranty_end = delivered_on + warranty_years.
     """
-    return dispatch_service.deliver_order(db, order_id, current_user.id)
+    tech_id = payload.technician_id if payload else None
+    return dispatch_service.deliver_order(db, order_id, current_user.id, technician_id=tech_id)
 
 
 

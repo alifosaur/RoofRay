@@ -79,3 +79,4 @@ def seed_technicians():
 
 if __name__ == "__main__":
     seed_technicians()
+

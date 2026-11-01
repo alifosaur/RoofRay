@@ -88,6 +88,18 @@ class InstallationJob(Base):
     def order_number(self) -> str:
         return self.order.order_number if self.order else ""
 
+    @property
+    def technician_name(self):
+        return self.technician.full_name if self.technician else None
+
+    @property
+    def technician_phone(self):
+        return self.technician.phone if self.technician else None
+
+    @property
+    def technician_email(self):
+        return self.technician.email if self.technician else None
+
 
 class JobPhoto(Base):
     __tablename__ = "job_photos"

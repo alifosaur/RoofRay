@@ -22,7 +22,7 @@ router = APIRouter(prefix="/users", tags=["Users"])
 def list_users(
     role: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.ADMIN, UserRole.SALES)),
+    current_user: User = Depends(require_role(UserRole.ADMIN, UserRole.SALES, UserRole.WAREHOUSE)),
 ):
     query = db.query(User)
     if role:
@@ -122,7 +122,7 @@ def technician_availability(
     start: Optional[date] = None,
     days: int = 7,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.ADMIN, UserRole.SALES)),
+    current_user: User = Depends(require_role(UserRole.ADMIN, UserRole.SALES, UserRole.WAREHOUSE)),
 ):
     """Calendar view for assigning surveys: all technicians are free and ready for assignment."""
     start = start or date.today()

@@ -1,4 +1,5 @@
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
+from typing import Optional
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -6,6 +7,8 @@ from app.models.serial import SerialItem, SerialStatus
 from app.models.product import Product
 from app.models.order import Order, OrderStatus
 from app.models.audit import AuditLog
+from app.models.job import InstallationJob, JobStatus
+from app.models.user import User, UserRole
 from app.schemas.serial import SerialItemRegister, SerialScanRequest
 from sqlalchemy.exc import IntegrityError
 from app.core import cache, events
@@ -162,7 +165,12 @@ def _scan(db: Session, order_id: int, clean_serial: str, current_user_id: int) -
     return serial_item
 
 
-def deliver_order(db: Session, order_id: int, current_user_id: int) -> Order:
+def deliver_order(
+    db: Session,
+    order_id: int,
+    current_user_id: int,
+    technician_id: Optional[int] = None,
+) -> Order:
     order = db.query(Order).filter(Order.id == order_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
@@ -202,55 +210,101 @@ def deliver_order(db: Session, order_id: int, current_user_id: int) -> Order:
     ))
     _stage_event(db, order, OrderStatus.DELIVERED)
 
-    # Release the installation job to its technician
+    # Resolve target technician: explicit technician_id -> survey technician -> existing job technician -> first active technician
+    target_tech_id = technician_id
+    if not target_tech_id:
+        if order.quote and order.quote.lead and order.quote.lead.survey and order.quote.lead.survey.technician_id:
+            survey_tech = db.query(User).filter(
+                User.id == order.quote.lead.survey.technician_id,
+                User.role == UserRole.TECHNICIAN,
+                User.is_active == True,
+            ).first()
+            if survey_tech:
+                target_tech_id = survey_tech.id
+
+    if not target_tech_id and order.installation_job:
+        target_tech_id = order.installation_job.technician_id
+
+    if not target_tech_id:
+        default_tech = db.query(User).filter(User.role == UserRole.TECHNICIAN, User.is_active == True).first()
+        target_tech_id = default_tech.id if default_tech else current_user_id
+
+    # Create or update installation job assigned to the selected technician
     job = order.installation_job
-    if job:
-        events.emit(
-            db, "job.released", {"job_id": job.id, "order_id": order.id},
-            user_ids=[job.technician_id],
-            roles=[UserRole.ADMIN],
-            title="Installation job ready",
-            message=f"Materials delivered for {order.customer.name}. The installation job is now on your schedule.",
-            link="/technician",
-            category="Installation",
-            notify_user_ids=[job.technician_id],
+    if not job:
+        job = InstallationJob(
+            order_id=order.id,
+            technician_id=target_tech_id,
+            scheduled_date=datetime.utcnow() + timedelta(days=2),
+            status=JobStatus.SCHEDULED,
+            notes=f"Installation job auto-created on delivery for Order {order.order_number}.",
         )
-        from app.core import mailer
-        if job.technician and job.technician.email:
-            mailer.send_email(
-                job.technician.email,
-                f"Solar Installation Job Ready: Order #{order.order_number} — RoofRay",
-                (
-                    f"Hello {job.technician.full_name},\n\n"
-                    f"All hardware components for Order #{order.order_number} have been delivered to the customer site.\n\n"
-                    f"Customer: {order.customer.name}\n"
-                    f"Phone: {order.customer.phone}\n"
-                    f"Site Address: {order.customer.address}\n\n"
-                    f"Please complete mounting, wiring, power generation testing, and capture customer digital sign-off.\n"
-                    f"Portal: {settings.PUBLIC_APP_URL}/technician\n\n"
-                    f"Best regards,\nRoofRay Operations"
-                ),
-            )
-        if order.customer and order.customer.user and order.customer.user.email:
-            mailer.send_email(
-                order.customer.user.email,
-                f"Materials Delivered — Installation Technician {job.technician.full_name} Assigned — RoofRay",
-                (
-                    f"Hello {order.customer.name},\n\n"
-                    f"Your solar equipment has been safely delivered to your rooftop premises!\n\n"
-                    f"Assigned Lead Technician: {job.technician.full_name}\n"
-                    f"Technician Contact: {job.technician.phone or 'Contact RoofRay Support'}\n\n"
-                    f"Our technician {job.technician.full_name} will arrive on site to perform precision mounting, wiring, and commissioning.\n\n"
-                    f"Track installation progress: {settings.PUBLIC_APP_URL}/customer\n\n"
-                    f"Best regards,\nRoofRay Solutions Team"
-                ),
-            )
+        db.add(job)
+        db.flush()
+    else:
+        if target_tech_id and job.technician_id != target_tech_id:
+            job.technician_id = target_tech_id
+        if job.status == JobStatus.CANCELLED:
+            job.status = JobStatus.SCHEDULED
+        db.flush()
+
+    db.refresh(job)
+
+    # Release the installation job to its assigned technician
+    events.emit(
+        db, "job.released", {"job_id": job.id, "order_id": order.id, "technician_id": job.technician_id},
+        user_ids=[job.technician_id],
+        roles=[UserRole.ADMIN],
+        title="Installation job ready",
+        message=f"Materials delivered for {order.customer.name}. The installation job is now on your schedule.",
+        link="/technician",
+        category="Installation",
+        notify_user_ids=[job.technician_id],
+    )
+    from app.core import mailer
+    if job.technician and job.technician.email:
+        mailer.send_email(
+            job.technician.email,
+            f"Solar Installation Job Ready: Order #{order.order_number} — RoofRay",
+            (
+                f"Hello {job.technician.full_name},\n\n"
+                f"All hardware components for Order #{order.order_number} have been delivered to the customer site.\n\n"
+                f"Customer: {order.customer.name}\n"
+                f"Phone: {order.customer.phone}\n"
+                f"Site Address: {order.customer_address or order.customer.address}\n\n"
+                f"Please complete precision mounting, wiring, power generation testing, and capture customer digital sign-off.\n"
+                f"Portal: {settings.PUBLIC_APP_URL}/technician\n\n"
+                f"Best regards,\nRoofRay Operations"
+            ),
+        )
+    if order.customer and order.customer.user and order.customer.user.email:
+        tech_display_name = job.technician.full_name if job.technician else "Certified RoofRay Technician"
+        tech_contact = (job.technician.phone if job.technician else None) or "RoofRay Support"
+        mailer.send_email(
+            order.customer.user.email,
+            f"Materials Delivered — Installation Technician {tech_display_name} Assigned — RoofRay",
+            (
+                f"Hello {order.customer.name},\n\n"
+                f"Your solar equipment has been safely delivered to your rooftop premises!\n\n"
+                f"Assigned Lead Technician: {tech_display_name}\n"
+                f"Technician Contact: {tech_contact}\n\n"
+                f"Our technician {tech_display_name} will arrive on site to perform precision mounting, wiring, and commissioning.\n\n"
+                f"Track installation progress: {settings.PUBLIC_APP_URL}/customer\n\n"
+                f"Best regards,\nRoofRay Solutions Team"
+            ),
+        )
     db.commit()
     db.refresh(order)
     return order
 
 
-def update_order_stage(db: Session, order_id: int, new_status: OrderStatus, current_user_id: int) -> Order:
+def update_order_stage(
+    db: Session,
+    order_id: int,
+    new_status: OrderStatus,
+    current_user_id: int,
+    technician_id: Optional[int] = None,
+) -> Order:
     """Strict fulfilment sequence: CONFIRMED → PACKING → PACKED → DISPATCHED → OUT_FOR_DELIVERY → DELIVERED."""
     order = db.query(Order).filter(Order.id == order_id).first()
     if not order:
@@ -262,7 +316,7 @@ def update_order_stage(db: Session, order_id: int, new_status: OrderStatus, curr
         raise HTTPException(status_code=400, detail=f"Next stage for this order is {expected.value}, not {new_status.value}")
 
     if new_status == OrderStatus.DELIVERED:
-        return deliver_order(db, order_id, current_user_id)
+        return deliver_order(db, order_id, current_user_id, technician_id=technician_id)
     if new_status == OrderStatus.PACKED:
         from app.services import inventory_service
         inventory_service.pack_pick_list(db, order.pick_list.id, current_user_id)

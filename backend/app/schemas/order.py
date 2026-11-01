@@ -45,5 +45,7 @@ class OrderOut(BaseModel):
     customer_address: Optional[str] = None
     capacity_kw: Optional[float] = None
     system_type: Optional[str] = None
+    technician_id: Optional[int] = None
+    technician_name: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)

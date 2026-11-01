@@ -11,6 +11,8 @@ import {
   faCheckCircle,
   faShieldAlt,
   faExclamationTriangle,
+  faTools,
+  faUserCheck,
 } from '@fortawesome/free-solid-svg-icons';
 
 // Strict fulfilment sequence (the backend enforces it; PACKED and DELIVERED also require every serial scanned)
@@ -36,6 +38,10 @@ export const DispatchPage: React.FC = () => {
   const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isDelivering, setIsDelivering] = useState(false);
 
+  // Field technicians list for assigned installation jobs
+  const [technicians, setTechnicians] = useState<any[]>([]);
+  const [selectedTechnicianId, setSelectedTechnicianId] = useState<number | null>(null);
+
   const scannerRef = useRef<Html5QrcodeScanner | null>(null);
 
   const [activeWarehouseTab, setActiveWarehouseTab] = useState<'fulfillment' | 'lookup'>('fulfillment');
@@ -43,9 +49,20 @@ export const DispatchPage: React.FC = () => {
   const [lookupResults, setLookupResults] = useState<any[]>([]);
   const [lookupLoading, setLookupLoading] = useState(false);
 
+  const fetchTechnicians = async () => {
+    try {
+      const data = await api.get<any>('/users/technicians/availability');
+      const list = data?.technicians || [];
+      setTechnicians(list);
+    } catch (e) {
+      console.warn('Could not load technicians', e);
+    }
+  };
+
   const fetchOrdersAndProducts = async () => {
     try {
       setLoading(true);
+      fetchTechnicians();
       const [allOrders, stockProducts] = await Promise.all([
         api.get<any[]>('/orders'),
         api.get<any[]>('/inventory/stock'),
@@ -78,10 +95,18 @@ export const DispatchPage: React.FC = () => {
     setIsDelivering(true);
     setActionMessage(null);
     try {
-      await api.put(`/dispatch/orders/${selectedOrderId}/stage`, { stage: newStage });
+      const payload: any = { stage: newStage };
+      if (newStage === 'DELIVERED' && selectedTechnicianId) {
+        payload.technician_id = selectedTechnicianId;
+      }
+      await api.put(`/dispatch/orders/${selectedOrderId}/stage`, payload);
+      const assignedTech = technicians.find((t) => (t.technician_id || t.id) === selectedTechnicianId);
       setActionMessage({
         type: 'success',
-        text: `Order stage updated to ${newStage.replace(/_/g, ' ')}!`,
+        text:
+          newStage === 'DELIVERED'
+            ? `Order stage updated to DELIVERED! Assigned & released to technician ${assignedTech ? assignedTech.name : 'selected crew'}.`
+            : `Order stage updated to ${newStage.replace(/_/g, ' ')}!`,
       });
       await fetchOrdersAndProducts();
       await fetchOrderDetails(selectedOrderId);
@@ -116,6 +141,9 @@ export const DispatchPage: React.FC = () => {
         api.get<any[]>(`/dispatch/serials?order_id=${orderId}`),
       ]);
       setSelectedOrder(orderData);
+      if (orderData?.technician_id) {
+        setSelectedTechnicianId(orderData.technician_id);
+      }
       setScannedItems(serialsData || []);
       setPickList(orderData.pick_list_id ? await api.get<any>(`/inventory/pick-lists/${orderData.pick_list_id}`) : null);
     } catch (err) {
@@ -234,10 +262,15 @@ export const DispatchPage: React.FC = () => {
     try {
       setIsDelivering(true);
       setActionMessage(null);
-      const updated = await api.post<any>(`/dispatch/orders/${selectedOrderId}/deliver`);
+      const payload: any = {};
+      if (selectedTechnicianId) {
+        payload.technician_id = selectedTechnicianId;
+      }
+      const updated = await api.post<any>(`/dispatch/orders/${selectedOrderId}/deliver`, payload);
+      const assignedTech = technicians.find((t) => (t.technician_id || t.id) === selectedTechnicianId);
       setActionMessage({
         type: 'success',
-        text: `Order ${updated.order_number} marked DELIVERED! All serial warranties initialized.`,
+        text: `Order ${updated.order_number} marked DELIVERED! Warranties initialized & assigned to technician ${assignedTech ? assignedTech.name : 'selected crew'}.`,
       });
       fetchOrdersAndProducts();
       fetchOrderDetails(selectedOrderId);
@@ -315,6 +348,12 @@ export const DispatchPage: React.FC = () => {
                     <div className="text-gray-500 mt-1">
                       {o.customer_name || `Customer #${o.customer_id}`}{o.capacity_kw ? ` • ${o.capacity_kw} kW ${o.system_type || ''}` : ''}
                     </div>
+                    {o.technician_name && (
+                      <div className="text-[11px] text-[#714B67] font-semibold mt-0.5 flex items-center gap-1">
+                        <FontAwesomeIcon icon={faTools} className="text-[10px]" />
+                        <span>Tech: {o.technician_name}</span>
+                      </div>
+                    )}
                     <div className="text-odoo-primary font-semibold mt-1">
                       ₹{o.total_amount?.toLocaleString()}
                     </div>
@@ -349,6 +388,53 @@ export const DispatchPage: React.FC = () => {
                         <span>{NEXT_STAGE[selectedOrder.status].label}</span>
                       </button>
                     )}
+                  </div>
+                </div>
+
+                {/* Assigned Field Technician Selector */}
+                <div className="mb-5 p-3.5 bg-gradient-to-r from-purple-50/70 via-indigo-50/40 to-white border border-purple-200/90 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-2xs">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-purple-100 text-[#714B67] flex items-center justify-center font-bold text-sm shadow-2xs shrink-0">
+                      <FontAwesomeIcon icon={faTools} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">
+                          Assigned Installation Technician
+                        </span>
+                        <span className="bg-emerald-100 text-emerald-800 text-[10px] font-semibold px-2 py-0.5 rounded-full">
+                          Free · Ready to Assign
+                        </span>
+                      </div>
+                      <div className="font-semibold text-gray-900 mt-0.5 text-xs">
+                        {selectedOrder?.technician_name ? (
+                          <span>
+                            Selected: <strong className="text-[#714B67] font-bold">{selectedOrder.technician_name}</strong> · Job auto-releases upon delivery completion
+                          </span>
+                        ) : (
+                          <span className="text-gray-600">
+                            Select certified technician to receive installation job on delivery completion
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={selectedTechnicianId || ''}
+                      onChange={(e) => setSelectedTechnicianId(Number(e.target.value))}
+                      className="bg-white border border-gray-300 rounded-md px-3 py-1.5 text-xs font-bold text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#714B67] focus:border-[#714B67] shadow-2xs"
+                    >
+                      <option value="" disabled>-- Select Certified Technician --</option>
+                      {technicians.map((t) => {
+                        const tId = t.technician_id || t.id;
+                        return (
+                          <option key={tId} value={tId}>
+                            {t.name || t.full_name} {t.phone ? `(${t.phone})` : ''} — Free
+                          </option>
+                        );
+                      })}
+                    </select>
                   </div>
                 </div>
 
